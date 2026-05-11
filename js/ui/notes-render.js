@@ -1,0 +1,739 @@
+// Extracted from js/ui/render.js. Keeps the original object API while making notes maintainable.
+const RenderNotes = {
+  showNotes() {
+    const modal = document.getElementById('notes-modal');
+    const content = document.getElementById('notes-content');
+    if (!modal || !content) return;
+    content.innerHTML = '';
+
+    const totalNotes = Object.values(G.notes || {}).reduce((sum, entries) => sum + entries.length, 0);
+    const notesCountEl = document.getElementById('notes-count');
+    if (notesCountEl) notesCountEl.textContent = totalNotes > 0 ? `[${totalNotes}]` : '';
+
+    const tabs = document.createElement('div');
+    tabs.className = 'notes-tabs';
+
+    const relicTab = this._createNotesTab('聖物筆記', true);
+    const terrainTab = this._createNotesTab('地形情報');
+    const equipmentTab = this._createNotesTab('武器裝備');
+    const rulesTab = this._createNotesTab('規則索引');
+    tabs.append(relicTab, terrainTab, equipmentTab, rulesTab);
+    content.appendChild(tabs);
+
+    const area = document.createElement('div');
+    area.className = 'notes-area';
+    content.appendChild(area);
+
+    const showTab = (activeTab, render) => {
+      for (const tab of [relicTab, terrainTab, equipmentTab, rulesTab]) {
+        tab.classList.toggle('active', tab === activeTab);
+      }
+      area.innerHTML = '';
+      render.call(this, area);
+    };
+
+    relicTab.addEventListener('click', () => showTab(relicTab, this._renderRelicNotesGrid));
+    terrainTab.addEventListener('click', () => showTab(terrainTab, this._renderTerrainNotes));
+    equipmentTab.addEventListener('click', () => showTab(equipmentTab, this._renderEquipmentNotes));
+    rulesTab.addEventListener('click', () => showTab(rulesTab, this._renderRulesNotes));
+    showTab(relicTab, this._renderRelicNotesGrid);
+
+    const libraryRelics = (G.library || []).filter(relic => relic?.effect?.type !== 'unlock_library');
+    if (G.libraryUnlocked && libraryRelics.length > 0) {
+      const libSection = document.createElement('div');
+      libSection.id = 'library-section';
+      libSection.innerHTML = `<h4 style="color:var(--accent);margin:14px 0 8px">聖物庫（${libraryRelics.length}）</h4>`;
+      for (const relic of libraryRelics) {
+        const display = this._relicDisplay(relic);
+        const item = document.createElement('div');
+        item.className = 'library-relic';
+        item.innerHTML = `${display.icon} <span class="relic-name">${display.name}</span> <span class="relic-holder">${display.desc}</span>`;
+        libSection.appendChild(item);
+      }
+      content.appendChild(libSection);
+    }
+
+    modal.classList.remove('hidden');
+  },
+
+  _createNotesTab(label, active = false) {
+    const tab = document.createElement('button');
+    tab.className = `notes-tab${active ? ' active' : ''}`;
+    tab.textContent = label;
+    return tab;
+  },
+
+  _renderEquipmentNotes(container) {
+    const weapons = typeof WEAPONS !== 'undefined' ? this._orderedWeaponNotes(WEAPONS) : [];
+    const sections = [
+      { title: '武器', items: weapons, display: item => this._weaponDisplay(item) },
+      { title: '裝備', items: typeof GEARS !== 'undefined' ? GEARS : [], display: item => this._gearDisplay(item) },
+      { title: '消耗品', items: typeof EQUIPMENT !== 'undefined' ? EQUIPMENT : [], display: item => this._itemDisplay(item) },
+    ];
+
+    for (const section of sections) {
+      const group = document.createElement('details');
+      group.className = 'equipment-note-group';
+      group.open = true;
+
+      const summary = document.createElement('summary');
+      summary.className = 'equipment-note-title';
+      summary.innerHTML = `<span class="equipment-note-title-text">${section.title}<em>（${section.items.length}）</em></span>`;
+      group.appendChild(summary);
+
+      const list = document.createElement('div');
+      list.className = 'equipment-note-list';
+
+      for (const item of section.items) {
+        const display = section.display(item);
+        const tags = [
+          item.tier && item.tier > 1 ? `進階 ${item.tier}` : '',
+          item.minDay ? `第 ${item.minDay} 天後` : '',
+        ].filter(Boolean);
+
+        const entry = document.createElement('div');
+        entry.className = 'equipment-note-entry';
+        entry.innerHTML = `
+          <div class="equipment-note-head">
+            <span class="equipment-note-icon">${display.icon}</span>
+            <span class="equipment-note-name">${display.name}</span>
+            ${tags.map(tag => `<span class="equipment-note-tag">${tag}</span>`).join('')}
+          </div>
+          <div class="equipment-note-desc">${display.desc}</div>
+        `;
+        list.appendChild(entry);
+      }
+
+      if (section.items.length === 0) {
+        const empty = document.createElement('p');
+        empty.className = 'notes-empty';
+        empty.textContent = `尚無${section.title}資料。`;
+        list.appendChild(empty);
+      }
+
+      group.appendChild(list);
+      container.appendChild(group);
+    }
+  },
+
+  _renderRulesNotes(container) {
+    const sections = [
+      {
+        title: '骰子與傷害',
+        items: [
+          ['攻擊骰', '攻擊時擲骰，最終骰面會加上角色攻擊與各種加成後計算傷害。'],
+          ['自然骰與最終骰', '自然骰是原始骰面；最終骰是保底、道具、聖物或共鳴調整後用來計算的骰面。'],
+          ['最終傷害', '最終傷害會先套用武器、裝備、聖物與共鳴加成，再處理格檔、減傷與固定傷害。'],
+          ['傷害向下取整', '百分比調整造成小數時向下取整；若規則寫最低值，會套用該最低值。'],
+        ],
+      },
+      {
+        title: '弱點與破綻',
+        items: [
+          ['原生弱點', '原生弱點代表敵人身上的穩定弱點。命中時會觸發武器、弓、匕首與部分共鳴效果。'],
+          ['破綻', '破綻只看最終骰面。基礎命中時傷害 +1，部分職業、聖物或共鳴會改變加成。'],
+          ['破綻刷新', '產生破綻時，會排除所有目前有效的原生弱點骰面；若沒有可用骰面，該次破綻生成無效。同來源再次產生時會刷新或覆蓋原本的破綻。'],
+          ['原生弱點刷新', '產生新的原生弱點時，只會避開其他原生弱點；破綻不會阻止原生弱點生成。若沒有可用骰面，該次原生弱點生成無效。'],
+          ['可疑弱點', '探索者主戰未命中原生弱點時會標記可疑弱點；之後若骰面與原生弱點差 1，可能消耗標記並轉為命中原生弱點。'],
+        ],
+      },
+      {
+        title: '傷口',
+        items: [
+          ['傷口層數', '每 1 層傷口會使敵人受到的傷害提高 5%，目前上限通常為 15 層。'],
+          ['傷口爆發', '部分武器、裝備或聖物會消耗或引爆傷口，造成額外固定傷害。'],
+          ['傷口流派', '痛苦面具、痛苦徽記、太刀與傷口裝備會圍繞傷口疊層、放大或爆發。'],
+        ],
+      },
+      {
+        title: '旗幟',
+        items: [
+          ['舉旗', '持有旗子聖物的角色主戰攻擊前，可以選擇要舉起哪一件旗，旗面會自動決定。新旗面會取代同一件旗目前的旗面。'],
+          ['執旗者判定', '執旗者舉旗以本次攻擊骰判定：1-2 失敗，3-4 為二階，5-6 為三階。'],
+          ['融合旗', '融合旗不會舉旗失敗。非執旗者舉起時直接二階；執旗者舉起時 1-4 二階，5-6 三階。'],
+          ['雙旗戰陣', '同一角色持有戰爭旗與鷹眼旗，且其中一面已融合時，可同時維持一面戰爭旗與一面鷹眼旗。'],
+        ],
+      },
+      {
+        title: '戰鬥節奏',
+        items: [
+          ['仇恨', '攻擊會提高角色仇恨，高傷害會額外增加。敵人攻擊後，被攻擊者仇恨會降低。'],
+          ['格檔', '格檔會先吸收受到的傷害。玩家與敵人的格檔分開計算。'],
+          ['戰鼓', '戰鼓會提供接下來幾次我方主戰攻擊加成，但持鼓者主戰時骰面附加傷害減半。'],
+        ],
+      },
+      {
+        title: '地圖與事件',
+        items: [
+          ['行動', '白天移動與探索會消耗行動。夜晚黑暗怪會追擊隊伍，黑夜結束今天時全隊會受到黑夜侵蝕。'],
+          ['休息點', '休息點可以恢復生命；使用過的休息點會依照規則重新變為可用。'],
+          ['神壇', '神壇每日可用一次。血祭需探索骰判定；融合聖物消耗 1 行動且必定成功。'],
+          ['藏寶圖', '藏寶圖會指引一處寶箱位置。黑暗怪不應吞掉已生成的寶箱獎勵。'],
+        ],
+      },
+    ];
+
+    for (const section of sections) {
+      const group = document.createElement('details');
+      group.className = 'equipment-note-group rules-note-group';
+      group.open = true;
+
+      const summary = document.createElement('summary');
+      summary.className = 'equipment-note-title';
+      summary.innerHTML = `<span class="equipment-note-title-text">${section.title}<em>（${section.items.length}）</em></span>`;
+      group.appendChild(summary);
+
+      const list = document.createElement('div');
+      list.className = 'equipment-note-list rules-note-list';
+      for (const [name, desc] of section.items) {
+        const entry = document.createElement('div');
+        entry.className = 'equipment-note-entry rules-note-entry';
+        entry.innerHTML = `
+          <div class="equipment-note-head"><span class="equipment-note-name">${name}</span></div>
+          <div class="equipment-note-desc">${desc}</div>
+        `;
+        list.appendChild(entry);
+      }
+
+      group.appendChild(list);
+      container.appendChild(group);
+    }
+  },
+
+  _orderedWeaponNotes(weapons) {
+    const result = [];
+    const used = new Set();
+    const byId = new Map((weapons || []).map(weapon => [weapon.id, weapon]));
+    const baseWeapons = (weapons || []).filter(weapon => (weapon.tier || 1) === 1);
+
+    for (const weapon of baseWeapons) {
+      result.push(weapon);
+      used.add(weapon.id);
+      const upgraded = weapon.upgradeTo ? byId.get(weapon.upgradeTo) : null;
+      if (upgraded) {
+        result.push(upgraded);
+        used.add(upgraded.id);
+      }
+    }
+
+    for (const weapon of weapons || []) {
+      if (!used.has(weapon.id)) result.push(weapon);
+    }
+
+    return result;
+  },
+
+  _renderRelicNotesGrid(container) {
+    const relics = typeof RELICS !== 'undefined' ? RELICS : [];
+    if (relics.length === 0) {
+      container.innerHTML = '<p class="notes-empty">尚無聖物資料。</p>';
+      return;
+    }
+
+    const grid = document.createElement('div');
+    grid.className = 'relic-note-grid';
+
+    for (const relic of relics) {
+      if (!relic?.id || relic.effect?.type === 'unlock_library') continue;
+      const display = this._relicDisplay(relic);
+      const total = display.lore.length;
+      const item = document.createElement('div');
+      item.className = 'relic-note-icon';
+      item.innerHTML = `
+        <span class="relic-note-emoji">${display.icon}</span>
+        <span class="relic-note-name">${display.name}</span>
+        <span class="relic-note-count">${total}/${total}</span>
+      `;
+      item.addEventListener('click', () => {
+        container.innerHTML = '';
+        this._renderRelicLoreDetail(container, relic);
+      });
+      grid.appendChild(item);
+    }
+
+    container.appendChild(grid);
+    this._renderRelicResonanceList(container);
+  },
+
+  _renderRelicResonanceList(container) {
+    const section = document.createElement('div');
+    section.className = 'relic-resonance-section';
+
+    const title = document.createElement('div');
+    title.className = 'relic-lore-title';
+    title.textContent = '聖物共鳴組合';
+    section.appendChild(title);
+
+    const grid = document.createElement('div');
+    grid.className = 'relic-note-grid resonance-note-grid';
+    for (const res of this._resonanceNotes()) {
+      const relicDisplays = (res.relics || []).map(id => this._relicDisplay(this._getRelicById(id) || { id }));
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'relic-note-icon resonance-note-icon';
+      item.innerHTML = `
+        <span class="relic-note-emoji">${relicDisplays.map(display => display.icon).join('')}</span>
+        <span class="relic-note-name">${res.name}</span>
+      `;
+      item.addEventListener('click', () => {
+        container.innerHTML = '';
+        this._renderRelicResonanceDetail(container, res);
+      });
+      grid.appendChild(item);
+    }
+    section.appendChild(grid);
+
+    container.appendChild(section);
+  },
+
+  _renderRelicResonanceDetail(container, res) {
+    const back = document.createElement('button');
+    back.className = 'btn-secondary btn-small notes-back-btn';
+    back.textContent = '返回';
+    back.addEventListener('click', () => {
+      container.innerHTML = '';
+      this._renderRelicNotesGrid(container);
+    });
+    container.appendChild(back);
+
+    const title = document.createElement('div');
+    title.className = 'relic-lore-title';
+    title.textContent = res.name;
+    container.appendChild(title);
+
+    const body = document.createElement('div');
+    body.className = 'resonance-detail-card';
+    body.innerHTML = `
+      <div class="resonance-detail-kicker">${res.desc}</div>
+      <div class="resonance-detail-effect">${res.body || '共鳴效果已啟動。'}</div>
+      ${res.detail?.length ? `<ul class="resonance-detail-list">${res.detail.map(line => `<li>${line}</li>`).join('')}</ul>` : ''}
+    `;
+    container.appendChild(body);
+
+    const pairTitle = document.createElement('div');
+    pairTitle.className = 'resonance-subtitle';
+    pairTitle.textContent = '配套聖物';
+    container.appendChild(pairTitle);
+
+    const pair = document.createElement('div');
+    pair.className = 'resonance-relic-pair';
+    const slots = this._resonanceRelicSlots(res);
+    for (const entry of slots) {
+      const relic = this._getRelicById(entry.id) || { id: entry.id };
+      const display = this._relicDisplay(relic);
+      const effectText = entry.slot === '融合聖物' ? (display.fusedDesc || display.desc) : display.desc;
+      const item = document.createElement('div');
+      item.className = 'resonance-relic-card';
+      item.innerHTML = `
+        <div class="resonance-relic-head">
+          <span class="equipment-note-icon">${display.icon}</span>
+          <span class="equipment-note-name">${display.name}</span>
+          <span class="equipment-note-tag">${entry.slot}</span>
+        </div>
+        <div class="equipment-note-desc">${effectText}</div>
+      `;
+      pair.appendChild(item);
+    }
+    container.appendChild(pair);
+
+    const related = this._resonanceRelatedRules(res.id);
+    if (related.length > 0) {
+      const ruleTitle = document.createElement('div');
+      ruleTitle.className = 'resonance-subtitle';
+      ruleTitle.textContent = '相關規則';
+      container.appendChild(ruleTitle);
+
+      const rules = document.createElement('div');
+      rules.className = 'resonance-related-rules';
+      for (const [name, desc] of related) {
+        const rule = document.createElement('div');
+        rule.className = 'resonance-rule-card';
+        rule.innerHTML = `<strong>${name}</strong><span>${desc}</span>`;
+        rules.appendChild(rule);
+      }
+      container.appendChild(rules);
+    }
+  },
+
+  _resonanceRelicSlots(res) {
+    const ids = res.relics || [];
+    if (res.id === 'dual_banner_formation') {
+      return ids.map(id => ({ id, slot: '其中一面融合' }));
+    }
+    return [
+      { id: ids[0], slot: '融合聖物' },
+      { id: ids[1], slot: '攜帶聖物' },
+    ].filter(entry => entry.id);
+  },
+
+  _resonanceRelatedRules(id) {
+    const rules = {
+      pain_resonance: [
+        ['傷口', '每層通常會使敵人受到傷害提高 5%；爆發共鳴的持有者攻擊時會忽略這個傷口增傷。'],
+        ['傷口引爆', '達到共鳴門檻後會消耗所有傷口，依層數造成固定傷害。'],
+      ],
+      pain_scar_resonance: [
+        ['傷口', '每層傷口通常會使敵人受到傷害提高 5%；折磨共鳴保留這個增傷，並在 6 層以上進一步放大持有者傷害。'],
+        ['多段攻擊', '多次命中能更快堆高傷口，也更容易吃到折磨的長線增傷。'],
+      ],
+      star_hunter_eye: [
+        ['原生弱點', '弓命中原生弱點後可追加攻擊，鷹眼暫時原生弱點也能支援這個節奏。'],
+        ['追加攻擊', '追加攻擊不觸發敵人行動，但仍會消耗本回合追擊次數。'],
+      ],
+      star_breaker_eye: [
+        ['原生弱點', '裂星破滅只會破壞真正命中的原生弱點；鷹眼羽飾的視為命中不會破壞。'],
+        ['裂星破壞', '被破壞的原生弱點會暫時失效；非無弱點敵人回合開始前會補回可用原生弱點。'],
+      ],
+      dodeca_fate_dice: [
+        ['原生弱點', '命運骰可以命中原生弱點，並以原生弱點作為高爆發核心。'],
+        ['押注', '賭命骰子押中會提高傷害；懊悔時下次受擊回合受到的傷害 +30%，最多 3 層。'],
+        ['自然骰', '自然骰 12 且觸發共鳴弱點時，會把命運骰爆發推到最高。'],
+      ],
+      dodeca_lucky_dice: [
+        ['破綻', '幸運骰不命中原生弱點，主要吃破綻與破綻倍數。'],
+        ['押注', '押中破綻或倍數時爆發更高；懊悔仍會累積下次受擊風險。'],
+      ],
+      dual_banner_formation: [
+        ['舉旗', '持旗者主戰攻擊前選擇要舉哪一件旗，旗面自動決定。'],
+        ['雙旗', '戰爭旗與鷹眼旗可以同時維持，但同一件旗再次舉起會覆蓋原本旗面。'],
+        ['執旗者', '執旗者用本次攻擊骰決定旗階；融合旗不會舉旗失敗。'],
+      ],
+    };
+    return rules[id] || [];
+  },
+
+  _renderRelicLoreDetail(container, relic) {
+    const display = this._relicDisplay(relic);
+
+    const back = document.createElement('button');
+    back.className = 'btn-secondary btn-small notes-back-btn';
+    back.textContent = '返回';
+    back.addEventListener('click', () => {
+      container.innerHTML = '';
+      this._renderRelicNotesGrid(container);
+    });
+    container.appendChild(back);
+
+    const title = document.createElement('div');
+    title.className = 'relic-lore-title';
+    title.textContent = `${display.icon} ${display.name}`;
+    container.appendChild(title);
+
+    container.appendChild(this._createRelicEffectBlock(display.desc, display.fusedDesc));
+
+    const list = document.createElement('div');
+    list.className = 'relic-lore-list';
+    for (let i = 0; i < display.lore.length; i++) {
+      const entry = document.createElement('div');
+      entry.className = 'relic-lore-entry';
+      entry.innerHTML = `<span class="relic-lore-num">${i + 1}</span><span class="relic-lore-text">${display.lore[i]}</span>`;
+      list.appendChild(entry);
+    }
+    if (display.locationHint) {
+      const hint = document.createElement('div');
+      hint.className = 'note-hint';
+      hint.textContent = `取得線索：${display.locationHint}`;
+      list.appendChild(hint);
+    }
+    container.appendChild(list);
+  },
+
+  _createRelicEffectBlock(desc, fusedDesc = '') {
+    const effect = document.createElement('div');
+    effect.className = 'relic-note-effect';
+
+    const title = document.createElement('strong');
+    title.textContent = '聖物效果';
+    effect.appendChild(title);
+
+    const base = document.createElement('span');
+    base.textContent = desc || '尚無說明。';
+    effect.appendChild(base);
+
+    if (fusedDesc) {
+      const fused = document.createElement('div');
+      fused.className = 'relic-note-fused-effect';
+
+      const label = document.createElement('b');
+      label.textContent = '融合後';
+      fused.appendChild(label);
+
+      const text = document.createElement('span');
+      text.textContent = fusedDesc;
+      fused.appendChild(text);
+      effect.appendChild(fused);
+    }
+
+    return effect;
+  },
+
+  _renderTerrainNotes(container) {
+    const terrains = [
+      { icon: '◇', name: '平地', desc: '常見的空曠地形，通常觸發普通事件或資源事件。', tags: ['普通', '事件', '探索'] },
+      { image: 'assets/terrain/forest-tile.png', icon: '🌲', name: '森林', desc: '樹影遮蔽視線，較容易遇到探索事件、資源與潛伏危險。', tags: ['探索', '資源', '危險'] },
+      { image: 'assets/terrain/ruins-tile.png', icon: '🏚️', name: '廢墟', desc: '舊文明殘跡，常藏有事件、聖物線索與陷阱。', tags: ['事件', '聖物', '陷阱'] },
+      { image: 'assets/terrain/cave-tile.png', icon: '🕳️', name: '洞穴', desc: '黑暗與迷失並存，可能帶來高風險事件與寶藏。', tags: ['危險', '寶藏', '探索'] },
+      { image: 'assets/terrain/altar-tile.png', icon: '⛩️', name: '神壇', desc: '每日可使用一次，可血祭降低黑暗或融合聖物。', tags: ['血祭', '融合', '黑暗'] },
+      { image: 'assets/terrain/rest-tile.png', icon: '🔥', name: '休息點', desc: '可恢復生命。用過後會熄滅，等待規則刷新後再次可用。', tags: ['恢復', '休息', '刷新'] },
+    ];
+
+    for (const info of terrains) {
+      const entry = document.createElement('div');
+      entry.className = 'terrain-note-entry';
+      const visual = info.image
+        ? `<img class="terrain-note-image" src="${info.image}" alt="${info.name}">`
+        : `<span class="terrain-note-icon">${info.icon}</span>`;
+      entry.innerHTML = `
+        <div class="terrain-note-visual">
+          ${visual}
+          <div class="terrain-note-name">${info.name}</div>
+        </div>
+        <div class="terrain-note-body">
+          <div class="terrain-note-desc">${info.desc}</div>
+          <div class="terrain-note-tags">${info.tags.map(tag => `<span class="terrain-tag">${tag}</span>`).join('')}</div>
+        </div>
+      `;
+      container.appendChild(entry);
+    }
+  },
+
+  _getRelicById(id) {
+    if (typeof getRelicById === 'function') return getRelicById(id);
+    return (typeof RELICS !== 'undefined' ? RELICS : []).find(relic => relic.id === id) || null;
+  },
+
+  _relicDisplay(relic = {}) {
+    const overrides = {
+      war_banner: {
+        name: '戰爭旗',
+        icon: '⚑',
+        desc: '主戰攻擊前，可選擇舉起戰爭旗，旗面自動決定。戰吼面：全隊擊中傷害依階級提高。創傷面：每回合第一次擊中時依階級施加傷口。',
+        fusedDesc: '融合後此旗不會舉旗失敗。非執旗者舉起時直接成為二階；執旗者舉起時，1-4 為二階，5-6 為三階。',
+        lore: ['布面殘破，號令卻仍能讓隊伍重新排成一線。'],
+        locationHint: '支援路線事件或普通聖物中可能出現。',
+      },
+      eagle_banner: {
+        name: '鷹眼旗',
+        icon: '⚑',
+        desc: '主戰攻擊前，可選擇舉起鷹眼旗，旗面自動決定。破綻面：每回合附加鷹眼破綻，高階命中時額外增傷。原生面：命中原生弱點時增傷，高階可新增鷹眼暫時原生弱點。',
+        fusedDesc: '融合後此旗不會舉旗失敗。非執旗者舉起時直接成為二階；執旗者舉起時，1-4 為二階，5-6 為三階。',
+        lore: ['旗尖所指之處，連陰影都露出裂縫。'],
+        locationHint: '支援路線事件或普通聖物中可能出現。',
+      },
+      wager_dice: {
+        name: '賭命骰子',
+        icon: '🎲',
+        desc: '戰鬥開始後，持有者主戰前可押注骰面。若本次攻擊命中押注骰面，傷害 +4；若未命中，下次受擊回合受到的傷害 +30%，最多 3 層。',
+        fusedDesc: '可押注 4 個骰面，命中仍為傷害 +4；懊悔懲罰仍最多 3 層。',
+        lore: ['骰子沉甸甸的，像把一小段命運握在掌心。'],
+        locationHint: '命運賭桌事件或聖物獎勵中可能出現。',
+      },
+      lucky_star: {
+        name: '幸運星',
+        icon: '⭐',
+        desc: '攻擊骰最終為 6 時傷害 +2；每場戰鬥前 1 次可將小於等於 3 的攻擊骰面改為 6，且免疫以此方式造成的雙數副作用。',
+        fusedDesc: '每場戰鬥前 2 次可改為 6；完全免疫最終骰面 6 與 12 的雙數懲罰。若使用 12 面骰，每場戰鬥前 2 次骰到 6 時有 50% 機率改為 12，且 12 傷害 +4。',
+        lore: ['它不像星星，更像一枚不肯熄滅的小小承諾。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      exorcism_ring: {
+        name: '驅邪戒',
+        icon: '💍',
+        desc: '淨化判定失敗時可重骰一次。',
+        fusedDesc: '淨化判定不再重骰，改為必定成功。',
+        lore: ['戒面刻著細小符文，靠近黑暗時會微微發熱。'],
+        locationHint: '黑夜聖物獎勵中可能出現。',
+      },
+      eagle_eye_feather: {
+        name: '鷹眼羽飾',
+        icon: '🪶',
+        desc: '主戰使用弓時，最終骰面至少為 5，可視為命中原生弱點並觸發弓追擊；此視為命中不會破壞原生弱點。',
+        fusedDesc: '每場戰鬥第一次由鷹眼羽飾觸發的弓追加攻擊，額外傷害 +3。',
+        lore: ['羽毛仍記得天空的高度。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      flaw_lens: {
+        name: '鷹眼透鏡',
+        icon: '🔍',
+        desc: '主戰攻擊命中原生弱點時，有 50% 機率新增 1 個原生弱點；每場戰鬥最多成功新增 1 次，失敗不消耗機會。',
+        fusedDesc: '本場第一次命中原生弱點後，必定新增 1 個原生弱點；命中原生弱點時傷害 +2。',
+        lore: ['透鏡裡的裂紋，總能對準敵人最薄的地方。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      pain_mask: {
+        name: '痛苦面具',
+        icon: '🎭',
+        desc: '主戰時，攻擊 4 層以上傷口的敵人，每 4 層傷口額外造成 1 點傷害。',
+        fusedDesc: '保留原效果；若敵人傷口達 15 層，會引爆傷口造成額外固定傷害。',
+        lore: ['面具內側沒有臉，只有咬緊的痛。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      pain_splinter_badge: {
+        name: '痛苦徽記',
+        icon: '🩸',
+        desc: '攻擊 5 層以上傷口的敵人時，最終傷害提高 20%。',
+        fusedDesc: '最終傷害提高 30%，並將傷口上限提高至 20。',
+        lore: ['徽記像乾涸的傷疤，碰到鮮血時又重新發亮。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      black_iron_crown: {
+        name: '黑鐵王冠',
+        icon: '👑',
+        desc: '黑暗怪狩獵時削弱黑暗怪。黑暗等級越高，效果越明顯。',
+        fusedDesc: '對黑暗怪額外提高傷害，並保留削弱效果。',
+        lore: ['它不是為王準備的，而是為仍敢直視黑夜的人。'],
+        locationHint: '黑夜聖物獎勵中可能出現。',
+      },
+    };
+
+    const data = overrides[relic.id] || {};
+    return {
+      name: data.name || relic.name || relic.id || '未知聖物',
+      icon: data.icon || relic.icon || '◆',
+      desc: data.desc || relic.desc || '尚無說明。',
+      fusedDesc: data.fusedDesc || (relic.fusedEffect ? '融合後效果已套用。' : ''),
+      lore: data.lore || relic.lore || [],
+      locationHint: data.locationHint || relic.locationHint || '',
+    };
+  },
+
+  _weaponDisplay(weapon = {}) {
+    const overrides = {
+      sword: ['劍', '⚔️', '主戰時，傷害 +1。'],
+      bow: ['弓', '🏹', '主戰時，命中原生弱點後，可追加攻擊。每回合最多額外追擊 2 次。'],
+      dagger: ['匕首', '🗡️', '主戰時，命中弱點時額外 +2 傷害。'],
+      hammer: ['槌', '🔨', '主戰時，額外破除敵人格檔；若擲出 1，主戰者 -1 HP。'],
+      battle_drum: ['戰鼓', '🥁', '主戰攻擊後，敲響戰鼓：接下來 2 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
+      healing_staff: ['祈癒杖', '+', '主戰時，命中原生弱點後，全隊恢復生命。'],
+      katana: ['太刀', '⚔️', '主戰造成傷害時，施加 1 層傷口。'],
+      sword_plus: ['進階劍', '⚔️', '主戰時，傷害 +2。'],
+      bow_plus: ['逐星弓', '🏹', '主戰時，命中原生弱點後可追加攻擊。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。'],
+      dagger_plus: ['影牙匕首', '🗡️', '主戰時，命中弱點額外 +2 傷害；未命中任何弱點時，額外造成等同最終骰面的傷害。'],
+      hammer_plus: ['進階槌', '🔨', '主戰時，額外破除敵人 4 點格檔；若擲出 1，主戰者 -1 HP。'],
+      battle_drum_plus: ['進階戰鼓', '🥁', '主戰攻擊後，接下來 3 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
+      healing_staff_plus: ['進階祈癒杖', '+', '主戰時，本次攻擊無視敵人格檔。命中原生弱點時，全隊恢復 2 HP。'],
+      soul_cutter_katana: ['斷魂太刀', '⚔️', '主戰造成傷害時施加 1 層傷口；命中 8 層以上傷口敵人時本次傷害 +3；若本次攻擊觸發傷口引爆，額外造成 10 點固定傷害。'],
+    };
+    const data = overrides[weapon.id] || [];
+    return {
+      name: data[0] || weapon.name || weapon.id || '未知武器',
+      icon: data[1] || weapon.icon || '◆',
+      desc: data[2] || weapon.desc || '尚無說明。',
+    };
+  },
+
+  _gearDisplay(gear = {}) {
+    const overrides = {
+      shield: ['盾牌', '🛡️', '主戰攻擊時，獲得等同骰面一半的格檔，向下取整，最低 1。'],
+      grappling_hook: ['鉤索', '🪝', '主戰攻擊時，若原本未命中任何弱點，最終骰面 +1 並重新判定命中。每回合限一次；若因此命中原生弱點，不會觸發弓追擊。'],
+      telescope: ['望遠鏡', '🔭', '若裝備者不是主戰者，敵人新增 1 個破綻。'],
+      bandage: ['繃帶包', '🩹', '主戰攻擊後，治療生命比例最低的隊友 3 HP。每場戰鬥限一次。'],
+      serrated_oil: ['鋸齒油', '🧴', '主戰攻擊時，若最終骰面至少為 5 且造成傷害，額外施加 1 層傷口。每回合限一次。'],
+      corrosive_oil: ['腐蝕油', '🧪', '主戰命中任一弱點且敵人至少 5 層傷口時，消耗 1 層傷口並造成 3 點固定傷害。每回合限一次。'],
+      bone_dice_bag: ['骨骰袋', '🎲', '每場戰鬥前 2 次，攻擊骰 1/2/3 會翻為 6/5/4。若因此觸發搏命者雙數，免疫該次反噬與減傷。'],
+    };
+    const data = overrides[gear.id] || [];
+    return {
+      name: data[0] || gear.name || gear.id || '未知裝備',
+      icon: data[1] || gear.icon || '◆',
+      desc: data[2] || gear.desc || '尚無說明。',
+    };
+  },
+
+  _itemDisplay(item = {}) {
+    const overrides = {
+      herb_pack: ['草藥包', '🌿', '立即使用，恢復目標 30% 最大生命；輔助使用時恢復 40%。'],
+      whetstone: ['磨刀石', '🪨', '本場戰鬥主戰攻擊 +1。'],
+      leather_patch: ['皮革補片', '🧩', '本場戰鬥受到的傷害 -1。'],
+      bone_dice: ['骨骰', '🎲', '下一次骰子判定重骰，保留較高結果。'],
+      focus_charm: ['專注護符', '🔷', '下一次骰子判定，若擲出 1 改為 2。'],
+    };
+    const data = overrides[item.id] || [];
+    return {
+      name: data[0] || item.name || item.id || '未知道具',
+      icon: data[1] || item.icon || '◆',
+      desc: data[2] || item.desc || '尚無說明。',
+    };
+  },
+
+  _resonanceNotes() {
+    return [
+      {
+        id: 'pain_resonance',
+        name: '痛痕共鳴・爆發',
+        relics: ['pain_mask', 'pain_splinter_badge'],
+        desc: '同身：融合痛苦面具 + 痛苦徽記。',
+        body: '持有者攻擊時，目標傷口不提供傷害加成；若本次造成傷害，附加等同最終骰面的傷口。施加傷口後若目標達到 10 層以上傷口，引爆並消耗所有傷口，每層造成 2 點固定傷害。',
+        detail: ['太刀、痛苦面具與創傷面仍會照常追加傷口，超過 10 層的部分也會計入本次引爆。'],
+      },
+      {
+        id: 'pain_scar_resonance',
+        name: '痛痕共鳴・折磨',
+        relics: ['pain_splinter_badge', 'pain_mask'],
+        desc: '同身：融合痛苦徽記 + 痛苦面具。',
+        body: '持有者攻擊 6 層以上傷口的敵人時，該次擊中最終傷害額外提高 20%。',
+        detail: ['偏向穩定放大，適合多段攻擊或高基礎傷害。'],
+      },
+      {
+        id: 'star_hunter_eye',
+        name: '獵星之眼',
+        relics: ['eagle_eye_feather', 'flaw_lens'],
+        desc: '同身：融合鷹眼羽飾 + 鷹眼透鏡。',
+        body: '持有者每次使用弓攻擊前，若敵人沒有獵星產生的鷹眼暫時原生弱點，新增 1 個；命中後改為新的鷹眼暫時原生弱點。弓的追加攻擊傷害 +2；若同回合觸發 2 次以上追加攻擊，最後一次追加攻擊的攻擊骰必定視為 6。',
+        detail: ['鷹眼暫時原生弱點可觸發弓追擊，且不會在命中前刷新。強制 6 不會額外觸發原生弱點破除，也不會因此再延伸新的弓追擊。'],
+      },
+      {
+        id: 'star_breaker_eye',
+        name: '裂星破滅',
+        relics: ['flaw_lens', 'eagle_eye_feather'],
+        desc: '同身：融合鷹眼透鏡 + 鷹眼羽飾。',
+        body: '持有者使用弓主戰命中任一原生弱點時，破壞這次命中的原生弱點，額外造成 10 點固定傷害。',
+        detail: [
+          '任一原生弱點包含敵人的主要原生弱點、額外原生弱點與暫時原生弱點。',
+          '同一回合可以破壞多個原生弱點。',
+          '若敵人沒有可破壞的原生弱點，不會造成裂星破滅的固定傷害。',
+          '非無弱點敵人每回合開始前會補到 2 個可用原生弱點。',
+        ],
+      },
+      {
+        id: 'dodeca_fate_dice',
+        name: '十二面命運骰',
+        relics: ['wager_dice', 'lucky_star'],
+        desc: '同身：融合賭命骰子 + 幸運星。',
+        body: '攻擊骰改為 1d12，可以命中原生弱點；若使用賭命骰子，可額外押注 3 個骰面；搏命者單數刷新原生弱點，其他職業只有 7、9、11 會刷新；命中原生弱點或視為命中原生弱點時最終傷害 x3；最終骰值等於原生弱點 x2 時額外觸發共鳴弱點。',
+        detail: [
+          '命中破綻不會觸發命運骰 x2；破綻倍數是十二面幸運骰的玩法。',
+          '命中原生弱點或共鳴弱點會使最終傷害 x3。',
+          '共鳴弱點會套用該原生弱點效果。',
+          '自然骰出 12 且觸發共鳴弱點時，最終傷害改為 x4。',
+        ],
+      },
+      {
+        id: 'dodeca_lucky_dice',
+        name: '十二面幸運骰',
+        relics: ['lucky_star', 'wager_dice'],
+        desc: '同身：融合幸運星 + 賭命骰子。',
+        body: '攻擊骰改為 1d12且不命中原生弱點；若使用賭命骰子，可額外押注 3 個骰面；搏命者單數刷新破綻，7、9、11 刷新 2 個；其他職業只有 7、9、11 會刷新 1 個；命中破綻或破綻倍數時獲得額外傷害。',
+        detail: [
+          '最終骰值等於破綻，或是任一破綻的倍數時，視為命中破綻，傷害 +3。',
+          '每個符合倍數的破綻額外使傷害 +8。',
+          '破綻為 1 時，所有最終骰值都視為它的倍數。',
+        ],
+      },
+      {
+        id: 'dual_banner_formation',
+        name: '雙旗戰陣',
+        relics: ['war_banner', 'eagle_banner'],
+        desc: '同身：同時持有戰爭旗與鷹眼旗，且其中一面已融合。',
+        body: '戰鬥中可同時維持 1 面戰爭旗與 1 面鷹眼旗。',
+        detail: [
+          '再次舉起同一件旗時，會覆蓋該旗目前的旗面。',
+          '不同旗可並存，因此可以同時保留一個戰爭旗效果與一個鷹眼旗效果。',
+          '融合旗不會舉旗失敗；執旗者舉融合旗時 1-4 為二階，5-6 為三階。',
+        ],
+      },
+    ];
+  },
+};
+
+Object.assign(Render, RenderNotes);

@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>黑夜邊境</title>
+  <meta name="description" content="帶領小隊穿越黑霧邊界，在白日探索、救援、蒐集聖物，撐過第 10 天後降臨的黑夜。">
+  <meta property="og:title" content="黑夜邊境">
+  <meta property="og:description" content="白日探索，黑夜求生。帶領小隊穿越黑霧邊界。">
+  <meta property="og:image" content="assets/site-thumbnail.png">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="黑夜邊境">
+  <meta name="twitter:description" content="白日探索，黑夜求生。帶領小隊穿越黑霧邊界。">
+  <meta name="twitter:image" content="assets/site-thumbnail.png">
+  <link rel="icon" type="image/png" href="assets/site-thumbnail.png">
+  <link rel="apple-touch-icon" href="assets/site-thumbnail.png">
+  <link rel="stylesheet" href="style.css?v=weakness-color-balance1">
+</head>
+<body>
+<div id="app">
+
+  <!-- ═══════════════ 開始畫面 ═══════════════ -->
+  <div id="start-screen" class="screen active">
+    <div class="start-bg" aria-hidden="true"></div>
+    <div class="start-shell">
+      <section class="title-card">
+        <div class="title-kicker">DARK FRONTIER SURVIVAL</div>
+        <h1 class="game-title">
+          <img src="assets/title-logo.svg" alt="黑夜邊境">
+        </h1>
+        <p class="game-subtitle">
+          帶領小隊穿越黑霧邊界，在白日探索、救援、蒐集聖物；當第 10 天黑夜降臨，每一次移動都會付出代價。
+        </p>
+        <div class="start-actions">
+          <button id="btn-new-game" class="btn-primary">開始探索</button>
+          <button id="btn-notes-start" class="btn-secondary">探險筆記</button>
+        </div>
+      </section>
+
+      <aside class="start-brief">
+        <div class="brief-item">
+          <span class="brief-num">09</span>
+          <span><b>白日準備</b>探索地形、找出救援線索，讓隊伍撐過黑夜。</span>
+        </div>
+        <div class="brief-item">
+          <span class="brief-num">10</span>
+          <span><b>黑夜降臨</b>黑暗怪開始追獵，每一步都可能流血。</span>
+        </div>
+        <div class="brief-item">
+          <span class="brief-num">20</span>
+          <span><b>黎明抵達</b>帶著聖物撤離，或繼續深入邊境。</span>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 遊戲畫面 ═══════════════ -->
+  <div id="game-screen" class="screen" style="display:none">
+
+    <!-- 頂部狀態列 -->
+    <div id="top-bar">
+      <div id="day-display">
+        <span id="day-label">第 <span id="day-num">1</span> 天</span>
+        <span id="phase-label" class="phase-day">白日探索期</span>
+      </div>
+      <div id="actions-display">
+        行動力：<span id="actions-left">3</span>&thinsp;/&thinsp;3
+      </div>
+      <div id="darkness-display">
+        <span id="darkness-label">晝夜平衡</span> <span id="darkness-num"></span>
+        <span id="light-charges-display"></span>
+        <div class="darkness-bar"><div id="darkness-bar-fill"></div></div>
+      </div>
+      <div id="top-controls">
+        <button id="btn-end-day" class="btn-small">結束今天 →</button>
+        <button id="btn-open-notes" class="btn-small">探險筆記</button>
+        <button id="btn-dev-tool" class="btn-small dev-tool-btn">測試工具</button>
+      </div>
+    </div>
+
+    <!-- 主體 -->
+    <div id="main-content">
+
+      <!-- 左側：日誌面板 -->
+      <div id="log-panel">
+        <div class="log-panel-title">日誌</div>
+        <div id="log-messages"></div>
+      </div>
+
+      <!-- 中間：地圖面板 -->
+      <div id="map-panel">
+        <div id="map-grid"></div>
+        <div id="map-hint">點擊相鄰格子移動探索</div>
+      </div>
+
+      <!-- 右側面板 -->
+      <div id="right-panel">
+        <div id="squad-panel">
+          <h3>小隊</h3>
+          <div id="squad-list"></div>
+        </div>
+
+        <div id="effects-panel" style="display:none">
+          <!-- 由 render.js 填入 -->
+        </div>
+
+        <div id="resonance-panel" style="display:none">
+          <!-- 由 render.js 填入 -->
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /#game-screen -->
+
+  <!-- ═══════════════ 事件 Modal ═══════════════ -->
+  <div id="event-modal" class="modal hidden">
+    <div class="modal-content">
+      <h2 id="modal-title"></h2>
+      <div id="modal-desc"></div>
+      <div id="modal-choices"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 選角 Modal ═══════════════ -->
+  <div id="squad-select-modal" class="modal hidden">
+    <div class="modal-content squad-select-layout">
+      <div class="squad-select-detail" id="squad-detail-left">
+        <div class="char-detail-placeholder">將滑鼠移到角色卡上</div>
+      </div>
+      <div class="squad-select-center">
+        <h2>選擇起始角色</h2>
+        <p style="color:var(--text-dim);font-size:.9em;margin-bottom:16px">
+          選擇 2 人（最多可帶 3 人，另一名可在探索中救援）
+        </p>
+        <div id="squad-select"></div>
+        <div style="display:flex;gap:10px;justify-content:center;margin-top:16px">
+          <button id="btn-confirm-squad" class="btn-primary" disabled>確認出發</button>
+          <button id="btn-cancel-squad" class="btn-secondary">返回</button>
+        </div>
+      </div>
+      <div class="squad-select-detail" id="squad-detail-right">
+        <div class="char-detail-placeholder">選擇第二位角色後顯示</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 筆記 Modal ═══════════════ -->
+  <div id="notes-modal" class="modal hidden">
+    <div class="modal-content wide">
+      <h2>📖 探險筆記</h2>
+      <div id="notes-content"></div>
+      <button id="btn-close-notes" class="btn-secondary" style="margin-top:16px">關閉</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 結束畫面 ═══════════════ -->
+  <div id="gameover-screen" class="screen" style="display:none">
+    <div class="title-card">
+      <h2 id="gameover-title"></h2>
+      <p id="gameover-desc"></p>
+      <div id="gameover-results"></div>
+      <button id="btn-restart" class="btn-primary">再來一局</button>
+    </div>
+  </div>
+
+  <!-- 黑夜過渡蓋層 -->
+  <div id="night-overlay"></div>
+  <div id="gameover-intro" class="gameover-intro" aria-hidden="true"></div>
+
+</div><!-- /#app -->
+
+<!-- Scripts（順序不可改） -->
+<script src="js/config.js?v=treasure-mimic1"></script>
+<script src="js/data/equipment.js?v=star-chaser-bow1"></script>
+<script src="js/data/characters.js?v=suspicious-weakness1"></script>
+<script src="js/data/relics.js?v=banner-attack-roll-rank1"></script>
+<script src="js/data/enemies.js?v=training-dummy1"></script>
+<script src="js/data/events.js?v=relic-sources1"></script>
+<script src="js/data/resonances.js?v=pain-scar-threshold1"></script>
+<script src="js/core/dice.js?v=rulesnotes2"></script>
+<script src="js/core/map.js?v=hidden-sites1"></script>
+<script src="js/core/combat.js?v=suspicious-weakness1"></script>
+<script src="js/core/relic-rules.js?v=wager-remorse1"></script>
+<script src="js/core/equipment-rules.js?v=rulesnotes2"></script>
+<script src="js/core/terrain-rules.js?v=rulesnotes2"></script>
+<script src="js/core/game.js?v=gameover-lower-summary1"></script>
+<script src="js/core/inventory.js?v=split-core1"></script>
+<script src="js/core/character-details.js?v=eagle-lens-rename1"></script>
+<script src="js/core/dice-flow.js?v=body-resonance-per-char1"></script>
+<script src="js/core/relic-resonance.js?v=fate-dice-x3x4-test1"></script>
+<script src="js/core/game-state.js?v=gameover-intro1"></script>
+  <script src="js/core/combat-flow.js?v=temp-weakness-icon1"></script>
+<script src="js/core/site-actions.js?v=night-erosion1"></script>
+<script src="js/core/event-handlers.js?v=relic-choice-groups1"></script>
+  <script src="js/core/event-treasure.js?v=victory-drop-flow1"></script>
+<script src="js/core/event-encounters.js?v=split-events1"></script>
+<script src="js/core/event-traps.js?v=split-events1"></script>
+<script src="js/core/event-notes.js?v=split-events1"></script>
+<script src="js/core/dark-monsters.js?v=rulesnotes2"></script>
+<script src="js/core/dev-tool.js?v=eagle-lens-rename1"></script>
+<script src="js/ui/render.js?v=suspicious-weakness1"></script>
+<script src="js/ui/modal-render.js?v=suspicious-weakness1"></script>
+<script src="js/ui/notes-render.js?v=suspicious-weakness1"></script>
+<script src="js/main.js?v=rulesnotes2"></script>
+</body>
+</html>

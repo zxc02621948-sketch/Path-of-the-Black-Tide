@@ -1,0 +1,7 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -n \"--c-\\\\|--accent\\\\|--text\" \"D:\\\\The Black Night Box/style.css\")"
+    ]
+  }
+}

@@ -1,0 +1,279 @@
+// Extracted from js/core/game.js. Keeps the original Game API while making this system easier to maintain.
+const GameSiteActions = {
+  _triggerAltar(cell) {
+    this._recordTerrain('altar');
+    const usedToday = cell.altarUsedDay === G.day;
+    const fusionCandidates = this._altarFusionCandidates();
+    const choices = [];
+
+    if (!usedToday) {
+      choices.push({
+        label: '血祭：全隊最大 HP -1，探索骰 4-5 黑暗 -1，6 黑暗 -2',
+        danger: true,
+        action: () => this._doAltarBloodSacrifice(cell),
+      });
+      choices.push({
+        label: G.actionsLeft > 0
+          ? '融合聖物：消耗 1 行動，角色最大 HP -1'
+          : '融合聖物：行動不足',
+        action: () => this._chooseAltarFusionTarget(cell),
+      });
+    }
+
+    choices.push({
+      label: '離開',
+      action: () => { this._closeModal(); Render.fullRender(); },
+    });
+
+    this._openModal({
+      title: '神壇',
+      desc: [
+        usedToday
+          ? '這座神壇今天已經使用過。'
+          : '古老神壇低聲燃著微光，可以選擇血祭或融合聖物。',
+        `可融合角色：${fusionCandidates.length}`,
+      ].join('\n\n'),
+      choices,
+    });
+  },
+
+  _altarFusionCandidates() {
+    return this._aliveSquad().filter(char =>
+      char.relic &&
+      char.relic.fusable !== false &&
+      !char.fusedRelic &&
+      char.maxHp > 1
+    );
+  },
+
+  _chooseAltarFusionTarget(cell) {
+    if (cell.altarUsedDay === G.day) {
+      this._triggerAltar(cell);
+      return;
+    }
+    if (G.actionsLeft <= 0) {
+      this._openModal({
+        title: '神壇融合',
+        desc: '行動不足，無法融合聖物。',
+        choices: [{ label: '返回', action: () => this._triggerAltar(cell) }],
+      });
+      return;
+    }
+    const candidates = this._altarFusionCandidates();
+    if (candidates.length === 0) {
+      this._openModal({
+        title: '神壇融合',
+        desc: '目前沒有可融合的聖物，或角色最大 HP 不足以支付代價。',
+        choices: [{ label: '返回', action: () => this._triggerAltar(cell) }],
+      });
+      return;
+    }
+
+    this._openModal({
+      title: '神壇融合',
+      desc: '選擇要融合聖物的角色。融合會消耗 1 行動，且該角色最大 HP -1。',
+      choices: candidates.map(char => ({
+        label: `${char.name}：融合「${char.relic.name}」`,
+        action: () => this._doAltarFusion(char, cell),
+      })).concat([{ label: '返回', action: () => this._triggerAltar(cell) }]),
+    });
+  },
+
+  _doAltarFusion(char, cell) {
+    if (cell.altarUsedDay === G.day || G.actionsLeft <= 0 || !char?.relic || char.relic.fusable === false || char.fusedRelic || char.maxHp <= 1) {
+      this._triggerAltar(cell);
+      return;
+    }
+
+    this._closeModal();
+    G.actionsLeft = Math.max(0, G.actionsLeft - 1);
+    cell.altarUsedDay = G.day;
+
+    const relic = char.relic;
+    const fusedRelic = { ...relic };
+    if (fusedRelic.fusedEffect) fusedRelic.effect = { ...fusedRelic.fusedEffect };
+
+    char.maxHp = Math.max(1, char.maxHp - 1);
+    char.hp = Math.min(char.hp, char.maxHp);
+    char.fusedRelic = fusedRelic;
+    char.relic = null;
+
+    this._applyFusionBonus(char, fusedRelic);
+    this._removeMapRelicsById(fusedRelic.id);
+    this._unlockNote(fusedRelic.id, true);
+    const newly = this._updateResonances();
+
+    this._log(`${char.name} 融合聖物「${fusedRelic.name}」，最大 HP -1。`, 'reward');
+    const resonanceText = newly.length > 0
+      ? `\n\n聖物共鳴啟動：\n${newly.map(res => `${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}`).join('\n')}`
+      : '';
+    this._openModal({
+      title: '神壇融合成功',
+      desc: `${char.name} 最大 HP -1，融合聖物「${fusedRelic.name}」。\n\n消耗 1 行動。${resonanceText}`,
+      choices: [{ label: '離開神壇', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _doAltarBloodSacrifice(cell) {
+    if (cell.altarUsedDay === G.day) {
+      this._triggerAltar(cell);
+      return;
+    }
+
+    this._closeModal();
+    cell.altarUsedDay = G.day;
+
+    const alive = this._aliveSquad();
+    if (alive.length === 0) {
+      Render.fullRender();
+      return;
+    }
+
+    for (const char of alive) {
+      char.maxHp = Math.max(1, char.maxHp - 1);
+      char.hp = Math.min(char.hp, char.maxHp);
+    }
+
+    const actor = alive.find(c => c.cls === 'explorer') || alive[0];
+    const rollResult = this._rollWithMods('explore', actor, { successMin: 4 });
+    const roll = rollResult.value;
+    const amount = roll === 6 ? 2 : roll >= 4 ? 1 : 0;
+    if (amount > 0) this._applyDarkness(-amount, '神壇血祭');
+
+    this._log(amount > 0
+      ? `神壇血祭成功：${actor.name} 擲出 ${Dice.face(roll)}（${roll}），黑暗 -${amount}。`
+      : `神壇血祭失敗：${actor.name} 擲出 ${Dice.face(roll)}（${roll}），黑暗不變。`,
+      amount > 0 ? 'reward' : 'dim');
+
+    this._openModal({
+      title: '神壇血祭',
+      desc: [
+        '全隊最大 HP -1。',
+        `${actor.name} 正在擲探索骰進行血祭判定。`,
+      ].join('\n\n'),
+      preDesc: [
+        '全隊最大 HP -1。',
+        `${actor.name} 正在擲探索骰進行血祭判定。`,
+      ].join('\n\n'),
+      resultAppend: [
+        `${actor.name} 擲出 ${Dice.face(roll)}（${roll}）。`,
+        amount === 2 ? '大成功：黑暗 -2。' : amount === 1 ? '成功：黑暗 -1。' : '失敗：黑暗不變。',
+      ].join('\n\n'),
+      dice: { type: amount > 0 ? 'neutral' : 'danger', label: `${actor.name} 的探索骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, animate: true, charCls: rollResult.charCls },
+      choices: [{ label: '離開神壇', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
+    });
+  },
+
+  _triggerRest(cell) {
+    this._recordTerrain('rest');
+    this._refreshRestPoints();
+    if (G.phase !== 'day') {
+      this._triggerEmberPoint(cell);
+      return;
+    }
+
+    const dead = G.squad.filter(c => c.dead);
+    const injured = this._aliveSquad().filter(c => c.hp < c.maxHp);
+    const choices = [];
+
+    choices.push({
+      label: '休息：全隊恢復 20% 最大 HP',
+      action: () => {
+        const healed = this._healAliveSquad(c => Math.ceil(c.maxHp * 0.20), true);
+        this._log(healed.length > 0 ? '隊伍休息並恢復生命。' : '隊伍休息，但沒有人需要治療。', 'reward');
+        this._markRestUsed(cell);
+        this._closeModal();
+        Render.fullRender();
+      },
+    });
+
+    if (injured.length > 0) {
+      choices.push({
+        label: '急救：指定一名角色恢復 40% 最大 HP',
+        action: () => {
+          const targetChoices = injured.map(char => ({
+            label: `${char.name}（HP ${char.hp}/${char.maxHp}）`,
+            action: () => {
+              const before = char.hp;
+              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.40));
+              char.hp = Math.min(char.maxHp, char.hp + heal);
+              this._log(`${char.name} 恢復 ${char.hp - before} HP。`, 'reward');
+              this._markRestUsed(cell);
+              this._closeModal();
+              Render.fullRender();
+            },
+          }));
+          targetChoices.push({ label: '返回', action: () => { this._closeModal(); this._triggerRest(cell); } });
+          this._openModal({ title: '急救', desc: '選擇要治療的角色。', choices: targetChoices });
+        },
+      });
+    }
+
+    for (const char of dead) {
+      const reviveHp = Math.ceil(char.maxHp * 0.20);
+      choices.push({
+        label: `救起 ${char.name}（${reviveHp} HP）`,
+        action: () => {
+          this._reviveChar(char, reviveHp);
+          this._markRestUsed(cell);
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+    }
+
+    choices.push({ label: '離開', action: () => { this._closeModal(); Render.fullRender(); } });
+    this._openModal({ title: '休息點', desc: '你們找到可以短暫喘息的地方。', choices });
+  },
+
+  _triggerEmberPoint(cell) {
+    const choices = [
+      {
+        label: '殘火治療：全隊恢復 20% 最大 HP',
+        action: () => {
+          const healed = this._healAliveSquad(char => Math.ceil(char.maxHp * 0.20), false);
+          if (healed.length > 0) this._log('殘火讓隊伍恢復生命。', 'reward');
+          this._markRestUsed(cell);
+          this._closeModal();
+          Render.fullRender();
+        },
+      },
+      {
+        label: `點燃火把：接下來 ${CONFIG.TORCH_SAFE_MOVES} 次黑夜移動視野 +1`,
+        action: () => {
+          G.torchActive = CONFIG.TORCH_SAFE_MOVES;
+          this._log('火把被點燃，接下來的黑夜移動視野提高。', 'reward');
+          this._markRestUsed(cell);
+          this._closeModal();
+          Render.fullRender();
+        },
+      },
+      {
+        label: '撤離',
+        action: () => {
+          this._log('隊伍選擇撤離。', 'important');
+          this._markRestUsed(cell);
+          this._closeModal();
+          this._endGame('evacuate');
+        },
+      },
+    ];
+
+    for (const char of G.squad.filter(c => c.dead)) {
+      const reviveHp = Math.ceil(char.maxHp * 0.20);
+      choices.push({
+        label: `救起 ${char.name}（${reviveHp} HP）`,
+        action: () => {
+          this._reviveChar(char, reviveHp);
+          this._markRestUsed(cell);
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+    }
+
+    this._openModal({ title: '殘火點', desc: '黑夜中的殘火仍留有一點溫度。', choices });
+  },
+};
+
+Object.assign(Game, GameSiteActions);
