@@ -1,6 +1,6 @@
 ﻿// Combat rules used by Game.
 const CombatRules = {
-  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
+  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
     const rawRoll = rollResult.value;
     const diceRaw = rollResult.raw ?? rollResult.value;
     const logs = [];
@@ -17,20 +17,15 @@ const CombatRules = {
     }
 
     const telescopeActive = supporters.some(c => c.gear.effect?.type === 'add_temp_weakness');
-    if (telescopeActive && !enemy.tempWeakness) {
+    if (telescopeActive && CombatStatus.tempWeaknesses(enemy, 'normal').length === 0) {
       const value = this._nextTempWeakness(enemy, enemy.weakness);
       if (value) {
-        enemy.tempWeakness = value;
-        logs.push(`望遠鏡：敵人增加破綻 ${enemy.tempWeakness}`);
+        CombatStatus.setTempWeakness(enemy, value, { source: 'normal' });
+        logs.push(`望遠鏡：敵人增加破綻 ${value}`);
       } else {
         logs.push('望遠鏡：沒有可用骰面產生破綻');
       }
     }
-
-    const hasBlock = !suppressEnemyAction && (intent?.type === 'block' || intent?.type === 'block_attack') && !enemy.blockBroken;
-    const blockVal = hasBlock ? (enemy.block || 0) : 0;
-    enemy._block = Math.max(0, blockVal);
-    if (enemy._block > 0) logs.push(`${enemy.name} 格檔 +${enemy._block}`);
 
     const exposedFloor = enemy.exposed ? 2 : 0;
     const relicFloor = this._relicCombatFloor(attacker);
@@ -105,19 +100,19 @@ const CombatRules = {
         logs.push(`賭命骰子：押中 ${roll}，本擊傷害 +${bonus}`);
       } else {
         const maxStacks = wagerDice.maxMissStacks || 3;
-        const beforeStacks = attacker._wagerDiceMissStacks || 0;
-        attacker._wagerDiceMissStacks = Math.min(maxStacks, beforeStacks + 1);
-        logs.push(`賭命骰子：${roll} 未命中押注，懊悔 ${beforeStacks} → ${attacker._wagerDiceMissStacks} 層`);
+        const { before, after } = CombatStatus.addRemorse(attacker, 1, {
+          maxStacks,
+          rate: wagerDice.missPenaltyRate || 0.30,
+        });
+        logs.push(`賭命骰子：${roll} 未命中押注，懊悔 ${before} → ${after} 層`);
       }
     }
 
     let stunned = false;
-    enemy.extraWeaknesses = Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : [];
-    enemy.gamblerTempWeaknesses = Array.isArray(enemy.gamblerTempWeaknesses)
-      ? enemy.gamblerTempWeaknesses
-      : (enemy.gamblerTempWeakness ? [enemy.gamblerTempWeakness] : []);
+    CombatStatus.nativeWeaknesses(enemy, 'extra');
+    CombatStatus.setTempWeaknesses(enemy, CombatStatus.tempWeaknesses(enemy, 'gambler'), { source: 'gambler' });
 
-    enemy.disabledNativeWeaknesses = Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : [];
+    CombatStatus.disabledNativeWeaknesses(enemy);
     for (const activeBanner of banners) {
       if (suppressEnemyAction || activeBanner.faceType !== 'eagle_temp_weakness' || activeBanner.usedThisRound) continue;
       const value = this._nextTempWeakness(enemy, 0, [], { eagle: true });
@@ -129,18 +124,14 @@ const CombatRules = {
         logs.push(`${activeBanner.name}・${activeBanner.faceName}：沒有可用骰面產生鷹眼破綻`);
       }
     }
-    const disabledNativeWeaknesses = new Set(enemy.disabledNativeWeaknesses);
-    const activeNativeWeaknesses = [
-      disabledNativeWeaknesses.has(enemy.weakness) ? null : enemy.weakness,
-      ...enemy.extraWeaknesses.filter(w => !disabledNativeWeaknesses.has(w)),
-    ].filter(Boolean);
+    const activeNativeWeaknesses = CombatStatus.nativeWeaknesses(enemy, 'enemy');
     const allowFinalNativeWeakness = !rollResult.dodecaLuckyDice;
     let realWeaknessHit = allowFinalNativeWeakness && (
       activeNativeWeaknesses.includes(diceRaw) ||
       activeNativeWeaknesses.includes(roll)
     );
     let grapplingHookAssisted = false;
-    const tempWeaknesses = [enemy.tempWeakness, enemy.eagleTempWeakness, ...enemy.gamblerTempWeaknesses].filter(Boolean);
+    const tempWeaknesses = CombatStatus.tempWeaknesses(enemy);
     let luckyTempMultipleHits = rollResult.dodecaLuckyDice
       ? tempWeaknesses.filter(w => w > 0 && roll % w === 0)
       : [];
@@ -149,6 +140,15 @@ const CombatRules = {
       ? activeNativeWeaknesses.find(w => roll === w * 2)
       : null;
     let resonanceWeaknessHit = !!resonanceWeaknessSource;
+    let suspiciousFlawSource = null;
+    if (!realWeaknessHit && allowFinalNativeWeakness && attacker.cls === 'explorer' && enemy.suspiciousFlaw) {
+      suspiciousFlawSource = activeNativeWeaknesses.find(w => Math.abs(roll - w) === 1 || Math.abs(diceRaw - w) === 1);
+      if (suspiciousFlawSource) {
+        enemy.suspiciousFlaw = false;
+        realWeaknessHit = true;
+        logs.push(`可疑弱點：${attacker.name} 消耗標記，差 1 視為命中原生弱點 ${suspiciousFlawSource}`);
+      }
+    }
     const canUseGrapplingHook = attacker.gear?.effect?.type === 'grappling_hook' &&
       !attacker._grapplingHookUsedRound &&
       roll < maxRoll &&
@@ -171,15 +171,6 @@ const CombatRules = {
         : null;
       resonanceWeaknessHit = !!resonanceWeaknessSource;
     }
-    let suspiciousFlawSource = null;
-    if (!realWeaknessHit && allowFinalNativeWeakness && attacker.cls === 'explorer' && enemy.suspiciousFlaw) {
-      suspiciousFlawSource = activeNativeWeaknesses.find(w => Math.abs(roll - w) === 1 || Math.abs(diceRaw - w) === 1);
-      if (suspiciousFlawSource) {
-        enemy.suspiciousFlaw = false;
-        realWeaknessHit = true;
-        logs.push(`可疑弱點：${attacker.name} 消耗標記，差 1 視為命中原生弱點 ${suspiciousFlawSource}`);
-      }
-    }
     const gamblerTempWeaknessHit = !rollResult.dodecaLuckyDice && !realWeaknessHit && !tempWeaknessHit &&
       !!(enemy.gamblerTempWeakness && roll === enemy.gamblerTempWeakness);
     const eagleFeatherNativeHit = !!eagleFeatherNativeCandidate && allowFinalNativeWeakness && !realWeaknessHit && weapon?.effect?.type === 'bow_followup';
@@ -193,29 +184,58 @@ const CombatRules = {
       if (eff.type === 'block_break') {
         enemy.blockBroken = true;
         enemy.blockBrokenUntilRound = (round || 1) + 1;
-        enemy._block = 0;
+        CombatStatus.clearBlock(enemy);
+        if (enemy.abilityState?.shellCharge) {
+          logs.push(`${prefix}：蓄撞 ${enemy.abilityState.shellCharge} → 0。`);
+          enemy.abilityState.shellCharge = 0;
+        }
         logs.push(`${prefix}：敵人格檔暫時破除。`);
       }
       if (eff.type === 'fear') {
-        enemy._block = 0;
+        CombatStatus.clearBlock(enemy);
         logs.push(`${prefix}：本次無視格檔。`);
+      }
+      if (eff.type === 'poison_weaken') {
+        if (!enemy.abilityState) enemy.abilityState = {};
+        enemy.abilityState.poisonWeakened = true;
+        logs.push(`${prefix}：毒粉潰散，本場戰鬥毒粉傷害 -1。`);
       }
       if (eff.type === 'expose') {
         enemy.exposed = true;
-        enemy.exposedUntilRound = (round || 1) + 1;
-        logs.push(`${prefix}：敵人被揭露，攻擊骰暫時保底 2。`);
+        enemy.exposedUntilRound = (round || 1) + Math.max(1, eff.duration || 1);
+        logs.push(`${prefix}：敵人被揭露。`);
       }
       if (eff.type === 'gear_drop_boost') {
         enemy.gearDropBoost = true;
         logs.push(`${prefix}：箱扣鬆脫，勝利後角色裝備掉落率提高。`);
       }
+      if (eff.type === 'suppress_pain_growth') {
+        if (!enemy.abilityState) enemy.abilityState = {};
+        enemy.abilityState.painGrowthSuppressed = true;
+        logs.push(`${prefix}：痛痕滋長被破除，牠不再於每回合開始自然累積傷口。`);
+      }
+      if (eff.type === 'clear_gaze_weaknesses') {
+        for (const char of squad || []) CombatStatus.clearNativeWeaknesses(char, { source: 'gaze' });
+        logs.push(`${prefix}：裂隙凝視被打斷，我方全體由裂隙凝視產生的原生弱點清除。`);
+      }
+      if (eff.type === 'add_fate_unlucky') {
+        const added = EnemyAbilities._addFateUnluckyFace(enemy);
+        logs.push(added
+          ? `${prefix}：命運偏折，擲命守衛新增厄運面 ${added}。`
+          : `${prefix}：命運偏折，但擲命守衛已沒有可新增的厄運面。`);
+      }
+      if (eff.type === 'clear_dice_pollution') {
+        EnemyAbilities.clearOneDicePollutionFromAll(squad, logs);
+      }
       return eff;
     };
 
     if (realWeaknessHit) {
-      const eff = applyNativeWeaknessEffect('原生弱點');
+      const eff = allowNativeWeaknessEffect ? applyNativeWeaknessEffect('原生弱點') : (enemy.weaknessEffect || {});
       damage += 3;
-      logs.push(`命中原生弱點 ${nativeWeaknessFace}：${eff.desc || ''}，傷害 +3`);
+      logs.push(allowNativeWeaknessEffect
+        ? `命中原生弱點 ${nativeWeaknessFace}：${eff.desc || ''}，傷害 +3`
+        : `追擊命中原生弱點 ${nativeWeaknessFace}：不觸發破除效果，傷害 +3`);
 
       const lens = attacker.fusedRelic?.effect?.type === 'flaw_lens'
         ? attacker.fusedRelic
@@ -231,7 +251,7 @@ const CombatRules = {
           const added = this._nextNativeWeakness(enemy, nativeWeaknessFace);
           if (added) {
             attacker._flawLensUsed = true;
-            enemy.extraWeaknesses.push(added);
+            CombatStatus.addExtraNativeWeakness(enemy, added, { source: 'flaw_lens' });
             logs.push(`鷹眼透鏡：敵人新增原生弱點 ${added}`);
           } else {
             attacker._flawLensUsed = true;
@@ -242,8 +262,7 @@ const CombatRules = {
         }
       }
       if (enemy.eagleNativeWeakness?.source === 'star_hunter_eye' && enemy.eagleNativeWeakness.value === nativeWeaknessFace) {
-        enemy.extraWeaknesses = (enemy.extraWeaknesses || []).filter(w => w !== nativeWeaknessFace);
-        enemy.eagleNativeWeakness = null;
+        CombatStatus.setEagleNativeWeakness(enemy, null);
         const nextStarHunterWeakness = this._nextEagleWeakness(enemy, nativeWeaknessFace);
         if (nextStarHunterWeakness) {
           this._setEagleWeakness(enemy, {
@@ -288,8 +307,10 @@ const CombatRules = {
         logs.push('裂星破滅：鷹眼羽飾的視為命中不會破壞原生弱點。');
       }
     } else if (resonanceWeaknessHit) {
-      const eff = applyNativeWeaknessEffect('共鳴弱點');
-      logs.push(`共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，觸發「${eff.desc || ''}」。`);
+      const eff = allowNativeWeaknessEffect ? applyNativeWeaknessEffect('共鳴弱點') : (enemy.weaknessEffect || {});
+      logs.push(allowNativeWeaknessEffect
+        ? `共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，觸發「${eff.desc || ''}」。`
+        : `追擊命中共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，不觸發破除效果。`);
     } else if (tempWeaknessHit) {
       const bonus = rollResult.dodecaLuckyDice ? 3 : 1;
       damage += bonus;
@@ -312,24 +333,42 @@ const CombatRules = {
       logs.push('命中搏命者產生的破綻。');
     }
 
+    if (rollResult.pollutionLocked) {
+      logs.push(`污染鎖定：原始骰面 ${rollResult.pollutedFace} 無法被改骰或保底。`);
+    }
+
+    const playerDamageState = { damage, pollutionTriggered: false, pollutionHeal: 0, pollutionSelfDamage: 0 };
+    EnemyAbilities.beforePlayerDamage(playerDamageState, {
+      attacker,
+      enemy,
+      squad,
+      roll,
+      rollResult,
+      realWeaknessHit,
+      weaknessHit,
+      allowNativeWeaknessEffect,
+      logs,
+      round,
+    });
+    damage = Math.max(0, playerDamageState.damage || 0);
+
     const gamblerFace = roll;
     const gamblerEvenBacklash = attacker.cls === 'scholar' && gamblerFace % 2 === 0;
     const dodecaOddRefresh = gamblerFace % 2 === 1 && (attacker.cls === 'scholar' || gamblerFace >= 7);
 
     if ((rollResult.dodecaFateDice || rollResult.dodecaLuckyDice) && dodecaOddRefresh) {
       if (rollResult.dodecaFateDice) {
-        enemy.extraWeaknesses = enemy.extraWeaknesses.filter(w => w !== enemy.gamblerNativeWeakness);
+        CombatStatus.removeExtraNativeWeakness(enemy, enemy.gamblerNativeWeakness);
         enemy.gamblerNativeWeakness = this._nextNativeWeakness(enemy, gamblerFace);
         if (enemy.gamblerNativeWeakness) {
-          enemy.extraWeaknesses.push(enemy.gamblerNativeWeakness);
+          CombatStatus.addExtraNativeWeakness(enemy, enemy.gamblerNativeWeakness, { source: 'gambler_native' });
           logs.push(`十二面命運骰：單數 ${gamblerFace}，刷新 1 個原生弱點：${enemy.gamblerNativeWeakness}`);
         } else {
           logs.push(`十二面命運骰：單數 ${gamblerFace}，沒有可用骰面刷新原生弱點`);
         }
       } else {
         const count = attacker.cls === 'scholar' && gamblerFace >= 7 ? 2 : 1;
-        enemy.gamblerTempWeaknesses = this._nextGamblerTempWeaknesses(enemy, gamblerFace, count);
-        enemy.gamblerTempWeakness = enemy.gamblerTempWeaknesses[0] || null;
+        CombatStatus.setTempWeaknesses(enemy, this._nextGamblerTempWeaknesses(enemy, gamblerFace, count), { source: 'gambler' });
         logs.push(enemy.gamblerTempWeaknesses.length > 0
           ? `十二面幸運骰：單數 ${gamblerFace}，刷新 ${enemy.gamblerTempWeaknesses.length} 個搏命破綻：${enemy.gamblerTempWeaknesses.join('、')}`
           : `十二面幸運骰：單數 ${gamblerFace}，沒有可用骰面刷新破綻`);
@@ -342,8 +381,7 @@ const CombatRules = {
       logs.push(`十二面骰：非搏命者擲出低單數 ${gamblerFace}，不刷新弱點。`);
     } else if (attacker.cls === 'scholar') {
       if (gamblerFace % 2 === 1) {
-        enemy.gamblerTempWeakness = this._nextGamblerTempWeakness(enemy, gamblerFace);
-        enemy.gamblerTempWeaknesses = enemy.gamblerTempWeakness ? [enemy.gamblerTempWeakness] : [];
+        CombatStatus.setTempWeakness(enemy, this._nextGamblerTempWeakness(enemy, gamblerFace), { source: 'gambler' });
         logs.push(enemy.gamblerTempWeakness
           ? `搏命者：單數攻擊，刷新搏命破綻 ${enemy.gamblerTempWeakness}`
           : '搏命者：沒有可用骰面刷新破綻');
@@ -355,18 +393,17 @@ const CombatRules = {
         } else if (rollResult.boneDiceBagSuppressScholarBacklash) {
           logs.push('骨骰袋：本次低骰補正變為偶數，不觸發雙數反噬');
         } else {
-          const beforeStacks = attacker._gamblerBacklashStacks || 0;
-          attacker._gamblerBacklashStacks = Math.min(3, beforeStacks + 1);
-          attacker._gamblerBacklashRate = 0.20;
-          logs.push(`搏命者：雙數反噬，${attacker.name} 反噬 ${beforeStacks} → ${attacker._gamblerBacklashStacks} 層`);
+          const { before, after } = CombatStatus.addBacklash(attacker, 1, { maxStacks: 3, rate: 0.20 });
+          logs.push(`搏命者：雙數反噬，${attacker.name} 反噬 ${before} → ${after} 層`);
         }
       }
     }
 
     if (weapon?.effect?.type === 'healing_staff') {
-      if (enemy._block > 0) {
-        logs.push(`祈癒杖：本次攻擊無視格檔 ${enemy._block}`);
-        enemy._block = 0;
+      const currentBlock = CombatStatus.getBlock(enemy);
+      if (currentBlock > 0) {
+        logs.push(`祈癒杖：本次攻擊無視格檔 ${currentBlock}`);
+        CombatStatus.clearBlock(enemy);
       }
       if (realWeaknessHit) {
         const heal = weapon.effect.healOnRealWeakness || 1;
@@ -394,16 +431,6 @@ const CombatRules = {
         damage += roll;
         logs.push(`影牙匕首：未命中弱點，額外造成最終骰面 ${roll} 傷害，傷害 ${damage}`);
       }
-    }
-
-    if (weapon?.effect?.type === 'defense_pierce' && enemy._block > 0) {
-      const pierce = Math.min(weapon.effect.value, enemy._block);
-      enemy._block = Math.max(0, enemy._block - weapon.effect.value);
-      logs.push(`槌：格檔 -${pierce}，剩餘 ${enemy._block}`);
-    }
-    if (weapon?.effect?.type === 'defense_pierce' && rawRoll === weapon.effect.penalty?.onRoll) {
-      attacker.hp = Math.max(0, attacker.hp - weapon.effect.penalty.selfDmg);
-      logs.push(`槌反噬：骰出 1，${attacker.name} 自受 ${weapon.effect.penalty.selfDmg} 傷`);
     }
 
     const dmgBonus = attacker.fusedRelic?.effect?.type === 'combat_damage_bonus'
@@ -512,11 +539,10 @@ const CombatRules = {
       }
     }
 
-    if (enemy._block > 0 && damage > 0) {
-      const absorbed = Math.min(enemy._block, damage);
-      enemy._block = Math.max(0, enemy._block - damage);
-      damage = Math.max(0, damage - absorbed);
-      logs.push(`格檔吸收 ${absorbed}，剩餘傷害 ${damage}`);
+    if (CombatStatus.getBlock(enemy) > 0 && damage > 0) {
+      const blockResult = CombatStatus.consumeBlock(enemy, damage);
+      damage = blockResult.damage;
+      logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，剩餘傷害 ${damage}`);
     }
 
     if (starBreakerFixedDamage > 0) {
@@ -528,6 +554,7 @@ const CombatRules = {
     const canUseCorrosiveOil = corrosiveOil &&
       !attacker._corrosiveOilUsedRound &&
       weaknessHit &&
+      damage > 0 &&
       currentWounds >= (corrosiveOil.woundThreshold || 5);
     if (canUseCorrosiveOil) {
       attacker._corrosiveOilUsedRound = true;
@@ -538,7 +565,7 @@ const CombatRules = {
 
     const playerBlockValue = this._playerShieldBlock(attacker, roll);
     if (playerBlockValue > 0) {
-      attacker._shield = Math.max(attacker._shield || 0, playerBlockValue);
+      CombatStatus.raiseBlock(attacker, playerBlockValue);
       logs.push(`${attacker.gear.name}：${attacker.name} 獲得格檔 ${playerBlockValue}`);
     }
 
@@ -611,12 +638,29 @@ const CombatRules = {
       }
     }
     const enemyDead = enemy.hp <= 0;
-    enemy._block = 0;
+    let enemyBlockGain = 0;
+    const enemyWillBlock = !suppressEnemyAction && !stunned && !enemyDead && !enemy.blockBroken &&
+      (intent?.type === 'block' || intent?.type === 'block_attack');
+    if (enemyWillBlock) {
+      const blockVal = Math.max(0, enemy.block || 0);
+      if (blockVal > 0) {
+        CombatStatus.raiseBlock(enemy, blockVal);
+        enemyBlockGain = blockVal;
+        logs.push(`${enemy.name} 格檔 +${blockVal}`);
+        EnemyAbilities.afterEnemyBlock?.({
+          enemy,
+          intent,
+          block: blockVal,
+          logs,
+          round,
+        });
+      }
+    }
 
     let counterDmg = 0;
     let aoeCounter = 0;
     let enemyDiceRoll = null;
-    const enemyAttackFlow = !suppressEnemyAction && !stunned && !enemyDead &&
+    let enemyAttackFlow = !suppressEnemyAction && !stunned && !enemyDead &&
       ['attack', 'block_attack', 'dice_attack', 'aoe'].includes(intent?.type);
     if (enemyAttackFlow) {
       if (intent?.type === 'attack' || intent?.type === 'block_attack') counterDmg = enemy.attack;
@@ -632,6 +676,36 @@ const CombatRules = {
     const counterTarget = counterDmg > 0
       ? (squad.find(c => c.id === intent?.targetId && c.hp > 0 && !c.dead) || attacker)
       : null;
+    const enemyActionResult = {
+      counterDmg,
+      aoeCounter,
+      enemyDiceRoll,
+      enemyAttackFlow,
+      counterTarget,
+      counterTargetId: counterTarget?.id || null,
+      counterTargetName: counterTarget?.name || null,
+      aoeDamageByChar: null,
+      gazeSummary: null,
+      fateSummary: null,
+      bannerSummary: null,
+      fateLuckyFace: null,
+      fateUnluckyFaces: null,
+    };
+    if (!enemyDead) {
+      EnemyAbilities.beforeEnemyAction(enemyActionResult, {
+        attacker,
+        enemy,
+        squad,
+        intent,
+        logs,
+        round,
+      });
+    }
+    counterDmg = Math.max(0, enemyActionResult.counterDmg || 0);
+    aoeCounter = Math.max(0, enemyActionResult.aoeCounter || 0);
+    enemyDiceRoll = enemyActionResult.enemyDiceRoll;
+    enemyAttackFlow = !!enemyActionResult.enemyAttackFlow;
+    const aoeDamageByChar = enemyActionResult.aoeDamageByChar || null;
 
     if (counterDmg > 0) {
       const armorReduce = (combatMods || []).filter(m => m.type === 'damage_reduce').reduce((s, m) => s + m.value, 0);
@@ -647,29 +721,20 @@ const CombatRules = {
         counterDmg = Math.max(0, counterDmg - weapon.effect.value);
         logs.push(`弓：未造成傷害，反擊 -${weapon.effect.value}，剩餘 ${counterDmg}`);
       }
-      if (counterTarget._shield > 0) {
-        const absorbed = Math.min(counterTarget._shield, counterDmg);
-        counterTarget._shield -= absorbed;
-        counterDmg -= absorbed;
-        logs.push(`格檔吸收 ${absorbed}，剩餘格檔 ${counterTarget._shield}，反擊 ${counterDmg}`);
+      counterDmg = CombatStatus.applyWoundTakenBonus(counterTarget, counterDmg, logs);
+      if (CombatStatus.getBlock(counterTarget) > 0) {
+        const blockResult = CombatStatus.consumeBlock(counterTarget, counterDmg);
+        counterDmg = blockResult.damage;
+        logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，反擊 ${counterDmg}`);
       }
       if (counterDmg > 0) {
-        const wagerStacks = wagerDice?.active ? 0 : (counterTarget._wagerDiceMissStacks || 0);
-        if (wagerStacks > 0) {
-          const rate = counterTarget._wagerDicePenaltyRate || 0.30;
-          const bonus = Math.max(1, Math.ceil(counterDmg * rate * wagerStacks));
-          counterDmg += bonus;
-          counterTarget._wagerDicePenaltyPendingClear = true;
-          logs.push(`賭命骰子：懊悔 ${wagerStacks} 層，本次受擊傷害 +${bonus}，反擊 ${counterDmg}`);
-        }
-        const gamblerStacks = counterTarget._gamblerBacklashStacks || 0;
-        if (gamblerStacks > 0) {
-          const rate = counterTarget._gamblerBacklashRate || 0.20;
-          const bonus = Math.max(1, Math.ceil(counterDmg * rate * gamblerStacks));
-          counterDmg += bonus;
-          counterTarget._gamblerBacklashPendingClear = true;
-          logs.push(`搏命反噬：${gamblerStacks} 層，本次受擊傷害 +${bonus}，反擊 ${counterDmg}`);
-        }
+        counterDmg = CombatStatus.applyIncomingRiskBonuses(counterTarget, counterDmg, {
+          allowRemorse: !wagerDice?.active,
+          allowBacklash: true,
+          logs,
+          damageLabel: '受擊傷害',
+          resultLabel: '反擊',
+        });
         counterTarget.hp = Math.max(0, counterTarget.hp - counterDmg);
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
@@ -681,6 +746,19 @@ const CombatRules = {
       logs.push(`${enemy.name} 被震懾，無法行動。`);
     } else if (intent?.type === 'block' && !enemyDead) {
       logs.push(`${enemy.name} 採取防禦，沒有反擊。`);
+    } else if (intent?.type === 'banner_switch' && !enemyDead && !enemyActionResult.bannerSummary) {
+      logs.push(`${enemy.name} 換旗整隊，沒有攻擊。`);
+    }
+
+    if (!enemyDead) {
+      EnemyAbilities.afterEnemyAction(enemyActionResult, {
+        attacker,
+        enemy,
+        squad,
+        intent,
+        logs,
+        round,
+      });
     }
 
     return {
@@ -691,8 +769,17 @@ const CombatRules = {
       counterDmg,
       counterTargetId: counterTarget?.id || null,
       counterTargetName: counterTarget?.name || null,
+      enemyBlockGain,
       aoeCounter,
+      aoeDamageByChar,
       enemyDiceRoll,
+      gazeRoll: enemyActionResult.gazeRoll || null,
+      gazeSummary: enemyActionResult.gazeSummary || null,
+      fateRoll: enemyActionResult.fateRoll || null,
+      fateSummary: enemyActionResult.fateSummary || null,
+      bannerSummary: enemyActionResult.bannerSummary || null,
+      fateLuckyFace: enemyActionResult.fateLuckyFace || null,
+      fateUnluckyFaces: Array.isArray(enemyActionResult.fateUnluckyFaces) ? enemyActionResult.fateUnluckyFaces : [],
       enemyAttackFlow,
       weaknessHit,
       realWeaknessHit,
@@ -766,30 +853,19 @@ const CombatRules = {
   },
 
   _nativeWeaknessSet(enemy) {
-    const disabled = new Set(Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : []);
-    return new Set([
-      disabled.has(enemy.weakness) ? null : enemy.weakness,
-      ...(Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : []).filter(w => !disabled.has(w)),
-      enemy.eagleNativeWeakness?.value && !disabled.has(enemy.eagleNativeWeakness.value) ? enemy.eagleNativeWeakness.value : null,
-    ].filter(Boolean));
+    return new Set(CombatStatus.nativeWeaknesses(enemy, 'enemy'));
   },
 
   _nativeWeaknessUsedSet(enemy) {
-    return new Set([
-      enemy.weakness,
-      ...(Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : []),
-      enemy.eagleNativeWeakness?.value || null,
-      ...(Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : []),
-    ].filter(Boolean));
+    return new Set(CombatStatus.nativeWeaknesses(enemy, 'used'));
   },
 
   _tempWeaknessSet(enemy, omit = {}) {
-    return new Set([
-      omit.telescope ? null : enemy.tempWeakness,
-      omit.gambler ? null : enemy.gamblerTempWeakness,
-      omit.eagle ? null : enemy.eagleTempWeakness,
-      ...(omit.gambler ? [] : (Array.isArray(enemy.gamblerTempWeaknesses) ? enemy.gamblerTempWeaknesses : [])),
-    ].filter(Boolean));
+    const values = [];
+    if (!omit.telescope) values.push(...CombatStatus.tempWeaknesses(enemy, 'normal'));
+    if (!omit.gambler) values.push(...CombatStatus.tempWeaknesses(enemy, 'gambler'));
+    if (!omit.eagle) values.push(...CombatStatus.tempWeaknesses(enemy, 'eagle'));
+    return new Set(values);
   },
 
   _nextTempWeakness(enemy, seed = 0, extraUsed = [], omit = {}) {
@@ -807,26 +883,21 @@ const CombatRules = {
   },
 
   _clearEagleWeakness(enemy) {
-    if (enemy.eagleNativeWeakness?.value) {
-      enemy.extraWeaknesses = (enemy.extraWeaknesses || []).filter(w => w !== enemy.eagleNativeWeakness.value);
-    }
-    enemy.eagleTempWeakness = null;
-    enemy.eagleNativeWeakness = null;
+    CombatStatus.clearTempWeakness(enemy, { source: 'eagle' });
+    CombatStatus.setEagleNativeWeakness(enemy, null);
   },
 
   _setEagleWeakness(enemy, { kind, value, duration = 0, round = 1, source = null }) {
     if (!value) return false;
-    enemy.extraWeaknesses = Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : [];
     this._clearEagleWeakness(enemy);
     if (kind === 'native') {
-      enemy.eagleNativeWeakness = {
+      CombatStatus.setEagleNativeWeakness(enemy, {
         value,
         expiresRound: Number.isFinite(duration) ? round + duration + 1 : null,
         source,
-      };
-      if (!enemy.extraWeaknesses.includes(value)) enemy.extraWeaknesses.push(value);
+      });
     } else {
-      enemy.eagleTempWeakness = value;
+      CombatStatus.setTempWeakness(enemy, value, { source: 'eagle' });
     }
     return true;
   },
@@ -875,28 +946,13 @@ const CombatRules = {
   },
 
   _eagleFeatherShatterTarget(enemy, activeNativeWeaknesses = []) {
-    const disabled = new Set(Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : []);
+    const disabled = new Set(CombatStatus.disabledNativeWeaknesses(enemy));
     if (enemy?.weakness && !disabled.has(enemy.weakness)) return enemy.weakness;
     return activeNativeWeaknesses.find(w => w && !disabled.has(w)) || null;
   },
 
   _shatterNativeWeakness(enemy, face) {
-    enemy.extraWeaknesses = Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : [];
-    enemy.disabledNativeWeaknesses = Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : [];
-
-    let shattered = false;
-    if (enemy.eagleNativeWeakness?.value === face) {
-      enemy.eagleNativeWeakness = null;
-      shattered = true;
-    }
-    const extraCount = enemy.extraWeaknesses.length;
-    enemy.extraWeaknesses = enemy.extraWeaknesses.filter(w => w !== face);
-    if (enemy.extraWeaknesses.length !== extraCount) shattered = true;
-    if (face === enemy.weakness && !enemy.disabledNativeWeaknesses.includes(face)) {
-      enemy.disabledNativeWeaknesses.push(face);
-      shattered = true;
-    }
-    return shattered;
+    return CombatStatus.shatterNativeWeakness(enemy, face);
   },
 };
 

@@ -230,40 +230,126 @@ const GameDevTool = {
   },
 
   _devChooseEnemyCombat() {
-    const enemies = (typeof ENEMIES !== 'undefined' ? ENEMIES : []).filter(Boolean);
-    const choices = enemies.map(enemy => {
-      const resolved = this._devResolveEnemyForCombat(enemy);
-      return {
-        label: `${resolved.icon || ''} ${resolved.name}`,
-        detail: this._devEnemyCombatDetail(resolved),
-        action: () => this._devStartEnemyCombat(resolved),
-      };
+    this._openModal({
+      title: '測試工具：指定怪物戰鬥',
+      desc: '選擇怪物分類。弱型與中型可以指定階段強度，測試戰鬥不消耗行動，也不會結算地圖格獎勵。',
+      choices: [
+        { label: '弱型怪物', action: () => this._devChooseEnemyCombatCategory('weak') },
+        { label: '中型怪物', action: () => this._devChooseEnemyCombatCategory('medium') },
+        { label: '強型怪物', action: () => this._devChooseEnemyCombatCategory('strong') },
+        { label: '頭目怪物', action: () => this._devChooseEnemyCombatCategory('boss') },
+        { label: '聖物守護者', action: () => this._devChooseEnemyCombatCategory('echo') },
+        { label: '黑暗怪物', action: () => this._devChooseEnemyCombatCategory('dark') },
+        { label: '返回', action: () => this.openDevTool() },
+      ],
     });
+  },
 
-    if (typeof this._darkMonsterEnemy === 'function') {
-      for (const level of [5, 10, 15]) {
+  _devChooseEnemyCombatCategory(category) {
+    if (category === 'dark') {
+      this._devChooseDarkMonsterCombat();
+      return;
+    }
+    const enemies = this._devEnemiesForCategory(category);
+    const labels = {
+      weak: '弱型怪物',
+      medium: '中型怪物',
+      strong: '強型怪物',
+      boss: '頭目怪物',
+      echo: '聖物守護者',
+    };
+    if (enemies.length === 0) {
+      this._openModal({
+        title: `測試工具：${labels[category] || '怪物'}`,
+        desc: '目前沒有這個分類的怪物。',
+        choices: [{ label: '返回', action: () => this._devChooseEnemyCombat() }],
+      });
+      return;
+    }
+    this._openModal({
+      title: `測試工具：${labels[category] || '怪物'}`,
+      desc: '選擇要測試的怪物。',
+      choices: enemies.map(enemy => {
+        const preview = this._devResolveEnemyForCombat(enemy, 0);
+        return {
+          label: `${preview.icon || ''} ${enemy.tiers?.[0]?.name || preview.name || enemy.id}`,
+          detail: this._devEnemyCombatDetail(preview),
+          action: () => this._devChooseEnemyCombatStrength(enemy, category),
+        };
+      }).concat([{ label: '返回', action: () => this._devChooseEnemyCombat() }]),
+    });
+  },
+
+  _devEnemiesForCategory(category) {
+    const enemies = (typeof ENEMIES !== 'undefined' ? ENEMIES : []).filter(Boolean);
+    if (category === 'weak') return enemies.filter(enemy => enemy.tier === 'weak' && !enemy.boss);
+    if (category === 'medium') return enemies.filter(enemy => enemy.tier === 'medium' && !enemy.boss);
+    if (category === 'strong') return enemies.filter(enemy => enemy.tier === 'strong' && !enemy.boss);
+    if (category === 'echo') return enemies.filter(enemy => enemy.echoGuardian);
+    if (category === 'boss') {
+      return enemies.filter(enemy =>
+        (enemy.boss || enemy.rescueBoss || enemy.erosionBoss || enemy.treasureMimic) &&
+        !enemy.echoGuardian &&
+        !enemy.devOnly
+      );
+    }
+    return [];
+  },
+
+  _devChooseEnemyCombatStrength(enemy, category) {
+    const tierCount = Array.isArray(enemy?.tiers) ? enemy.tiers.length : 0;
+    if (tierCount <= 0) {
+      const resolved = this._devResolveEnemyForCombat(enemy);
+      this._devStartEnemyCombat(resolved);
+      return;
+    }
+    this._openModal({
+      title: `測試工具：${enemy.tiers?.[0]?.name || enemy.name}`,
+      desc: '選擇要測試的階段強度。',
+      choices: enemy.tiers.map((tier, index) => {
+        const resolved = this._devResolveEnemyForCombat(enemy, index);
+        return {
+          label: `第 ${index + 1} 階：${tier.name}`,
+          detail: this._devEnemyCombatDetail(resolved),
+          action: () => this._devStartEnemyCombat(resolved),
+        };
+      }).concat([{ label: '返回', action: () => this._devChooseEnemyCombatCategory(category) }]),
+    });
+  },
+
+  _devChooseDarkMonsterCombat() {
+    if (typeof this._darkMonsterEnemy !== 'function') {
+      this._openModal({
+        title: '測試工具：黑暗怪物',
+        desc: '目前無法建立黑暗怪物。',
+        choices: [{ label: '返回', action: () => this._devChooseEnemyCombat() }],
+      });
+      return;
+    }
+    const levels = [5, 10, 15];
+    this._openModal({
+      title: '測試工具：黑暗怪物',
+      desc: '選擇黑暗怪物強度。',
+      choices: levels.map(level => {
         const darkEnemy = this._darkMonsterEnemy({ id: `dev_${level}`, level }, { activeHunt: false });
-        choices.push({
-          label: `${darkEnemy.icon || ''} ${darkEnemy.name}`,
+        return {
+          label: `黑暗 ${level}：${darkEnemy.icon || ''} ${darkEnemy.name}`,
           detail: this._devEnemyCombatDetail(darkEnemy),
           action: () => this._devStartEnemyCombat(darkEnemy, {
             source: 'devDarkMonster',
             darkMonsterId: `dev_${level}`,
           }),
-        });
-      }
-    }
-
-    this._openModal({
-      title: '測試工具：指定怪物戰鬥',
-      desc: '選擇一個怪物直接進入測試戰鬥。測試戰鬥不消耗行動，也不會結算地圖格獎勵。',
-      choices: choices.concat([{ label: '返回', action: () => this.openDevTool() }]),
+        };
+      }).concat([{ label: '返回', action: () => this._devChooseEnemyCombat() }]),
     });
   },
 
-  _devResolveEnemyForCombat(enemy) {
-    if (enemy?.tiers && typeof resolveEnemyTier === 'function') {
-      return resolveEnemyTier(enemy, G.day || 1);
+  _devResolveEnemyForCombat(enemy, tierIndex = null) {
+    if (enemy?.tiers) {
+      const index = Number.isInteger(tierIndex)
+        ? Math.max(0, Math.min(enemy.tiers.length - 1, tierIndex))
+        : Math.min(enemy.tiers.length - 1, Math.floor(((G.day || 1) - 1) / (enemy.tierUpDays || 1)));
+      return { ...enemy, ...enemy.tiers[index], tiers: undefined, devTierIndex: index };
     }
     return { ...enemy };
   },
@@ -328,6 +414,10 @@ const GameDevTool = {
     if (terrainType === 'empty' && typeof createFateGamblingTableEvent === 'function') {
       events.push(this._devDecorateEvent(createFateGamblingTableEvent()));
     }
+    if (typeof this._createEchoSiteClueEvent === 'function') {
+      const echoEvent = this._createEchoSiteClueEvent(true);
+      if (echoEvent) events.unshift(echoEvent);
+    }
     return events;
   },
 
@@ -345,6 +435,7 @@ const GameDevTool = {
       combat: '戰鬥',
       find_relic: '聖物',
       fate_table: '命運賭桌',
+      echo_site_clue: '共鳴遺址',
       treasure_map: '藏寶圖',
     };
     return map[ev.type] || ev.type || '事件';

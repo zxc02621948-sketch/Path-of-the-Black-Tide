@@ -36,8 +36,91 @@ const GameStateHelpers = {
       const nextLabel = `黑暗 ${G.darkness}`;
       this._log(`${reason ? `${reason}：` : ''}${changeLabel}（${prevLabel} → ${nextLabel}）`, delta > 0 ? 'danger' : 'reward');
     }
-    this._checkDevoured();
+    const reachedMilestone = delta > 0 ? this._nextDarknessMilestone(prev, G.darkness) : null;
+    if (this._checkDevoured()) return;
+    if (reachedMilestone) this._showDarknessMilestoneOnce(reachedMilestone);
     Render.renderTopBar();
+  },
+
+  _nextDarknessMilestone(prev, next) {
+    const milestones = [5, 10, 15];
+    return milestones
+      .filter(value => prev < value && next >= value)
+      .sort((a, b) => b - a)[0] || null;
+  },
+
+  _showDarknessMilestoneOnce(value) {
+    if (!G.darknessMilestones) G.darknessMilestones = {};
+    if (G.darknessMilestones[value]) return;
+    const info = this._darknessMilestoneInfo(value);
+    if (!info) return;
+    G.darknessMilestones[value] = true;
+    this._queueSystemModal({
+      title: info.title,
+      desc: info.desc,
+      choices: [{ label: '知道了', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _darknessMilestoneInfo(value) {
+    const devourAt = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
+    const infos = {
+      5: {
+        title: '黑暗怪已出現',
+        desc: [
+          '黑暗凝成了追獵者。從現在開始，黑暗怪會在地圖上出現並朝小隊移動。',
+          '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
+          '擊敗追殺而來的黑暗怪可使黑暗 -1；主動討伐黑暗怪可使黑暗 -3，並震懾其他黑暗怪，使牠們的追殺延後 1 天。',
+        ].join('\n\n'),
+      },
+      10: {
+        title: '黑暗正在壯大',
+        desc: [
+          '邊境的黑暗已經不再只是霧。黑暗怪會持續逼近，拖延會讓牠們更容易追上小隊。',
+          '每次結束今天前，請確認隊伍狀態、附近威脅，以及是否需要血祭、休息或主動清除黑暗。',
+        ].join('\n\n'),
+      },
+      15: {
+        title: '黑暗逼近吞噬',
+        desc: [
+          `黑暗已經接近極限。若黑暗達到 ${devourAt}，邊境會吞噬一切，遊戲將直接結束。`,
+          '接下來每一次提高黑暗都可能造成致命後果。請優先降低黑暗、擊破黑暗怪，或準備撐到黎明。',
+        ].join('\n\n'),
+      },
+    };
+    return infos[value] || null;
+  },
+
+  _showNightIntroOnce() {
+    if (G.nightIntroShown) return;
+    G.nightIntroShown = true;
+    this._queueSystemModal({
+      title: '黑夜降臨',
+      desc: [
+        `第 ${CONFIG.NIGHT_START_DAY || 10} 天開始，邊境進入黑夜。`,
+        `黑夜結束今天時，全隊會受到 ${CONFIG.NIGHT_END_HP_COST || 2} 點黑夜侵蝕。`,
+        '黑暗每日上升得更快，黑暗怪也會持續追蹤小隊。休息點會變成殘火點，可用來撤離；點燃火把能暫時提高黑夜視野。',
+      ].join('\n\n'),
+      choices: [{ label: '進入黑夜', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _queueSystemModal(cfg) {
+    if (!cfg || G.phase === 'over') return;
+    if (!Array.isArray(G.pendingSystemModals)) G.pendingSystemModals = [];
+    if (G.modal || G.combat) {
+      G.pendingSystemModals.push(cfg);
+      return;
+    }
+    this._openModal(cfg);
+  },
+
+  _flushSystemModal() {
+    if (G.phase === 'over' || G.modal || G.combat) return false;
+    if (!Array.isArray(G.pendingSystemModals) || G.pendingSystemModals.length === 0) return false;
+    const cfg = G.pendingSystemModals.shift();
+    this._openModal(cfg);
+    return true;
   },
 
   _checkDevoured() {
@@ -233,23 +316,15 @@ const GameStateHelpers = {
     return baseHeal + bonus;
   },
 
-  _reduceIncomingDamage(char, amount, allowCarriedIron = false, allowWagerPenalty = false) {
+  _reduceIncomingDamage(char, amount, allowCarriedIron = false, allowWagerPenalty = false, logs = null) {
     let damage = Math.max(0, amount);
-    if (allowWagerPenalty && char?._wagerDiceMissStacks > 0 && damage > 0) {
-      const stacks = char._wagerDiceMissStacks || 0;
-      const rate = char._wagerDicePenaltyRate || 0.30;
-      const bonus = Math.max(1, Math.ceil(damage * rate * stacks));
-      damage += bonus;
-      char._wagerDicePenaltyPendingClear = true;
-    }
-    if (allowWagerPenalty && char?._gamblerBacklashStacks > 0 && damage > 0) {
-      const stacks = char._gamblerBacklashStacks || 0;
-      const rate = char._gamblerBacklashRate || 0.20;
-      const bonus = Math.max(1, Math.ceil(damage * rate * stacks));
-      damage += bonus;
-      char._gamblerBacklashPendingClear = true;
-    }
-    return damage;
+    return CombatStatus.applyIncomingRiskBonuses(char, damage, {
+      allowRemorse: allowWagerPenalty,
+      allowBacklash: allowWagerPenalty,
+      logs,
+      damageLabel: '受傷',
+      resultLabel: '傷害',
+    });
   },
 
   _aliveSquad() {
@@ -275,6 +350,9 @@ const GameStateHelpers = {
         if (!cell.cleared && cell.content?.relic) ids.add(cell.content.relic.id);
         for (const r of (cell.droppedRelics || [])) ids.add(r.id);
       }
+    }
+    for (const site of (G.echoSites || [])) {
+      if (!site.defeated && site.reservedRelicId) ids.add(site.reservedRelicId);
     }
     return ids;
   },
@@ -335,7 +413,11 @@ const GameStateHelpers = {
   },
 
   _openModal(cfg) { G.modal = cfg; Render.showModal(cfg); },
-  _closeModal()   { G.modal = null; Render.hideModal(); },
+  _closeModal() {
+    G.modal = null;
+    Render.hideModal();
+    this._flushSystemModal();
+  },
 
   // Section.
   _loadNotes()             { try { return JSON.parse(localStorage.getItem('bbn_notes')    || '{}'); } catch { return {}; } },

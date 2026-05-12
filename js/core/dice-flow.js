@@ -5,6 +5,21 @@ const GameDiceFlow = {
       ? this._rollDodecaCombat(char)
       : Dice.roll(diceType, char);
     let value = base.value;
+    const pollutionLocked = diceType === 'combat' &&
+      typeof EnemyAbilities !== 'undefined' &&
+      EnemyAbilities.isPollutedRoll?.(char, base.raw, base.sides || 6);
+    if (pollutionLocked) {
+      return {
+        ...base,
+        value: base.raw,
+        floored: false,
+        pollutionLocked: true,
+        pollutedFaceHit: true,
+        pollutedFace: base.raw,
+        charId: char?.id || null,
+        charCls: char?.cls || null,
+      };
+    }
 
     if (G.rollMods.length > 0) {
       const mod = G.rollMods.shift();

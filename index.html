@@ -15,7 +15,7 @@
   <meta name="twitter:image" content="assets/site-thumbnail.png">
   <link rel="icon" type="image/png" href="assets/site-thumbnail.png">
   <link rel="apple-touch-icon" href="assets/site-thumbnail.png">
-  <link rel="stylesheet" href="style.css?v=weakness-color-balance1">
+  <link rel="stylesheet" href="style.css?v=enemy-detail-popover1">
 </head>
 <body>
 <div id="app">
@@ -64,8 +64,16 @@
         <span id="day-label">第 <span id="day-num">1</span> 天</span>
         <span id="phase-label" class="phase-day">白日探索期</span>
       </div>
-      <div id="actions-display">
-        行動力：<span id="actions-left">3</span>&thinsp;/&thinsp;3
+      <div id="actions-display" class="actions-display">
+        <span class="actions-label">行動力</span>
+        <span class="action-pips" aria-hidden="true">
+          <span class="action-pip filled"></span>
+          <span class="action-pip filled"></span>
+          <span class="action-pip filled"></span>
+        </span>
+        <span class="actions-count"><span id="actions-left">3</span>&thinsp;/&thinsp;3</span>
+        <span id="actions-hint" class="actions-hint">選擇相鄰格</span>
+        <button id="btn-end-day" class="btn-small">結束今天</button>
       </div>
       <div id="darkness-display">
         <span id="darkness-label">晝夜平衡</span> <span id="darkness-num"></span>
@@ -73,7 +81,6 @@
         <div class="darkness-bar"><div id="darkness-bar-fill"></div></div>
       </div>
       <div id="top-controls">
-        <button id="btn-end-day" class="btn-small">結束今天 →</button>
         <button id="btn-open-notes" class="btn-small">探險筆記</button>
         <button id="btn-dev-tool" class="btn-small dev-tool-btn">測試工具</button>
       </div>
@@ -90,6 +97,9 @@
 
       <!-- 中間：地圖面板 -->
       <div id="map-panel">
+        <button id="turn-end-float" class="turn-end-float" type="button" aria-live="polite">
+          行動力已用完，請結束今天
+        </button>
         <div id="map-grid"></div>
         <div id="map-hint">點擊相鄰格子移動探索</div>
       </div>
@@ -172,37 +182,44 @@
 </div><!-- /#app -->
 
 <!-- Scripts（順序不可改） -->
-<script src="js/config.js?v=treasure-mimic1"></script>
-<script src="js/data/equipment.js?v=star-chaser-bow1"></script>
-<script src="js/data/characters.js?v=suspicious-weakness1"></script>
-<script src="js/data/relics.js?v=banner-attack-roll-rank1"></script>
-<script src="js/data/enemies.js?v=training-dummy1"></script>
-<script src="js/data/events.js?v=relic-sources1"></script>
+<script src="js/config.js?v=echo-sites1"></script>
+<script src="js/data/equipment.js?v=followup-no-break1"></script>
+<script src="js/data/characters.js?v=shared-block1"></script>
+<script src="js/data/relics.js?v=gaze-native-shared1"></script>
+<script src="js/data/enemies.js?v=shadow-hunter1"></script>
+<script src="js/data/events.js?v=echo-sites1"></script>
 <script src="js/data/resonances.js?v=pain-scar-threshold1"></script>
 <script src="js/core/dice.js?v=rulesnotes2"></script>
 <script src="js/core/map.js?v=hidden-sites1"></script>
-<script src="js/core/combat.js?v=suspicious-weakness1"></script>
+<script src="js/core/combat-status.js?v=shared-block1"></script>
+<script src="js/core/enemy-abilities.js?v=shadow-hunter1"></script>
+<script src="js/core/combat.js?v=followup-no-break1"></script>
 <script src="js/core/relic-rules.js?v=wager-remorse1"></script>
 <script src="js/core/equipment-rules.js?v=rulesnotes2"></script>
 <script src="js/core/terrain-rules.js?v=rulesnotes2"></script>
-<script src="js/core/game.js?v=gameover-lower-summary1"></script>
-<script src="js/core/inventory.js?v=split-core1"></script>
+<script src="js/core/game.js?v=wish-chest1"></script>
+<script src="js/core/inventory.js?v=wish-chest1"></script>
 <script src="js/core/character-details.js?v=eagle-lens-rename1"></script>
 <script src="js/core/dice-flow.js?v=body-resonance-per-char1"></script>
 <script src="js/core/relic-resonance.js?v=fate-dice-x3x4-test1"></script>
-<script src="js/core/game-state.js?v=gameover-intro1"></script>
-  <script src="js/core/combat-flow.js?v=temp-weakness-icon1"></script>
-<script src="js/core/site-actions.js?v=night-erosion1"></script>
-<script src="js/core/event-handlers.js?v=relic-choice-groups1"></script>
+<script src="js/core/game-state.js?v=incoming-risks1"></script>
+  <script src="js/core/combat-flow.js?v=followup-no-break1"></script>
+  <script src="js/core/combat-tooltips.js?v=enemy-detail-popover1"></script>
+  <script src="js/core/combat-inventory-flow.js?v=combat-split1"></script>
+  <script src="js/core/combat-threat.js?v=shadow-hunter1"></script>
+  <script src="js/core/combat-retreat.js?v=retreat-confirm1"></script>
+<script src="js/core/site-actions.js?v=rest-heal-percent1"></script>
+<script src="js/core/echo-sites.js?v=echo-site-header1"></script>
+<script src="js/core/event-handlers.js?v=echo-site-header1"></script>
   <script src="js/core/event-treasure.js?v=victory-drop-flow1"></script>
 <script src="js/core/event-encounters.js?v=split-events1"></script>
 <script src="js/core/event-traps.js?v=split-events1"></script>
 <script src="js/core/event-notes.js?v=split-events1"></script>
 <script src="js/core/dark-monsters.js?v=rulesnotes2"></script>
-<script src="js/core/dev-tool.js?v=eagle-lens-rename1"></script>
-<script src="js/ui/render.js?v=suspicious-weakness1"></script>
-<script src="js/ui/modal-render.js?v=suspicious-weakness1"></script>
-<script src="js/ui/notes-render.js?v=suspicious-weakness1"></script>
-<script src="js/main.js?v=rulesnotes2"></script>
+<script src="js/core/dev-tool.js?v=combat-category-test1"></script>
+<script src="js/ui/render.js?v=wish-chest1"></script>
+<script src="js/ui/modal-render.js?v=enemy-detail-popover1"></script>
+<script src="js/ui/notes-render.js?v=followup-no-break1"></script>
+<script src="js/main.js?v=end-day-cta2"></script>
 </body>
 </html>

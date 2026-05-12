@@ -18,7 +18,11 @@ const Game = {
       lightCharges: 0,
       darkMonsters: [],
       erosionBossSpawned: false,
+      darknessMilestones: {},
+      nightIntroShown: false,
+      pendingSystemModals: [],
       fateGamblingTableTriggered: false,
+      echoSites: [],
 
       map: MapGen.generate(),
       playerX: cx,
@@ -199,12 +203,18 @@ const Game = {
 
     Render.fullRender();
     Render.showNightTransition();
+    this._showNightIntroOnce();
   },
 
   _applyNightEndErosion() {
     if (G.phase !== 'night') return false;
     const damage = CONFIG.NIGHT_END_HP_COST ?? 2;
     if (damage <= 0) return false;
+    if ((G.dawnWishProtection || 0) > 0) {
+      G.dawnWishProtection = Math.max(0, (G.dawnWishProtection || 0) - 1);
+      this._log(`黎明祈願庇護隊伍，免除本次黑夜侵蝕。剩餘 ${G.dawnWishProtection} 次。`, 'reward');
+      return false;
+    }
 
     const damaged = [];
     for (const char of this._aliveSquad()) {

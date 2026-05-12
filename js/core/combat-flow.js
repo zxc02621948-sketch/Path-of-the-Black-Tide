@@ -13,6 +13,9 @@ const GameCombatFlow = {
       char._grapplingHookUsedRound = false;
       char._corrosiveOilUsedRound = false;
       char._serratedOilUsedRound = false;
+      char.dicePollution = null;
+      CombatStatus.clearNativeWeaknesses(char, { source: 'gaze' });
+      CombatStatus.clearBattleWounds(char);
     }
 
     G.combat = {
@@ -45,21 +48,20 @@ const GameCombatFlow = {
     };
     G.combat.intent = this._resolveCombatIntent(G.combat.enemy);
     this._ensureRoundStartNativeWeakness(G.combat.enemy);
+    EnemyAbilities.onCombatStart(G.combat.enemy, { ...G.combat, squad: G.squad });
 
     G.combatMods = [...G.combatMods];
     this._showCombatModal();
   },
 
   _showCombatModal() {
-    const { enemy, intent } = G.combat;
+    const { enemy } = G.combat;
 
     const modDesc = G.combatMods.length > 0 ? '\n\n戰鬥調整存在。' : '';
 
-    const intentText = intent ? `\n\n敵人意圖：${this._combatIntentLabel(intent, enemy)}` : '';
-
     this._openModal({
       title: `遭遇：${enemy.name}`,
-      desc: `${enemy.desc}\n\nHP ${enemy.hp}/${enemy.maxHp} / 格檔 ${enemy._block || 0} / 攻擊 ${enemy.attack}\n原生弱點：${enemy.weakness}（${enemy.weaknessEffect.desc}）${intentText}${modDesc}`,
+      desc: `${enemy.desc}\n\nHP ${enemy.hp}/${enemy.maxHp} / 格檔 ${CombatStatus.getBlock(enemy)} / 攻擊 ${enemy.attack}\n原生弱點：${enemy.weakness}（${enemy.weaknessEffect.desc}）${modDesc}`,
       combat: {
         ...this._buildCombatScene(enemy, null, this._combatStatusText()),
         selectable: !this._combatItemTargeting() && !G.combat.actionInProgress,
@@ -89,6 +91,7 @@ const GameCombatFlow = {
       const canReroll  = attacker.cls === 'scholar' &&
                          this._gamblerRerollsLeft() > 0 &&
                          !rollResult.gamblerResolved &&
+                         !rollResult.pollutionLocked &&
                          !opts.starHunterForceSix;
       if (canReroll) {
         let resolved = false;
@@ -159,6 +162,7 @@ const GameCombatFlow = {
       intent: G.combat.intent,
       round: G.combat.round,
       suppressEnemyAction: !!opts.bowFollowUp,
+      allowNativeWeaknessEffect: !opts.bowFollowUp,
       eagleFeatherDamageBonus: opts.eagleFeatherDamageBonus || 0,
       eagleFeatherNativeCandidate: this._eagleFeatherCanTrigger(attacker, rollResult),
       starHunterEyeDamageBonus: opts.starHunterEyeDamageBonus || 0,
@@ -176,6 +180,15 @@ const GameCombatFlow = {
     if (preCombatLogs.length > 0) {
       combatResult.logs.unshift(...preCombatLogs);
     }
+    EnemyAbilities.afterPlayerAttack(combatResult, {
+      attacker,
+      enemy,
+      squad: G.squad,
+      combat: G.combat,
+      logs: combatResult.logs,
+      rollResult,
+      opts,
+    });
     if (!opts.bowFollowUp) {
       this._spendBattleDrumCharge(combatResult.logs);
       this._refreshBattleDrum(attacker, combatResult.logs);
@@ -189,18 +202,18 @@ const GameCombatFlow = {
     if (combatResult.aoeCounter > 0) {
       const alive = this._aliveSquad();
       const allowWagerIncoming = !G.combat.wagerDice;
-      this._log(`${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`, 'danger');
+      const variedAoe = combatResult.aoeDamageByChar && Object.keys(combatResult.aoeDamageByChar).length > 0;
+      this._log(variedAoe
+        ? `${enemy.name} 反擊全隊，基礎 ${combatResult.aoeCounter} 傷害。`
+        : `${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`, 'danger');
       for (const c of alive) {
-        const stacks = allowWagerIncoming ? (c._wagerDiceMissStacks || 0) : 0;
-        let reduced = this._reduceIncomingDamage(c, combatResult.aoeCounter, true, allowWagerIncoming);
-        if (stacks > 0 && reduced > combatResult.aoeCounter) {
-          combatResult.logs.push(`賭命骰子：${c.name} 懊悔 ${stacks} 層，本次全隊攻擊受傷 ${combatResult.aoeCounter} → ${reduced}`);
-        }
-        if (c._shield > 0 && reduced > 0) {
-          const absorbed = Math.min(c._shield, reduced);
-          c._shield -= absorbed;
-          reduced -= absorbed;
-          combatResult.logs.push(`${c.name} 的格檔吸收 ${absorbed}，剩餘格檔 ${c._shield}`);
+        let incomingAoe = Math.max(0, combatResult.aoeDamageByChar?.[c.id] ?? combatResult.aoeCounter);
+        incomingAoe = CombatStatus.applyWoundTakenBonus(c, incomingAoe, combatResult.logs);
+        let reduced = this._reduceIncomingDamage(c, incomingAoe, true, allowWagerIncoming, combatResult.logs);
+        if (CombatStatus.getBlock(c) > 0 && reduced > 0) {
+          const blockResult = CombatStatus.consumeBlock(c, reduced);
+          reduced = blockResult.damage;
+          combatResult.logs.push(`${c.name} 的格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}`);
         }
         c.hp = Math.max(0, c.hp - reduced);
       }
@@ -336,6 +349,10 @@ const GameCombatFlow = {
         this._settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc);
         return;
       }
+      if (combatReward === 'echo_site') {
+        this._settleEchoSiteVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc);
+        return;
+      }
       if (combatReward === 'dev_test') {
         this._openModal({
           title: '測試戰鬥結束',
@@ -349,7 +366,10 @@ const GameCombatFlow = {
       }
 
       let droppedRelic = null;
-      const pool = this._getAvailableRelics(G.phase === 'night' ? getNightRelics() : getDayRelics());
+      const canDropRelic = this._canCombatDropRelic(enemy, combatReward);
+      const pool = canDropRelic
+        ? this._getAvailableRelics(G.phase === 'night' ? getNightRelics() : getDayRelics())
+        : [];
       if (pool.length > 0 && Math.random() < CONFIG.COMBAT_RELIC_DROP_CHANCE) {
         droppedRelic = weightedRelicPick(pool);
         cell.content = { relic: { ...droppedRelic } };
@@ -385,6 +405,12 @@ const GameCombatFlow = {
     }
   },
 
+  _canCombatDropRelic(enemy, combatReward = null) {
+    if (!enemy) return false;
+    if (enemy.boss || enemy.rescueBoss || enemy.erosionBoss || enemy.echoGuardian || enemy.treasureMimic) return false;
+    return !['rescue', 'erosion', 'corrupted', 'treasure_mimic', 'echo_site', 'dev_test'].includes(combatReward);
+  },
+
   _combatFinalHitDesc(attacker, enemy, combatResult = {}) {
     const damage = Math.max(0, combatResult.damage || 0);
     if (damage > 0) return `${attacker.name} 最後一擊對 ${enemy.name} 造成 ${damage} 點傷害。`;
@@ -397,7 +423,7 @@ const GameCombatFlow = {
     for (const char of G.squad) {
       char.dead = false;
       char.hp = Math.max(1, Math.min(char.maxHp || 1, char.hp || 1));
-      char._shield = 0;
+      CombatStatus.clearBlock(char);
     }
     this._endWagerDiceAttackFlow();
     G.combat = null;
@@ -482,6 +508,10 @@ const GameCombatFlow = {
   },
 
   _applyStarHunterForceSix(rollResult) {
+    if (rollResult?.pollutionLocked) {
+      this._log('污染骰面鎖定，獵星之眼無法改變本次骰面。', 'danger');
+      return rollResult;
+    }
     rollResult.value = 6;
     rollResult.floored = true;
     rollResult.starHunterForceSixNoWeakness = true;
@@ -739,219 +769,6 @@ const GameCombatFlow = {
     }
   },
 
-  showCombatStatusDetail(charId, statusType, ev = null) {
-    if (!G.combat) return;
-    const char = G.squad.find(c => c.id === charId);
-    if (!char) return;
-    const isRemorse = statusType === 'remorse';
-    const stacks = isRemorse
-      ? (char._wagerDiceMissStacks || 0)
-      : (char._gamblerBacklashStacks || 0);
-    if (stacks <= 0) return;
-
-    const rate = isRemorse ? 30 : 20;
-    const titleText = isRemorse ? '懊悔' : '反噬';
-    const sourceText = isRemorse
-      ? '賭命骰子押注失敗時累積。'
-      : '搏命者攻擊骰為雙數時累積。';
-    const descText = `${char.name} 目前 ${stacks} 層，下一次敵方攻擊流程受擊傷害提高 ${stacks * rate}%。${sourceText}觸發敵方攻擊流程後清除。`;
-
-    let popover = document.getElementById('combat-status-popover');
-    if (!popover) {
-      popover = document.createElement('div');
-      popover.id = 'combat-status-popover';
-      popover.className = 'combat-banner-popover combat-status-popover';
-      document.body.appendChild(popover);
-    }
-    popover.replaceChildren();
-
-    const title = document.createElement('div');
-    title.className = 'combat-banner-popover-title';
-    title.textContent = `${titleText} ${stacks} 層`;
-    const desc = document.createElement('div');
-    desc.className = 'combat-banner-popover-desc';
-    desc.textContent = descText;
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'combat-banner-popover-close';
-    close.textContent = '關閉';
-    close.addEventListener('click', () => popover.classList.remove('visible'));
-    popover.append(title, desc, close);
-
-    popover.classList.add('visible');
-    const target = ev?.currentTarget || null;
-    const rect = target?.getBoundingClientRect?.() || null;
-    const left = rect ? rect.left : (window.innerWidth / 2 - 130);
-    const top = rect ? rect.bottom + 6 : (window.innerHeight / 2 - 70);
-    popover.style.left = `${Math.max(8, Math.min(left, window.innerWidth - popover.offsetWidth - 8))}px`;
-    popover.style.top = `${Math.max(8, Math.min(top, window.innerHeight - popover.offsetHeight - 8))}px`;
-
-    if (!this._combatStatusOutsideHandler) {
-      this._combatStatusOutsideHandler = event => {
-        const panel = document.getElementById('combat-status-popover');
-        if (!panel?.classList.contains('visible')) return;
-        if (event.target.closest?.('#combat-status-popover, .combat-status-badge, .combat-wound-badge, .combat-native-weakness-badge, .combat-temp-weakness-badge')) return;
-        panel.classList.remove('visible');
-      };
-      document.addEventListener('click', this._combatStatusOutsideHandler);
-    }
-  },
-
-  showCombatWoundDetail(ev = null) {
-    const enemy = G.combat?.enemy;
-    if (!enemy) return;
-    const wounds = Math.max(0, enemy.wounds || 0);
-    if (wounds <= 0) return;
-    const max = enemy.woundMax || 15;
-    const bonus = wounds * 5;
-    const descText = `${enemy.name} 目前 ${wounds} / ${max} 層傷口，通常受到傷害提高 ${bonus}%。每 1 層傷口提供 +5% 受傷害；痛痕共鳴・爆發的持有者攻擊時會忽略這個增傷，改以快速累積並引爆傷口。`;
-
-    let popover = document.getElementById('combat-status-popover');
-    if (!popover) {
-      popover = document.createElement('div');
-      popover.id = 'combat-status-popover';
-      popover.className = 'combat-banner-popover combat-status-popover';
-      document.body.appendChild(popover);
-    }
-    popover.replaceChildren();
-
-    const title = document.createElement('div');
-    title.className = 'combat-banner-popover-title';
-    title.textContent = `傷口 ${wounds} 層`;
-    const desc = document.createElement('div');
-    desc.className = 'combat-banner-popover-desc';
-    desc.textContent = descText;
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'combat-banner-popover-close';
-    close.textContent = '關閉';
-    close.addEventListener('click', () => popover.classList.remove('visible'));
-    popover.append(title, desc, close);
-
-    popover.classList.add('visible');
-    const target = ev?.currentTarget || null;
-    const rect = target?.getBoundingClientRect?.() || null;
-    const left = rect ? rect.left : (window.innerWidth / 2 - 130);
-    const top = rect ? rect.bottom + 6 : (window.innerHeight / 2 - 70);
-    popover.style.left = `${Math.max(8, Math.min(left, window.innerWidth - popover.offsetWidth - 8))}px`;
-    popover.style.top = `${Math.max(8, Math.min(top, window.innerHeight - popover.offsetHeight - 8))}px`;
-
-    if (!this._combatStatusOutsideHandler) {
-      this._combatStatusOutsideHandler = event => {
-        const panel = document.getElementById('combat-status-popover');
-        if (!panel?.classList.contains('visible')) return;
-        if (event.target.closest?.('#combat-status-popover, .combat-status-badge, .combat-wound-badge, .combat-native-weakness-badge, .combat-temp-weakness-badge')) return;
-        panel.classList.remove('visible');
-      };
-      document.addEventListener('click', this._combatStatusOutsideHandler);
-    }
-  },
-
-  showCombatNativeWeaknessDetail(value, kind = 'main', ev = null) {
-    const enemy = G.combat?.enemy;
-    if (!enemy || !value) return;
-    const label = kind === 'extra' ? '原生弱點+' : '原生弱點';
-    const effect = enemy.weaknessEffect?.desc || '命中時會觸發此敵人的原生弱點效果。';
-    const descText = `${enemy.name} 的${label}為 ${value}。角色攻擊骰命中此骰面時，視為命中原生弱點，通常傷害 +3，並觸發此敵人的原生弱點效果：${effect}`;
-
-    let popover = document.getElementById('combat-status-popover');
-    if (!popover) {
-      popover = document.createElement('div');
-      popover.id = 'combat-status-popover';
-      popover.className = 'combat-banner-popover combat-status-popover';
-      document.body.appendChild(popover);
-    }
-    popover.replaceChildren();
-
-    const title = document.createElement('div');
-    title.className = 'combat-banner-popover-title';
-    title.textContent = `${label} ${value}`;
-    const desc = document.createElement('div');
-    desc.className = 'combat-banner-popover-desc';
-    desc.textContent = descText;
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'combat-banner-popover-close';
-    close.textContent = '關閉';
-    close.addEventListener('click', () => popover.classList.remove('visible'));
-    popover.append(title, desc, close);
-
-    popover.classList.add('visible');
-    const target = ev?.currentTarget || null;
-    const rect = target?.getBoundingClientRect?.() || null;
-    const left = rect ? rect.left : (window.innerWidth / 2 - 130);
-    const top = rect ? rect.bottom + 6 : (window.innerHeight / 2 - 70);
-    popover.style.left = `${Math.max(8, Math.min(left, window.innerWidth - popover.offsetWidth - 8))}px`;
-    popover.style.top = `${Math.max(8, Math.min(top, window.innerHeight - popover.offsetHeight - 8))}px`;
-
-    if (!this._combatStatusOutsideHandler) {
-      this._combatStatusOutsideHandler = event => {
-        const panel = document.getElementById('combat-status-popover');
-        if (!panel?.classList.contains('visible')) return;
-        if (event.target.closest?.('#combat-status-popover, .combat-status-badge, .combat-wound-badge, .combat-native-weakness-badge, .combat-temp-weakness-badge')) return;
-        panel.classList.remove('visible');
-      };
-      document.addEventListener('click', this._combatStatusOutsideHandler);
-    }
-  },
-
-  showCombatTempWeaknessDetail(value, kind = 'normal', ev = null) {
-    const enemy = G.combat?.enemy;
-    if (!enemy || !value) return;
-    const labelMap = {
-      normal: '破綻',
-      eagle: '鷹眼破綻',
-      gambler: '搏命破綻',
-    };
-    const label = labelMap[kind] || '破綻';
-    const sourceMap = {
-      normal: '通常由望遠鏡或其他效果暫時暴露。',
-      eagle: '由鷹眼效果產生。',
-      gambler: '由搏命者或相關效果產生。',
-    };
-    const descText = `${enemy.name} 目前有 ${label} ${value}。角色攻擊骰命中此骰面時，視為命中破綻，本次傷害 +1。${sourceMap[kind] || ''}`;
-
-    let popover = document.getElementById('combat-status-popover');
-    if (!popover) {
-      popover = document.createElement('div');
-      popover.id = 'combat-status-popover';
-      popover.className = 'combat-banner-popover combat-status-popover';
-      document.body.appendChild(popover);
-    }
-    popover.replaceChildren();
-
-    const title = document.createElement('div');
-    title.className = 'combat-banner-popover-title';
-    title.textContent = `${label} ${value}`;
-    const desc = document.createElement('div');
-    desc.className = 'combat-banner-popover-desc';
-    desc.textContent = descText;
-    const close = document.createElement('button');
-    close.type = 'button';
-    close.className = 'combat-banner-popover-close';
-    close.textContent = '關閉';
-    close.addEventListener('click', () => popover.classList.remove('visible'));
-    popover.append(title, desc, close);
-
-    popover.classList.add('visible');
-    const target = ev?.currentTarget || null;
-    const rect = target?.getBoundingClientRect?.() || null;
-    const left = rect ? rect.left : (window.innerWidth / 2 - 130);
-    const top = rect ? rect.bottom + 6 : (window.innerHeight / 2 - 70);
-    popover.style.left = `${Math.max(8, Math.min(left, window.innerWidth - popover.offsetWidth - 8))}px`;
-    popover.style.top = `${Math.max(8, Math.min(top, window.innerHeight - popover.offsetHeight - 8))}px`;
-
-    if (!this._combatStatusOutsideHandler) {
-      this._combatStatusOutsideHandler = event => {
-        const panel = document.getElementById('combat-status-popover');
-        if (!panel?.classList.contains('visible')) return;
-        if (event.target.closest?.('#combat-status-popover, .combat-status-badge, .combat-wound-badge, .combat-native-weakness-badge, .combat-temp-weakness-badge')) return;
-        panel.classList.remove('visible');
-      };
-      document.addEventListener('click', this._combatStatusOutsideHandler);
-    }
-  },
-
   _combatBannerView(banner) {
     return {
       relicId: banner.relicId,
@@ -1032,13 +849,14 @@ const GameCombatFlow = {
         this._clearExpiredWeaknessEffects(enemy);
         for (const banner of this._activeCombatBanners()) banner.usedThisRound = false;
         for (const char of G.squad) {
-          char._shield = 0;
+          CombatStatus.clearBlock(char);
           char._grapplingHookUsedRound = false;
           char._corrosiveOilUsedRound = false;
           char._serratedOilUsedRound = false;
         }
         G.combat.round++;
         this._ensureRoundStartNativeWeakness(enemy, combatResult.logs);
+        EnemyAbilities.onRoundStart(enemy, { ...G.combat, squad: G.squad }, combatResult.logs);
         G.combat.bowFollowUps = 0;
         G.combat.itemUsedRound = 0;
         G.combat.rollItemUsedRound = 0;
@@ -1046,7 +864,6 @@ const GameCombatFlow = {
         G.combat.pendingInventoryItemIndex = null;
         G.combat.intent = this._resolveCombatIntent(enemy);
         G.combat.actionInProgress = false;
-        const nextIntentText = this._combatIntentLabel(G.combat.intent, enemy);
   
         // Section.
         const summaryLines = [];
@@ -1057,14 +874,19 @@ const GameCombatFlow = {
         }
         if (combatResult.stunned) {
           summaryLines.push(`${enemy.name} 失衡，本回合無法行動。`);
-        } else if (combatResult.aoeCounter > 0) {
-          summaryLines.push(`${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`);
+      } else if (combatResult.aoeCounter > 0) {
+          const variedAoe = combatResult.aoeDamageByChar && Object.keys(combatResult.aoeDamageByChar).length > 0;
+          summaryLines.push(variedAoe
+            ? `${enemy.name} 反擊全隊，基礎 ${combatResult.aoeCounter} 傷害，凝視命中者加倍。`
+            : `${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`);
         } else if (combatResult.counterDmg > 0) {
           summaryLines.push(`${enemy.name} 攻擊 ${combatResult.counterTargetName || attacker.name}，造成 ${combatResult.counterDmg} 傷害。`);
         } else {
           summaryLines.push(`${enemy.name} 本回合沒有造成傷害。`);
         }
-        summaryLines.push(`\n敵人下一個意圖：${nextIntentText}`);
+        if (combatResult.gazeSummary) summaryLines.push(combatResult.gazeSummary);
+        if (combatResult.fateSummary) summaryLines.push(combatResult.fateSummary);
+        if (combatResult.bannerSummary) summaryLines.push(combatResult.bannerSummary);
   
         this._openModal({
           title: `戰鬥：第 ${G.combat.round - 1} 回合結果`,
@@ -1082,11 +904,24 @@ const GameCombatFlow = {
           combatAnims: {
             counterTarget: combatResult.counterDmg > 0 ? (combatResult.counterTargetId || attacker.id) : null,
             aoe: combatResult.aoeCounter > 0,
+            enemyBlock: combatResult.enemyBlockGain > 0,
+            delay: 400,
           },
           dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
-          enemyDice: combatResult.enemyDiceRoll
-            ? '?'
-            : null,
+          enemyDice: combatResult.gazeRoll
+            ? { type: 'danger', label: '裂隙凝視骰', value: combatResult.gazeRoll, sides: 6 }
+            : (combatResult.fateRoll
+              ? {
+                type: 'danger',
+                label: combatResult.fateLuckyFace
+                  ? `命運骰（幸運 ${combatResult.fateLuckyFace} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
+                  : '命運骰',
+                value: combatResult.fateRoll,
+                sides: 6,
+              }
+              : (combatResult.enemyDiceRoll
+                ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: 6 }
+                : null)),
           choices: this._combatActionChoices(),
         });
     },
@@ -1095,13 +930,11 @@ const GameCombatFlow = {
     if (!G.combat || !enemy || !Number.isFinite(enemy.weakness)) return;
     if (!this._combatHasStarBreakerEye()) return;
     if (CombatRules._nativeWeaknessSet(enemy).size > 0) return;
-    enemy.extraWeaknesses = Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : [];
-    enemy.disabledNativeWeaknesses = Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : [];
     const generated = [];
     while (CombatRules._nativeWeaknessSet(enemy).size < 2) {
       const value = CombatRules._randomNativeWeakness(enemy);
       if (!value) break;
-      enemy.extraWeaknesses.push(value);
+      CombatStatus.addExtraNativeWeakness(enemy, value, { source: 'restored_native' });
       generated.push(value);
     }
     if (generated.length > 0) {
@@ -1127,9 +960,7 @@ const GameCombatFlow = {
       this._log('敵人破綻狀態結束。', 'info');
     }
     if (enemy.eagleNativeWeakness?.expiresRound && round >= enemy.eagleNativeWeakness.expiresRound) {
-      const value = enemy.eagleNativeWeakness.value;
-      enemy.extraWeaknesses = (enemy.extraWeaknesses || []).filter(w => w !== value);
-      enemy.eagleNativeWeakness = null;
+      CombatStatus.setEagleNativeWeakness(enemy, null);
       this._log('鷹眼暫時原生弱點消失。', 'info');
     }
   },
@@ -1145,102 +976,15 @@ const GameCombatFlow = {
 
   _combatActionChoices() {
     if (!this._canRetreatCombat()) return [];
-    return [{ label: this._retreatChoiceLabel(), danger: true, action: () => this._retreatCombat() }];
-  },
-
-  _canRetreatCombat() {
-    const combat = G.combat;
-    const enemy = combat?.enemy;
-    if (!combat || !enemy) return false;
-    if (enemy.darkMonster || enemy.boss || enemy.rescueBoss || enemy.erosionBoss) return false;
-    if (combat.source === 'darkMonsterPassive' || combat.source === 'darkMonsterActive') return false;
-    if (['rescue', 'erosion', 'treasure_mimic'].includes(combat.reward)) return false;
-    return true;
-  },
-
-  _retreatChoiceLabel() {
-    const enemy = G.combat?.enemy;
-    const intent = G.combat?.intent;
-    if (!enemy || !intent) return '撤退（黑暗 +1）';
-    if (intent.type === 'attack' || intent.type === 'block_attack') {
-      const target = intent.targetName || '目標';
-      return `撤退（黑暗 +1，${target} 承受 ${enemy.attack || 0} 傷）`;
-    }
-    if (intent.type === 'dice_attack') {
-      const target = intent.targetName || '目標';
-      return `撤退（黑暗 +1，${target} 承受 1d6 傷）`;
-    }
-    if (intent.type === 'aoe') {
-      return `撤退（黑暗 +1，全隊各 ${Math.max(1, (enemy.attack || 0) - 2)} 傷）`;
-    }
-    if (intent.type === 'block') return '撤退（黑暗 +1，不受傷）';
-    return '撤退（黑暗 +1，承受意圖）';
-  },
-
-  openCombatBag() {
-    if (!G.combat || G.phase === 'over') return;
-    if (!this._canUseCombatBag()) {
-      this._showCombatModal();
-      return;
-    }
-    G.combat.bagOpen = !G.combat.bagOpen;
-    G.combat.pendingInventoryItemIndex = null;
-    this._showCombatModal();
-  },
-
-  selectCombatBagItem(itemIndex) {
-    if (!G.combat || G.phase === 'over') return;
-    this._ensureInventory();
-    if (G.combat.itemUsedRound === G.combat.round) {
-      this._showCombatModal();
-      return;
-    }
-    const idx = Number(itemIndex);
-    const slot = G.inventory[idx];
-    const item = this._inventoryItem(slot);
-    if (!slot || !item || item.useInCombat === false) return;
-    if (item.useType === 'roll_mod' && G.combat.rollItemUsedRound === G.combat.round) {
-      this._showCombatModal();
-      return;
-    }
-    G.combat.pendingInventoryItemIndex = idx;
-    G.combat.bagOpen = false;
-    this._showCombatModal();
-  },
-
-  useCombatInventoryItemOnTarget(charId) {
-    if (!G.combat || G.phase === 'over') return;
-    const char = G.squad.find(c => c.id === charId);
-    if (!char || char.dead || char.hp <= 0) return;
-    const idx = G.combat.pendingInventoryItemIndex;
-    const slot = G.inventory[idx];
-    const item = this._inventoryItem(slot);
-    if (!slot || !item || item.useInCombat === false) return;
-    const result = EquipmentRules.use(G, char, item);
-    if (result.used) {
-      this._consumeInventorySlot(idx);
-      G.combat.itemUsedRound = G.combat.round;
-      if (item.useType === 'roll_mod') G.combat.rollItemUsedRound = G.combat.round;
-      if (result.log) this._log(result.log, 'reward');
-    }
-    G.combat.pendingInventoryItemIndex = null;
-    G.combat.bagOpen = false;
-    this._showCombatModal();
-  },
-
-  cancelCombatItemTargeting() {
-    if (!G.combat) return;
-    G.combat.pendingInventoryItemIndex = null;
-    G.combat.bagOpen = true;
-    this._showCombatModal();
-  },
-
-  _combatItemTargeting() {
-    return G.combat?.pendingInventoryItemIndex !== null && G.combat?.pendingInventoryItemIndex !== undefined;
-  },
-
-  _canUseCombatBag() {
-    return !!G.combat && G.combat.itemUsedRound !== G.combat.round;
+    return [{
+      label: '撤退',
+      danger: true,
+      detailTitle: '確認撤退',
+      detail: this._retreatDetailText(),
+      confirmLabel: '確認撤退',
+      backLabel: '取消',
+      action: () => this._retreatCombat(),
+    }];
   },
 
   _supportTacticalActive(attacker) {
@@ -1270,67 +1014,6 @@ const GameCombatFlow = {
       const item = this._inventoryItem(slot);
       return { index, item, count: slot.count || 1 };
     }).filter(entry => entry.item);
-  },
-
-  _resolveCombatIntent(enemy) {
-    const base = typeof resolveIntent === 'function'
-      ? resolveIntent(enemy)
-      : { type: 'attack', weight: 1 };
-    const intent = { ...base, targetId: null, targetName: null };
-    if (['attack', 'block_attack', 'dice_attack'].includes(intent.type)) {
-      const target = this._pickEnemyIntentTarget(intent, enemy);
-      intent.targetId = target?.id || null;
-      intent.targetName = target?.name || null;
-    }
-    return intent;
-  },
-
-  _pickEnemyIntentTarget(intent = null, enemy = null) {
-    const alive = this._aliveSquad();
-    if (alive.length === 0) return null;
-    if (alive.length === 1) return alive[0];
-
-    const threatMap = G.combat?.threat || {};
-    const weighted = [];
-    const totalThreat = alive.reduce((sum, char) => sum + Math.max(0, threatMap[char.id] || 0), 0);
-    if (totalThreat <= 0) {
-      const weight = 1 / alive.length;
-      for (const char of alive) weighted.push({ char, weight });
-    } else {
-      const weights = alive.map(char => ({ char, weight: 3 + Math.max(0, threatMap[char.id] || 0) }));
-      const total = weights.reduce((sum, entry) => sum + entry.weight, 0);
-      for (const entry of weights) weighted.push({ char: entry.char, weight: entry.weight / total });
-    }
-
-    let roll = Math.random();
-    for (const entry of weighted) {
-      roll -= entry.weight;
-      if (roll <= 0) return entry.char;
-    }
-    return weighted[weighted.length - 1]?.char || alive[0];
-  },
-
-  _addCombatThreat(attacker, combatResult = null, isFollowUp = false) {
-    if (!G.combat || !attacker) return;
-    if (!G.combat.threat) G.combat.threat = {};
-    const current = G.combat.threat[attacker.id] || 0;
-    let gain = isFollowUp ? 1 : 2;
-    const damage = combatResult?.damage || 0;
-    if (damage >= 10) gain += Math.floor((damage - 10) / 5) + 1;
-    G.combat.threat[attacker.id] = Math.min(10, current + gain);
-  },
-
-  _halveCombatThreat(charId) {
-    if (!G.combat?.threat || !charId) return;
-    G.combat.threat[charId] = Math.floor((G.combat.threat[charId] || 0) / 2);
-  },
-
-  _combatIntentLabel(intent, enemy) {
-    if (!intent) return '';
-    const base = intentLabel(intent, enemy);
-    if (!['attack', 'block_attack', 'dice_attack'].includes(intent.type)) return base;
-    if (intent.targetName) return `${base} → ${intent.targetName}`;
-    return `${base} → 隨機目標`;
   },
 
   _wagerDiceEffect(char) {
@@ -1461,17 +1144,11 @@ const GameCombatFlow = {
 
   _clearWagerDicePenaltyAfterEnemyFlow(logs = null) {
     for (const char of G.squad || []) {
-      if (char?._wagerDicePenaltyPendingClear) {
-        const stacks = char._wagerDiceMissStacks || 0;
-        char._wagerDiceMissStacks = 0;
-        char._wagerDicePenaltyPendingClear = false;
-        if (logs && stacks > 0) logs.push(`賭命骰子：敵方攻擊流程結束，清除 ${char.name} 的懊悔 ${stacks} 層。`);
-      }
-      if (char?._gamblerBacklashPendingClear) {
-        const stacks = char._gamblerBacklashStacks || 0;
-        char._gamblerBacklashStacks = 0;
-        char._gamblerBacklashPendingClear = false;
-        if (logs && stacks > 0) logs.push(`搏命反噬：敵方攻擊流程結束，清除 ${char.name} 的反噬 ${stacks} 層。`);
+      for (const entry of CombatStatus.clearPendingIncomingRisks(char)) {
+        if (logs) {
+          const source = entry.type === 'remorse' ? '賭命骰子' : '搏命反噬';
+          logs.push(`${source}：敵方攻擊流程結束，清除 ${char.name} 的${entry.name} ${entry.stacks} 層。`);
+        }
       }
     }
   },
@@ -1626,9 +1303,7 @@ const GameCombatFlow = {
   _combatAttackAnim(attacker, callback) {
     const attackerEl = document.querySelector(`.combat-unit[data-char-id="${attacker.id}"]`);
     const enemyCard  = document.querySelector('.combat-enemy-card');
-    const intent     = G.combat?.intent;
-    const hasBlock   = !G.combat?.enemy?.blockBroken &&
-                       (intent?.type === 'block' || intent?.type === 'block_attack');
+    const hasBlock   = CombatStatus.getBlock(G.combat?.enemy) > 0;
 
     if (hasBlock && enemyCard) {
       enemyCard.classList.add('anim-block-up');
@@ -1648,66 +1323,6 @@ const GameCombatFlow = {
     setTimeout(callback, 500);
   },
 
-  _retreatCombat() {
-    const logs = this._applyRetreatIntentDamage();
-    this._applyDarkness(1, '撤退');
-    if (G.phase === 'over') return;
-    for (const line of logs) this._log(line, 'danger');
-    this._log('隊伍撤退，黑暗逼近。', 'danger');
-    G.combat = null;
-    G.combatMods = [];
-    this._closeModal();
-    if (this._checkLose()) return;
-    Render.fullRender();
-  },
-
-  _applyRetreatIntentDamage() {
-    const enemy = G.combat?.enemy;
-    const intent = G.combat?.intent;
-    const logs = [];
-    if (!enemy || !intent) return logs;
-
-    if (intent.type === 'attack' || intent.type === 'block_attack') {
-      const target = this._retreatIntentTarget(intent) || this._aliveSquad()[0];
-      if (target) {
-        const damage = this._applyRetreatDamage(target, enemy.attack || 0);
-        logs.push(`${enemy.name} 趁撤退攻擊 ${target.name}，造成 ${damage} 傷害。`);
-      }
-    } else if (intent.type === 'dice_attack') {
-      const target = this._retreatIntentTarget(intent) || this._aliveSquad()[0];
-      if (target) {
-        const roll = Math.ceil(Math.random() * 6);
-        const damage = this._applyRetreatDamage(target, roll);
-        logs.push(`${enemy.name} 趁撤退擲骰攻擊 ${target.name}：${roll}，造成 ${damage} 傷害。`);
-      }
-    } else if (intent.type === 'aoe') {
-      const damage = Math.max(1, (enemy.attack || 0) - 2);
-      for (const char of this._aliveSquad()) {
-        const dealt = this._applyRetreatDamage(char, damage);
-        logs.push(`${enemy.name} 趁撤退波及 ${char.name}，造成 ${dealt} 傷害。`);
-      }
-    } else if (intent.type === 'block') {
-      logs.push(`${enemy.name} 採取防禦，隊伍趁隙撤離。`);
-    }
-    this._clearWagerDicePenaltyAfterEnemyFlow(logs);
-    return logs;
-  },
-
-  _retreatIntentTarget(intent) {
-    return this._aliveSquad().find(char => char.id === intent?.targetId) || null;
-  },
-
-  _applyRetreatDamage(char, amount) {
-    let damage = this._reduceIncomingDamage(char, amount, true, true);
-    if (char._shield > 0 && damage > 0) {
-      const absorbed = Math.min(char._shield, damage);
-      char._shield -= absorbed;
-      damage -= absorbed;
-    }
-    char.hp = Math.max(0, char.hp - damage);
-    return damage;
-  },
-
   _buildCombatScene(enemy, attacker, status) {
     const intent = G.combat?.intent || null;
     const activeBanners = this._activeCombatBanners();
@@ -1715,23 +1330,37 @@ const GameCombatFlow = {
       status,
       attackerId: attacker?.id || null,
       intentLabel: intent ? this._combatIntentLabel(intent, enemy) : null,
+      intent: this._combatIntentView(intent, enemy),
       enemy: {
         id: enemy.id, name: enemy.name, icon: enemy.icon,
         desc: enemy.desc || '',
         hp: enemy.hp, maxHp: enemy.maxHp || enemy.hp,
-        block: enemy.blockBroken ? 0 : (enemy.block || 0),
-        currentBlock: enemy._block || 0,
+        block: CombatStatus.getBlock(enemy),
+        currentBlock: CombatStatus.getBlock(enemy),
         woundMax: enemy.woundMax || 15,
         wounds: enemy.wounds || 0,
         attack: enemy.attack, weakness: enemy.weakness,
-        tempWeakness: enemy.tempWeakness || null,
-        eagleTempWeakness: enemy.eagleTempWeakness || null,
+        tempWeakness: CombatStatus.tempWeaknesses(enemy, 'normal')[0] || null,
+        eagleTempWeakness: CombatStatus.tempWeaknesses(enemy, 'eagle')[0] || null,
         eagleNativeWeakness: enemy.eagleNativeWeakness || null,
-        extraWeaknesses: Array.isArray(enemy.extraWeaknesses) ? enemy.extraWeaknesses : [],
-        disabledNativeWeaknesses: Array.isArray(enemy.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : [],
+        extraWeaknesses: CombatStatus.nativeWeaknesses(enemy, 'extra'),
+        disabledNativeWeaknesses: CombatStatus.disabledNativeWeaknesses(enemy),
+        nativeWeaknessSources: { ...(enemy.nativeWeaknessSources || {}) },
         suspiciousFlaw: !!enemy.suspiciousFlaw,
-        gamblerTempWeakness: enemy.gamblerTempWeakness || null,
-        gamblerTempWeaknesses: Array.isArray(enemy.gamblerTempWeaknesses) ? enemy.gamblerTempWeaknesses : [],
+        gamblerNativeWeakness: enemy.gamblerNativeWeakness || null,
+        gamblerTempWeakness: CombatStatus.tempWeaknesses(enemy, 'gambler')[0] || null,
+        gamblerTempWeaknesses: CombatStatus.tempWeaknesses(enemy, 'gambler'),
+        fateGamble: enemy.abilityState?.fateGamble
+          ? {
+            luckyFace: enemy.abilityState.fateGamble.luckyFace || null,
+            unluckyFaces: Array.isArray(enemy.abilityState.fateGamble.unluckyFaces)
+              ? [...enemy.abilityState.fateGamble.unluckyFaces]
+              : [],
+          }
+          : null,
+        bannerGuardian: enemy.abilityState?.bannerGuardian
+          ? { stance: enemy.abilityState.bannerGuardian.stance || 'wound' }
+          : null,
         weaknessDesc: enemy.weaknessEffect?.desc || '',
       },
       squad: G.squad.map(c => ({
@@ -1744,12 +1373,96 @@ const GameCombatFlow = {
         gamblerBacklashStacks: c._gamblerBacklashStacks || 0,
         canWagerDice: !!this._wagerDiceEffect(c),
         wagerDiceFaces: G.combat?.wagerDicePlans?.[c.id]?.faces || [],
+        gazeWeaknesses: [...CombatStatus.nativeWeaknesses(c, 'gaze')],
+        woundMax: c.woundMax || 15,
+        wounds: c.wounds || 0,
+        block: CombatStatus.getBlock(c),
         threat: G.combat?.threat?.[c.id] || 0,
         activeBanners: activeBanners
           .filter(banner => banner.ownerId === c.id)
           .map(banner => this._combatBannerView(banner)),
       })),
     };
+  },
+
+  _combatIntentView(intent, enemy) {
+    if (!intent || !enemy) return null;
+    const type = intent.type || '';
+    const block = enemy.blockBroken ? 0 : Math.max(0, enemy.block || 0);
+    const painBonus = typeof this._enemyPainGrowthAttackBonus === 'function'
+      ? this._enemyPainGrowthAttackBonus(enemy)
+      : 0;
+    const bannerInfo = typeof this._enemyBannerGuardianIntentInfo === 'function'
+      ? this._enemyBannerGuardianIntentInfo(enemy, intent)
+      : { damageBonus: 0 };
+    const attackBonus = painBonus + (bannerInfo.damageBonus || 0);
+    const baseAttack = Math.max(0, enemy.attack || 0);
+    const target = {
+      targetId: intent.targetId || null,
+      targetName: intent.targetName || null,
+    };
+    if (type === 'attack') {
+      const damage = baseAttack + attackBonus;
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/intent-attack-single.png',
+        text: `攻${damage}`,
+        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${damage} 傷害` : `單體攻擊，造成 ${damage} 傷害`,
+      };
+    }
+    if (type === 'block_attack') {
+      const damage = baseAttack + attackBonus;
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/intent-block-attack.png',
+        text: `攻${damage}/防${block}`,
+        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${damage} 傷害；行動後格檔 +${block}` : `單體攻擊，造成 ${damage} 傷害；行動後格檔 +${block}`,
+      };
+    }
+    if (type === 'aoe') {
+      const poisonDust = Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'poison_dust');
+      if (poisonDust) {
+        const bonusText = baseAttack + attackBonus > 0 ? `+${baseAttack + attackBonus}` : '';
+        const weakenedText = enemy.abilityState?.poisonWeakened ? '，已潰散 -1' : '';
+        return {
+          type,
+          ...target,
+          icon: 'assets/icons/intent-attack-all.png',
+          text: `半骰數${bonusText}`,
+          title: `全體毒粉，造成骰面折半${bonusText}傷害${weakenedText}，最低 1`,
+        };
+      }
+      const damage = Math.max(1, baseAttack - 2) + attackBonus;
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/intent-attack-all.png',
+        text: `全${damage}`,
+        title: `全體攻擊，對全隊造成 ${damage} 傷害`,
+      };
+    }
+    if (type === 'dice_attack') {
+      const bonusText = attackBonus > 0 ? `+${attackBonus}` : '';
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/intent-attack-single.png',
+        text: `骰數${bonusText}`,
+        title: intent.targetName ? `攻擊 ${intent.targetName}，造成骰數${bonusText}傷害` : `單體擲骰攻擊，造成骰數${bonusText}傷害`,
+      };
+    }
+    if ((type === 'block' || type === 'banner_switch') && block > 0) {
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/block-intent-icon-red.png',
+        text: `防${block}`,
+        title: type === 'banner_switch' ? `換旗後格檔 +${block}` : `行動後格檔 +${block}`,
+      };
+    }
+    return null;
   },
 
 

@@ -11,6 +11,18 @@ const EQUIPMENT = [
     effect: { type: 'heal_percent', value: 0.30, supportValue: 0.40 },
   },
   {
+    id: 'wish_chest',
+    name: '祈願寶箱',
+    icon: '🎁',
+    desc: '擊敗強敵後獲得的戰利品。使用後可選擇休整、聖物、裝備、武器升級或黎明祈願。',
+    useType: 'choice',
+    useInCombat: false,
+    useOutOfCombat: true,
+    special: true,
+    dropPool: false,
+    effect: { type: 'wish_chest' },
+  },
+  {
     id: 'whetstone',
     name: '磨刀石',
     icon: '🪨',
@@ -64,7 +76,7 @@ const WEAPONS = [
     id: 'bow',
     name: '弓',
     icon: '🏹',
-    desc: '主戰時，命中原生弱點後，可追加攻擊一次。每次追加攻擊若再次命中原生弱點，可繼續追加攻擊。每回合最多額外追擊 2 次。',
+    desc: '主戰時，命中原生弱點後，可追加攻擊一次。每次追加攻擊若再次命中原生弱點，可繼續追加攻擊，但追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 2 次。',
     effect: { type: 'bow_followup', maxPerRound: 2 },
   },
   {
@@ -73,13 +85,6 @@ const WEAPONS = [
     icon: '🗡️',
     desc: '主戰時，命中弱點時，額外 +2 傷害。',
     effect: { type: 'weakness_bonus', value: 2 },
-  },
-  {
-    id: 'hammer',
-    name: '槌',
-    icon: '🔨',
-    desc: '主戰時，額外破除敵人 2 點格檔；若擲出 1，主戰者 -1 HP。',
-    effect: { type: 'defense_pierce', value: 2, penalty: { onRoll: 1, selfDmg: 1 } },
   },
   {
     id: 'battle_drum',
@@ -107,7 +112,6 @@ const WEAPONS = [
 Object.assign(WEAPONS.find(w => w.id === 'sword') || {}, { family: 'sword', tier: 1, upgradeTo: 'sword_plus' });
 Object.assign(WEAPONS.find(w => w.id === 'bow') || {}, { family: 'bow', tier: 1, upgradeTo: 'bow_plus' });
 Object.assign(WEAPONS.find(w => w.id === 'dagger') || {}, { family: 'dagger', tier: 1, upgradeTo: 'dagger_plus' });
-Object.assign(WEAPONS.find(w => w.id === 'hammer') || {}, { family: 'hammer', tier: 1, upgradeTo: 'hammer_plus' });
 Object.assign(WEAPONS.find(w => w.id === 'battle_drum') || {}, { family: 'battle_drum', tier: 1, upgradeTo: 'battle_drum_plus' });
 Object.assign(WEAPONS.find(w => w.id === 'healing_staff') || {}, { family: 'healing_staff', tier: 1, upgradeTo: 'healing_staff_plus' });
 Object.assign(WEAPONS.find(w => w.id === 'katana') || {}, { family: 'katana', tier: 1, upgradeTo: 'soul_cutter_katana' });
@@ -128,7 +132,7 @@ WEAPONS.push(
     tier: 2,
     name: '逐星弓',
     icon: '🏹',
-    desc: '主戰時，命中原生弱點後可追加攻擊。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。',
+    desc: '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。',
     effect: { type: 'bow_followup', maxPerRound: 3, followUpDamageStep: 2 },
   },
   {
@@ -139,15 +143,6 @@ WEAPONS.push(
     icon: '🗡️',
     desc: '主戰時，命中弱點時額外 +2 傷害。若本次攻擊未命中任何弱點，額外造成等同於最終骰面的傷害。',
     effect: { type: 'shadow_fang_dagger', weaknessBonus: 2 },
-  },
-  {
-    id: 'hammer_plus',
-    family: 'hammer',
-    tier: 2,
-    name: '進階槌',
-    icon: '🔨',
-    desc: '主戰時，額外破除敵人 4 點格檔；若擲出 1，主戰者 -1 HP。',
-    effect: { type: 'defense_pierce', value: 4, penalty: { onRoll: 1, selfDmg: 1 } },
   },
   {
     id: 'battle_drum_plus',
@@ -254,8 +249,8 @@ function getEquipById(id) {
 }
 
 function randomEquipment(day = 1) {
-  const pool = EQUIPMENT.filter(item => !item.minDay || day >= item.minDay);
-  const source = pool.length > 0 ? pool : EQUIPMENT;
+  const pool = EQUIPMENT.filter(item => item.dropPool !== false && (!item.minDay || day >= item.minDay));
+  const source = pool.length > 0 ? pool : EQUIPMENT.filter(item => item.dropPool !== false);
   return { ...source[Math.floor(Math.random() * source.length)] };
 }
 

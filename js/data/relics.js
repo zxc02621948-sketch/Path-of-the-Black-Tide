@@ -198,3 +198,57 @@ function getSupportRelics() {
 function getEventRelicById(id) {
   return RELICS.find(r => r.id === id && r.eventOnly) || null;
 }
+
+const ECHO_RELIC_SYSTEMS = [
+  {
+    id: 'wound',
+    name: '傷口體系',
+    siteName: '傷口共鳴遺址',
+    relics: ['pain_mask', 'pain_splinter_badge'],
+    clueText: '線索上的字像被指甲一筆一筆刮出來，越靠近末尾，紙面越像乾掉的傷疤。',
+    siteText: '遺址裡殘留著痛苦聖物的氣息。石階上滿是黑色裂痕，像有什麼東西曾在這裡反覆受傷又反覆站起。',
+    guardianText: '守護者不會格檔，卻會讓自身傷口滋長並付出生命，再把傷口轉為攻擊傷害；命中原生弱點可破除每回合自然滋長，但牠的撕裂自身意圖仍會繼續增加傷口並自損。',
+    victoryText: '遺址裡的傷痕逐漸閉合，只剩一件仍在微微顫動的聖物。',
+  },
+  {
+    id: 'eagle',
+    name: '鷹眼體系',
+    siteName: '鷹眼共鳴遺址',
+    relics: ['eagle_eye_feather', 'flaw_lens'],
+    clueText: '線索不是寫在紙上，而是刻在一片透明碎鏡裡。轉動角度時，鏡中會短暫浮出遠方的裂光。',
+    siteText: '遺址裡漂浮著銳利視線。每一道石縫都像眼睛，靜靜盯著隊伍的步伐與呼吸。',
+    guardianText: '守護者每回合會為我方全體新增各自的原生弱點；攻擊前擲凝視骰，若命中受擊者原生弱點則傷害 +3 並移除該弱點。命中守護者原生弱點可清除我方全體由裂隙凝視產生的原生弱點。',
+    victoryText: '凝視碎裂後，空氣中的裂光聚成一件聖物。',
+  },
+  {
+    id: 'fate',
+    name: '命運體系',
+    siteName: '命運共鳴遺址',
+    relics: ['wager_dice', 'lucky_star'],
+    clueText: '線索中央壓著一個骰印，明明沒有骰子，卻能聽見它在紙背後反覆滾動。',
+    siteText: '遺址裡傳出骰子滾動的聲音。每一步都像下注，連沉默都帶著代價。',
+    guardianText: '守護者每回合會指定幸運面與厄運面，攻擊前擲命運骰。命中幸運面時單體傷害 x4；命中厄運面時自身剩餘生命減半且本回合不攻擊。命中守護者原生弱點可為本次命運骰新增 1 個厄運面。',
+    victoryText: '最後一聲骰響停下，命運留下了它願意支付的代價。',
+  },
+  {
+    id: 'banner',
+    name: '戰旗體系',
+    siteName: '戰旗共鳴遺址',
+    relics: ['war_banner', 'eagle_banner'],
+    clueText: '線索是一角褪色旗布，邊緣被火燒黑，布面仍殘留著某種不肯散去的號令。',
+    siteText: '遺址裡插著褪色旗幟。風沒有吹動它們，卻仍能聽見整齊而遙遠的踏步聲。',
+    guardianText: '守護者像一支殘軍般死守陣地，格檔與持久戰會讓它更難突破。',
+    victoryText: '殘旗垂落，舊日軍勢的回聲散開，旗影下露出一件聖物。',
+  },
+];
+
+function getEchoRelicSystems() {
+  return ECHO_RELIC_SYSTEMS.map(system => ({
+    ...system,
+    relics: [...system.relics],
+  }));
+}
+
+function getEchoRelicSystemById(id) {
+  return getEchoRelicSystems().find(system => system.id === id) || null;
+}

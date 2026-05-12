@@ -119,16 +119,20 @@ const GameEventHandlers = {
       case 'combat':     this._triggerTerrainCombat(cell, ev); break;
       case 'find_relic': this._triggerRandomRelicFind(cell, ev); break;
       case 'fate_table': this._triggerFateGamblingTable(cell, ev); break;
+      case 'echo_site_clue': this._triggerEchoSiteClue(cell, ev); break;
       case 'treasure_map': this._triggerTreasureMap(cell, ev); break;
       default:           Render.fullRender();
     }
   },
 
   _rollTerrainEventForCell(cell) {
+    const echoEvent = this._maybeCreateEchoSiteClueEvent();
+    if (echoEvent) return echoEvent;
     const terrainType = ['forest', 'ruins', 'cave'].includes(cell.type) ? cell.type : 'empty';
     return randomTerrainEvent(terrainType, {
       ...G,
       squadHasRelic: relicId => this._squadHasRelic(relicId),
+      relicIdInRun: relicId => this._getRelicIdsInRun().has(relicId),
     });
   },
 
@@ -228,12 +232,14 @@ const GameEventHandlers = {
 
   _eventDiceText(ev) {
     if (!ev) return '';
+    if (ev.hideEventHeader) return '';
     if (!ev.categoryRoll) return `${ev.categoryName || this._rarityLabel(ev.rarity)}\n${ev.categoryDesc || ''}\n\n`;
     return `${ev.categoryName || this._rarityLabel(ev.rarity)}\n${ev.categoryDesc || ''}\n\n`;
   },
 
   _eventDiceInline(ev) {
     if (!ev) return '';
+    if (ev.hideEventHeader) return '';
     return ev.categoryName ? `${ev.categoryName}：` : '';
   },
 

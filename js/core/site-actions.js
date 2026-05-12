@@ -177,9 +177,9 @@ const GameSiteActions = {
     const choices = [];
 
     choices.push({
-      label: '休息：全隊恢復 20% 最大 HP',
+      label: '休息：全隊恢復 30% 最大 HP',
       action: () => {
-        const healed = this._healAliveSquad(c => Math.ceil(c.maxHp * 0.20), true);
+        const healed = this._healAliveSquad(c => Math.ceil(c.maxHp * 0.30), true);
         this._log(healed.length > 0 ? '隊伍休息並恢復生命。' : '隊伍休息，但沒有人需要治療。', 'reward');
         this._markRestUsed(cell);
         this._closeModal();
@@ -189,13 +189,13 @@ const GameSiteActions = {
 
     if (injured.length > 0) {
       choices.push({
-        label: '急救：指定一名角色恢復 40% 最大 HP',
+        label: '急救：指定一名角色恢復 50% 最大 HP',
         action: () => {
           const targetChoices = injured.map(char => ({
             label: `${char.name}（HP ${char.hp}/${char.maxHp}）`,
             action: () => {
               const before = char.hp;
-              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.40));
+              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.50));
               char.hp = Math.min(char.maxHp, char.hp + heal);
               this._log(`${char.name} 恢復 ${char.hp - before} HP。`, 'reward');
               this._markRestUsed(cell);
@@ -229,9 +229,9 @@ const GameSiteActions = {
   _triggerEmberPoint(cell) {
     const choices = [
       {
-        label: '殘火治療：全隊恢復 20% 最大 HP',
+        label: '殘火治療：全隊恢復 30% 最大 HP',
         action: () => {
-          const healed = this._healAliveSquad(char => Math.ceil(char.maxHp * 0.20), false);
+          const healed = this._healAliveSquad(char => Math.ceil(char.maxHp * 0.30), false);
           if (healed.length > 0) this._log('殘火讓隊伍恢復生命。', 'reward');
           this._markRestUsed(cell);
           this._closeModal();

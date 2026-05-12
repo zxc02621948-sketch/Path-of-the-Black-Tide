@@ -298,13 +298,13 @@ const EVENT_POOL = {
     },
     {
       id: 'empty_shadow_passage',
-      name: '移動的陰影',
-      desc: '有什麼東西從視線邊緣掠過，消失得無影無蹤，只留下微弱的氣息。',
+      name: '湧動的陰影',
+      desc: '地面上的陰影像水面般起伏，從腳邊無聲退開，只留下刺骨的寒意。黑暗 +1。',
       type: 'note',
       rarity: 'rare',
       category: 1,
       weight: 2,
-      noteText: '「只有黑夜才敢在光天化日下移動。」',
+      noteText: '「只有黑夜才敢在光天化日下湧動。」記錄此異象後，黑暗 +1。',
       darknessChange: 1,
     },
     {
@@ -363,6 +363,7 @@ function createFateGamblingTableEvent(baseEvent = null) {
     condition: state => (state?.darkness || 0) >= 5
       && !state?.fateGamblingTableTriggered
       && !state?.squadHasRelic?.('wager_dice')
+      && !state?.relicIdInRun?.('wager_dice')
       && (state?.squad || []).some(c => !c.dead && c.hp > 0),
     category: 6,
     categoryRoll: baseEvent?.categoryRoll || 6,

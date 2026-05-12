@@ -29,7 +29,32 @@ const Render = {
   // Section.
   renderTopBar() {
     document.getElementById('day-num').textContent = G.day;
-    document.getElementById('actions-left').textContent = G.actionsLeft;
+    const actionsLeft = Math.max(0, G.actionsLeft || 0);
+    const actionsMax = CONFIG.ACTIONS_PER_DAY || 3;
+    const actionsDisplay = document.getElementById('actions-display');
+    const actionsLeftEl = document.getElementById('actions-left');
+    const actionsHint = document.getElementById('actions-hint');
+    if (actionsLeftEl) actionsLeftEl.textContent = actionsLeft;
+    if (actionsDisplay) {
+      const pipWrap = actionsDisplay.querySelector('.action-pips');
+      if (pipWrap && pipWrap.children.length !== actionsMax) {
+        pipWrap.innerHTML = Array.from({ length: actionsMax }, () => '<span class="action-pip"></span>').join('');
+      }
+      actionsDisplay.classList.toggle('actions-empty', actionsLeft <= 0 && G.phase !== 'over');
+      actionsDisplay.classList.toggle('actions-low', actionsLeft === 1);
+      actionsDisplay.querySelectorAll('.action-pip').forEach((pip, index) => {
+        pip.classList.toggle('filled', index < actionsLeft);
+      });
+    }
+    if (actionsHint) {
+      actionsHint.textContent = actionsLeft <= 0
+        ? '今天已行動完'
+        : `還能行動 ${actionsLeft} 次`;
+    }
+    const turnEndFloat = document.getElementById('turn-end-float');
+    if (turnEndFloat) {
+      turnEndFloat.classList.toggle('visible', actionsLeft <= 0 && !G.modal && G.phase !== 'over');
+    }
     const darkness = Math.max(0, G.darkness || 0);
     const meterMax = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
     const darkMonsters = Array.isArray(G.darkMonsters) ? G.darkMonsters : [];
@@ -73,9 +98,8 @@ const Render = {
     const endDayBtn = document.getElementById('btn-end-day');
     endDayBtn.disabled = G.phase === 'over' || G.actionsLeft > 0;
     endDayBtn.title = G.actionsLeft > 0 ? '必須先用完今天的行動力' : '';
-    // 行動力用完時，按鈕高亮提示
-    endDayBtn.style.borderColor = G.actionsLeft <= 0 ? 'var(--accent)' : '';
-    endDayBtn.style.color = G.actionsLeft <= 0 ? 'var(--accent)' : '';
+    endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over');
+    endDayBtn.textContent = '結束今天';
 
     const devBtn = document.getElementById('btn-dev-tool');
     if (devBtn) {
@@ -121,6 +145,9 @@ const Render = {
 
           if (cell.content?.reward === 'rescue') {
             el.classList.add('rescue-target');
+          }
+          if (cell.content?.reward === 'echo_site') {
+            el.classList.add('echo-site-target');
           }
           if (cell.content?.reward === 'erosion') {
             el.classList.add('erosion-target');
@@ -318,6 +345,7 @@ const Render = {
     if (cell.corrupted) return '☣️';
     if (cell.content?.reward === 'erosion') return '🌫️';
     if (cell.content?.reward === 'rescue') return '🗝️';
+    if (cell.content?.reward === 'echo_site') return '◆';
     if (cell.type === 'enemy')  return '⚔️';
     if (cell.type === 'chest')  return '🧰';
     if (cell.type === 'relic')  return '💎';
@@ -340,6 +368,7 @@ const Render = {
     if (cell.type === 'rest')  return G.phase === 'night' ? '殘火' : '休息';
     if (cell.content?.reward === 'rescue') return '頭目';
     if (cell.content?.reward === 'erosion') return '侵蝕';
+    if (cell.content?.reward === 'echo_site') return cell.content?.echoSystemName || '共鳴';
     if (cell.type === 'enemy') return '';
     if (cell.type === 'relic') return '';
     return '';
@@ -359,6 +388,7 @@ const Render = {
     if (cell.corrupted) return '腐化空地，黑夜踏入會遭伏擊';
     if (cell.content?.reward === 'erosion') return '侵蝕頭目，擊敗可使黑暗 -1';
     if (cell.content?.reward === 'rescue') return '救援頭目，擊敗後可解救角色';
+    if (cell.content?.reward === 'echo_site') return `${cell.content?.echoSiteName || '共鳴遺址'}，擊敗守護者可獲得${cell.content?.echoSystemName || '共鳴'}聖物`;
     if (cell.type === 'enemy') return '敵人';
     if (cell.type === 'chest') return '寶箱';
     if (cell.type === 'relic') return '聖物';
@@ -371,7 +401,8 @@ const Render = {
   // Section.
   _charStatus(char) {
     if (char.dead) return char.deathLocation ? `死亡（遺落物 ${char.deathLocation.x},${char.deathLocation.y}）` : '死亡';
-    if (char._shield > 0) return `格檔 ${char._shield}`;
+    const block = typeof CombatStatus !== 'undefined' ? CombatStatus.getBlock(char) : Math.max(0, char._block || char._shield || 0);
+    if (block > 0) return `格檔 ${block}`;
     const pct = char.maxHp > 0 ? char.hp / char.maxHp : 0;
     if (pct <= 0.25) return '瀕死';
     if (pct <= 0.5)  return '重傷';
@@ -384,7 +415,8 @@ const Render = {
     const pct = char.maxHp > 0 ? char.hp / char.maxHp : 0;
     if (pct <= 0.25) return 'status-critical';
     if (pct <= 0.5)  return 'status-low';
-    if (char._shield > 0) return 'status-shield';
+    const block = typeof CombatStatus !== 'undefined' ? CombatStatus.getBlock(char) : Math.max(0, char._block || char._shield || 0);
+    if (block > 0) return 'status-shield';
     return 'status-ok';
   },
 
@@ -392,7 +424,7 @@ const Render = {
     const map = {
       warrior:  '戰鬥骰最低 3',
       explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中',
-      scholar:  '主戰攻擊時，單數刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次敵方攻擊流程受擊傷害每層 +20%，最多 3 層，觸發後清空',
+      scholar:  '主戰攻擊時，單數刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空',
       support:  '若輔助不是主戰者，主戰者本回合第一次攻擊傷害 +1；若主戰者本回合受到敵人攻擊，該次傷害 -1',
     };
     return map[cls] || '';
@@ -617,6 +649,8 @@ const Render = {
 
     if (G.torchActive > 0)
       items.push(`火把照明：剩餘 ${G.torchActive} 次移動`);
+    if ((G.dawnWishProtection || 0) > 0)
+      items.push(`黎明祈願：剩餘 ${G.dawnWishProtection} 次黑夜侵蝕免疫`);
     for (const m of G.combatMods)
       items.push(`戰鬥道具：${m.type === 'attack_bonus' ? `攻擊骰 +${m.value}` : `受傷 -${m.value}`}（${m.source}）`);
     for (const m of G.rollMods)

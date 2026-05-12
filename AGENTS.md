@@ -5,6 +5,7 @@ This project contains a lot of Traditional Chinese player-facing text. Treat tex
 ## Encoding
 
 - All source files must stay UTF-8.
+- Avoid using PowerShell `Get-Content` to inspect files with Traditional Chinese text; it can display valid UTF-8 as mojibake in this environment. Prefer `rg -n` for targeted search or Node.js `fs.readFileSync(path, 'utf8')` for reading snippets.
 - Do not edit project files with tools that may write ANSI, Big5, or UTF-16 by default.
 - Do not use PowerShell `Set-Content`, `Out-File`, or shell redirection for source-file edits unless the command explicitly preserves UTF-8 and has been verified.
 - Prefer `apply_patch` for manual edits.

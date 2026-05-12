@@ -115,6 +115,10 @@ document.addEventListener('DOMContentLoaded', () => {
     Game.endDay();
   });
 
+  document.getElementById('turn-end-float')?.addEventListener('click', () => {
+    Game.endDay();
+  });
+
   // ─── 筆記 ────────────────────────────────────────────────
   document.getElementById('btn-open-notes').addEventListener('click', () => {
     Render.showNotes();

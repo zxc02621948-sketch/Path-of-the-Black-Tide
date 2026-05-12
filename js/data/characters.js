@@ -28,7 +28,7 @@ const CHARACTER_CLASSES = {
     maxHp: 20,
     attack: 4,
     passive: 'gambler_attack',
-    passiveDesc: '主戰攻擊時，單數刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次敵方攻擊流程受擊傷害每層 +20%，最多 3 層，觸發後清空',
+    passiveDesc: '主戰攻擊時，單數刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空',
   },
   support: {
     id: 'support',
@@ -117,6 +117,6 @@ function createCharacter(name, cls, id) {
     safeMoveUsed: false,
     gamblerRerollsLeft: cls === 'scholar' ? 2 : 0,
     _ironShardUsed: false,
-    _shield: 0,
+    _block: 0,
   };
 }

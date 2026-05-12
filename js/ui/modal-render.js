@@ -227,10 +227,29 @@ const RenderModal = {
     contentEl.scrollTop = 0;
     descEl.scrollTop = 0;
     choicesEl.scrollTop = 0;
+    if (cfg.combat) {
+      requestAnimationFrame(() => this._positionCombatIntentArrow());
+      setTimeout(() => this._positionCombatIntentArrow(), 160);
+    }
 
     // Section.
     if (cfg.combatAnims) {
-      setTimeout(() => this._triggerCounterAnims(cfg.combatAnims), 120);
+      const delay = Number.isFinite(cfg.combatAnims.delay) ? cfg.combatAnims.delay : 120;
+      const hasEnemyAnim = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
+      const lockMs = delay + (cfg.combatAnims.enemyBlock ? 220 : 0) + 720;
+      if (hasEnemyAnim && combatActionsEl) {
+        const buttons = [...combatActionsEl.querySelectorAll('button')];
+        const selectableUnits = [...combatSceneEl.querySelectorAll('.combat-unit.selectable')];
+        buttons.forEach(btn => { btn.disabled = true; });
+        selectableUnits.forEach(unit => unit.classList.add('combat-anim-locked'));
+        if (G.combat) G.combat.actionInProgress = true;
+        setTimeout(() => {
+          buttons.forEach(btn => { btn.disabled = false; });
+          selectableUnits.forEach(unit => unit.classList.remove('combat-anim-locked'));
+          if (G.combat) G.combat.actionInProgress = false;
+        }, lockMs);
+      }
+      setTimeout(() => this._triggerCounterAnims(cfg.combatAnims), delay);
     }
   },
 
@@ -256,6 +275,35 @@ const RenderModal = {
     };
     if (typeof G !== 'undefined') G.modal = detailCfg;
     this.showModal(detailCfg);
+  },
+
+  _positionCombatIntentArrow() {
+    const scene = document.querySelector('.combat-scene');
+    const arrow = scene?.querySelector('.combat-intent-arrow');
+    if (!scene || !arrow) return;
+    const targetId = arrow.dataset.targetId || '';
+    const source = scene.querySelector('.combat-enemy-sprite');
+    const target = [...scene.querySelectorAll('.combat-unit[data-char-id]')]
+      .find(unit => unit.dataset.charId === targetId);
+    if (!source || !target) {
+      arrow.hidden = true;
+      return;
+    }
+    arrow.hidden = false;
+    const sourceRect = source.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const horizontal = targetRect.left > sourceRect.right;
+    const x1 = horizontal ? sourceRect.right + 2 : sourceRect.left + sourceRect.width / 2;
+    const y1 = sourceRect.top + sourceRect.height / 2;
+    const x2 = horizontal ? targetRect.left - 8 : targetRect.left + targetRect.width / 2;
+    const y2 = horizontal ? targetRect.top + targetRect.height / 2 : targetRect.top - 8;
+    arrow.setAttribute('viewBox', `0 0 ${Math.max(1, window.innerWidth)} ${Math.max(1, window.innerHeight)}`);
+    arrow.querySelector('line')?.setAttribute('x1', x1);
+    arrow.querySelector('line')?.setAttribute('y1', y1);
+    arrow.querySelector('line')?.setAttribute('x2', x2);
+    arrow.querySelector('line')?.setAttribute('y2', y2);
+    arrow.querySelector('circle')?.setAttribute('cx', x1);
+    arrow.querySelector('circle')?.setAttribute('cy', y1);
   },
 
   _animateModalDice(diceEl, finalValue, onDone = null) {
@@ -405,14 +453,22 @@ const RenderModal = {
     }, 24);
   },
 
-  _triggerCounterAnims({ counterTarget, aoe }) {
+  _triggerCounterAnims({ counterTarget, aoe, enemyBlock }) {
     const enemyCard = document.querySelector('.combat-enemy-card');
-    if (!counterTarget && !aoe) return;
+    if (!counterTarget && !aoe && !enemyBlock) return;
 
     // 敵人反擊前先晃動提示
-    if (enemyCard) {
-      enemyCard.classList.add('anim-pulse-left');
-      setTimeout(() => enemyCard.classList.remove('anim-pulse-left'), 400);
+    if (enemyBlock && enemyCard) {
+      enemyCard.classList.add('anim-block-up');
+      setTimeout(() => enemyCard.classList.remove('anim-block-up'), 430);
+    }
+
+    const attackDelay = enemyBlock ? 220 : 0;
+    if ((counterTarget || aoe) && enemyCard) {
+      setTimeout(() => {
+        enemyCard.classList.add('anim-pulse-left');
+        setTimeout(() => enemyCard.classList.remove('anim-pulse-left'), 400);
+      }, attackDelay);
     }
 
     // Section.
@@ -429,7 +485,7 @@ const RenderModal = {
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         }
       }
-    }, 270);
+    }, attackDelay + 270);
   },
 
   _combatSceneHtml(combat) {
@@ -438,6 +494,14 @@ const RenderModal = {
     const nativeInfo = this._activeEnemyNativeWeaknesses(combat.enemy);
     const weaknessDescHtml = nativeInfo.main && combat.enemy.weaknessDesc
       ? `<div class="combat-weakness-effect">⚡ ${combat.enemy.weaknessDesc}</div>`
+      : '';
+    const fateGamble = combat.enemy.fateGamble || null;
+    const fateGambleHtml = fateGamble?.luckyFace && Array.isArray(fateGamble.unluckyFaces) && fateGamble.unluckyFaces.length > 0
+      ? `<div class="combat-weakness-effect">命運盤：幸運 ${Dice.face(fateGamble.luckyFace)} ${fateGamble.luckyFace}／厄運 ${fateGamble.unluckyFaces.map(face => `${Dice.face(face)} ${face}`).join('、')}</div>`
+      : '';
+    const bannerGuardian = combat.enemy.bannerGuardian || null;
+    const bannerGuardianHtml = bannerGuardian
+      ? `<div class="combat-weakness-effect">旗面：${bannerGuardian.stance === 'damage' ? '戰吼旗（攻擊傷害 +2）' : '創傷旗（攻擊前全隊傷口 +2）'}</div>`
       : '';
     const selectable = !!combat.selectable;
     const itemTargeting = !!combat.itemTargeting;
@@ -450,14 +514,27 @@ const RenderModal = {
       const isDown = char.hp <= 0;
       const showPlayerDice = combat.playerDice && combat.attackerId === char.id;
       const canClick = (selectable || itemTargeting) && !isDown;
+      const isIntentTarget = this._combatShouldShowIntentArrow(combat) && combat.intent?.targetId === char.id;
       const threat = char.threat || 0;
       const wagerFaces = Array.isArray(char.wagerDiceFaces) ? char.wagerDiceFaces : [];
       const wagerActive = wagerFaces.length > 0;
+      const gazeWeaknesses = CombatStatus.nativeWeaknesses(char, 'gaze');
+      const gazeBadgeHtml = gazeWeaknesses.length > 0 && !isDown
+        ? this._combatAllyNativeWeaknessBadgeHtml(gazeWeaknesses)
+        : '';
+      const wounds = Math.max(0, Math.min(char.woundMax || 15, char.wounds || 0));
+      const woundBadgeHtml = wounds > 0 && !isDown
+        ? this._combatAllyWoundBadgeHtml(char, wounds)
+        : '';
+      const block = Math.max(0, char.block || 0);
+      const blockBadgeHtml = block > 0 && !isDown
+        ? this._combatAllyBlockBadgeHtml(char, block)
+        : '';
       const remorseStacks = char.wagerDiceMissStacks || 0;
       const remorseHtml = remorseStacks > 0 && !isDown ? `
         <button type="button" class="combat-status-badge remorse"
           onclick="event.stopPropagation(); Game.showCombatStatusDetail('${char.id}', 'remorse', event)"
-          title="懊悔 ${remorseStacks} 層，下次敵方攻擊流程受擊傷害提高 ${remorseStacks * 30}%">
+          title="懊悔 ${remorseStacks} 層，下次受擊流程受到的傷害提高 ${remorseStacks * 30}%">
           <img src="assets/icons/remorse-icon.png" alt="懊悔">
           <strong>+${remorseStacks * 30}%</strong>
         </button>
@@ -466,7 +543,7 @@ const RenderModal = {
       const backlashHtml = backlashStacks > 0 && !isDown ? `
         <button type="button" class="combat-status-badge backlash"
           onclick="event.stopPropagation(); Game.showCombatStatusDetail('${char.id}', 'backlash', event)"
-          title="反噬 ${backlashStacks} 層，下次敵方攻擊流程受擊傷害提高 ${backlashStacks * 20}%">
+          title="反噬 ${backlashStacks} 層，下次受擊流程受到的傷害提高 ${backlashStacks * 20}%">
           <img src="assets/icons/backlash-icon.png" alt="反噬">
           <strong>+${backlashStacks * 20}%</strong>
         </button>
@@ -496,11 +573,14 @@ const RenderModal = {
         ? `onclick="Game.useCombatInventoryItemOnTarget('${char.id}')"`
         : (selectable && !isDown ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
       return `
-        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${itemTargeting && !isDown ? ' item-target' : ''}"
+        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${itemTargeting && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
           data-char-id="${char.id}" ${clickAttr}>
           <div class="combat-unit-main">
             <span class="combat-sprite">${cls.icon}</span>
             <span class="combat-name">${char.name}</span>
+            ${gazeBadgeHtml}
+            ${woundBadgeHtml}
+            ${blockBadgeHtml}
             ${remorseHtml}
             ${backlashHtml}
             ${wagerHtml}
@@ -518,6 +598,7 @@ const RenderModal = {
     }).join('');
 
     const bagItems = (combat.inventory || []).filter(entry => entry.item && entry.item.useInCombat !== false);
+    const intentArrowHtml = this._combatIntentArrowHtml(combat);
     const bagHtml = combat.showBag ? `
       <div class="combat-bag-panel">
         ${bagItems.length > 0 ? bagItems.map(entry => {
@@ -537,24 +618,37 @@ const RenderModal = {
         <div class="combat-actions"></div>
         <button class="combat-bag-button${combat.canUseBag ? '' : ' disabled'}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包">🎒 背包</button>
       </div>
+      ${intentArrowHtml}
       ${bagHtml}
       <div class="combat-enemy-card hoverable-enemy">
         ${combat.enemyDice ? this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides) : ''}
         <div class="combat-side-label">敵人</div>
-        <div class="combat-enemy-sprite">${this._enemyIconHtml(combat.enemy)}</div>
-        ${this._combatEnemyStatusIconsHtml(combat.enemy)}
+        <div class="combat-enemy-figure">
+          <div class="combat-enemy-stance-column">
+            ${this._combatEnemyIntentHtml(combat.intent)}
+            <div class="combat-enemy-stance-divider" aria-hidden="true"></div>
+            ${this._combatEnemyBlockPanelHtml(combat.enemy)}
+          </div>
+          <button type="button" class="combat-enemy-sprite combat-enemy-detail-button"
+            onclick="event.stopPropagation(); Game.showCombatEnemyDetail(event)"
+            title="查看敵人詳情">
+            ${this._enemyIconHtml(combat.enemy)}
+          </button>
+          ${this._combatEnemyStatusIconsHtml(combat.enemy)}
+        </div>
         <div class="combat-enemy-name">${combat.enemy.name}</div>
         <div class="combat-hp-row">
           <div class="combat-hp-bar"><div class="combat-hp-fill ${enemyHpClass}" style="width:${enemyHpPct}%"></div></div>
           <span>${combat.enemy.hp}/${combat.enemy.maxHp}</span>
         </div>
         ${this._combatWeaknessRowHtml(combat.enemy)}
-        <div class="combat-stat-line">格檔 ${combat.enemy.block}　攻擊 ${combat.enemy.attack}</div>
+        <div class="combat-stat-line">攻擊 ${combat.enemy.attack}</div>
         ${combat.enemy.disabledNativeWeaknesses?.length ? `<div class="combat-weakness-effect">裂星破壞：${combat.enemy.disabledNativeWeaknesses.map(w => `${Dice.face(w)} ${w}`).join('、')}</div>` : ''}
         ${combat.enemy.suspiciousFlaw ? `<div class="combat-weakness-effect">可疑弱點：探索者可消耗，差 1 視為命中原生弱點</div>` : ''}
         ${combat.enemy.eagleNativeWeakness ? `<div class="combat-weakness-effect">鷹眼暫時原生弱點：${Dice.face(combat.enemy.eagleNativeWeakness.value)} ${combat.enemy.eagleNativeWeakness.value}</div>` : ''}
+        ${fateGambleHtml}
+        ${bannerGuardianHtml}
         ${weaknessDescHtml}
-        ${combat.intentLabel ? `<div class="combat-intent-line">${combat.intentLabel}</div>` : ''}
       </div>
       <div class="combat-center">
         <div class="combat-vs">VS</div>
@@ -568,10 +662,32 @@ const RenderModal = {
     `;
   },
 
+  _combatShouldShowIntentArrow(combat) {
+    const type = combat?.intent?.type || '';
+    return !!combat?.intent?.targetId && ['attack', 'block_attack', 'dice_attack'].includes(type);
+  },
+
+  _combatIntentArrowHtml(combat) {
+    if (!this._combatShouldShowIntentArrow(combat)) return '';
+    const targetId = String(combat.intent.targetId).replace(/"/g, '&quot;');
+    return `
+      <svg class="combat-intent-arrow" data-target-id="${targetId}" aria-hidden="true" focusable="false">
+        <defs>
+          <marker id="combat-intent-arrow-head" viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M 0 0 L 10 5 L 0 10 z"></path>
+          </marker>
+        </defs>
+        <line x1="0" y1="0" x2="0" y2="0"></line>
+        <circle cx="0" cy="0" r="3"></circle>
+      </svg>
+    `;
+  },
+
   _activeEnemyNativeWeaknesses(enemy) {
-    const disabled = new Set(Array.isArray(enemy?.disabledNativeWeaknesses) ? enemy.disabledNativeWeaknesses : []);
+    const disabled = new Set(CombatStatus.disabledNativeWeaknesses(enemy));
     const main = enemy?.weakness && !disabled.has(enemy.weakness) ? enemy.weakness : null;
-    const extras = (Array.isArray(enemy?.extraWeaknesses) ? enemy.extraWeaknesses : [])
+    const extras = CombatStatus.nativeWeaknesses(enemy, 'extra')
       .filter(w => w && !disabled.has(w) && w !== main);
     return { main, extras };
   },
@@ -598,12 +714,13 @@ const RenderModal = {
     const badges = [];
     if (nativeInfo.main) badges.push(this._combatNativeWeaknessBadgeHtml(nativeInfo.main, 'main', '原生', enemy));
     for (const value of nativeInfo.extras) {
-      badges.push(this._combatNativeWeaknessBadgeHtml(value, 'extra', '原生+', enemy));
+      const source = this._enemyNativeWeaknessSource(enemy, value);
+      badges.push(this._combatNativeWeaknessBadgeHtml(value, 'extra', this._enemyNativeWeaknessLabel(source), enemy, source));
     }
     return badges;
   },
 
-  _combatNativeWeaknessBadgeHtml(value, kind, label, enemy) {
+  _combatNativeWeaknessBadgeHtml(value, kind, label, enemy, source = '') {
     return `
       <button type="button" class="combat-native-weakness-badge ${kind === 'extra' ? 'extra' : 'main'}"
         onclick="event.stopPropagation(); Game.showCombatNativeWeaknessDetail(${value}, '${kind}', event)"
@@ -613,6 +730,71 @@ const RenderModal = {
           <strong>${value}</strong>
         </span>
         <span class="combat-native-weakness-label">${label}</span>
+      </button>
+    `;
+  },
+
+  _enemyNativeWeaknessSource(enemy, value) {
+    if (enemy?.eagleNativeWeakness?.value === value) return enemy.eagleNativeWeakness.source || 'eagle_native';
+    if (enemy?.gamblerNativeWeakness === value) return 'gambler_native';
+    return enemy?.nativeWeaknessSources?.[value] || '';
+  },
+
+  _enemyNativeWeaknessLabel(source) {
+    const labels = {
+      star_hunter_eye: '獵星',
+      eagle_native: '鷹眼',
+      flaw_lens: '透鏡',
+      gambler_native: '搏命',
+      restored_native: '再生',
+    };
+    return labels[source] || '原生+';
+  },
+
+  _combatAllyNativeWeaknessBadgeHtml(values) {
+    const faces = (Array.isArray(values) ? values : [values])
+      .map(Number)
+      .filter(face => face >= 1 && face <= 6)
+      .sort((a, b) => a - b);
+    const label = faces.join('.');
+      const title = faces.length > 1
+        ? `原生弱點 ${faces.join('、')}：被對應效果命中時，傷害 +3 並移除命中的弱點。`
+        : `原生弱點 ${label}：被對應效果命中時，傷害 +3 並移除。`;
+    return `
+      <span class="combat-native-weakness-badge ally" title="${title}">
+        <span class="combat-native-weakness-main">
+          <img src="assets/icons/native-weakness-icon.png" alt="原生弱點">
+        </span>
+        <strong class="ally-native-weakness-value">${label}</strong>
+      </span>
+    `;
+  },
+
+  _combatAllyWoundBadgeHtml(char, wounds) {
+    const max = char?.woundMax || 15;
+    const bonus = wounds * 5;
+    return `
+      <button type="button" class="combat-wound-badge ally"
+        onclick="event.stopPropagation(); Game.showCombatAllyWoundDetail('${char.id}', event)"
+        title="傷口 ${wounds} / ${max}，目前受傷害 +${bonus}%">
+        <span class="combat-wound-main">
+          <img src="assets/icons/wound-icon.png" alt="傷口">
+          <strong>${wounds}</strong>
+        </span>
+        <span class="combat-wound-bonus">+${bonus}%</span>
+      </button>
+    `;
+  },
+
+  _combatAllyBlockBadgeHtml(char, block) {
+    return `
+      <button type="button" class="combat-block-badge ally"
+        onclick="event.stopPropagation(); Game.showCombatAllyBlockDetail('${char.id}', event)"
+        title="格檔 ${block}：會先吸收受到的傷害">
+        <span class="combat-block-main">
+          <img class="combat-block-icon" src="assets/icons/block-icon-clean.png" alt="格檔">
+          <strong>${block}</strong>
+        </span>
       </button>
     `;
   },
@@ -627,11 +809,9 @@ const RenderModal = {
       used.add(key);
       badges.push(this._combatTempWeaknessBadgeHtml(value, kind, label));
     };
-    add(enemy?.tempWeakness, 'normal', '破綻');
-    add(enemy?.eagleTempWeakness, 'eagle', '鷹眼');
-    const gamblerWeaknesses = Array.isArray(enemy?.gamblerTempWeaknesses)
-      ? enemy.gamblerTempWeaknesses
-      : (enemy?.gamblerTempWeakness ? [enemy.gamblerTempWeakness] : []);
+    for (const value of CombatStatus.tempWeaknesses(enemy, 'normal')) add(value, 'normal', '破綻');
+    for (const value of CombatStatus.tempWeaknesses(enemy, 'eagle')) add(value, 'eagle', '鷹眼');
+    const gamblerWeaknesses = CombatStatus.tempWeaknesses(enemy, 'gambler');
     for (const value of gamblerWeaknesses) add(value, 'gambler', '搏命');
     return badges;
   },
@@ -664,6 +844,37 @@ const RenderModal = {
           <strong>${wounds}</strong>
         </span>
         <span class="combat-wound-bonus">+${bonus}%</span>
+      </button>
+    `;
+  },
+
+  _combatEnemyIntentHtml(intent) {
+    if (!intent?.icon || !intent?.text) {
+      return `
+        <button type="button" class="combat-enemy-intent-panel empty"
+          disabled aria-hidden="true" tabindex="-1">
+          <span aria-hidden="true"></span>
+        </button>
+      `;
+    }
+    return `
+      <button type="button" class="combat-enemy-intent-panel ${intent.type || ''}"
+        onclick="event.stopPropagation(); Game.showCombatIntentDetail(event)"
+        title="${intent.title || '敵人意圖'}">
+        <img src="${intent.icon}" alt="敵人意圖">
+        <strong>${intent.text}</strong>
+      </button>
+    `;
+  },
+
+  _combatEnemyBlockPanelHtml(enemy) {
+    const block = Math.max(0, enemy?.currentBlock || enemy?.block || 0);
+    return `
+      <button type="button" class="combat-enemy-block-panel${block > 0 ? '' : ' empty'}"
+        ${block > 0 ? 'onclick="event.stopPropagation(); Game.showCombatBlockDetail(event)"' : 'disabled aria-hidden="true"'}
+        title="${block > 0 ? `格檔 ${block}：會先吸收受到的傷害` : ''}">
+        <img class="combat-enemy-block-icon" src="assets/icons/block-icon-clean.png" alt="格檔">
+        <strong class="combat-enemy-block-value">${block}</strong>
       </button>
     `;
   },
@@ -729,8 +940,8 @@ const RenderModal = {
     for (const res of resonances) {
       rows.push(`<div class="cct-row"><span class="cct-label">共鳴</span>${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}</div>`);
     }
-    if (char.wagerDiceMissStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">懊悔</span>${char.wagerDiceMissStacks} 層，下次敵方攻擊流程受擊傷害提高 ${char.wagerDiceMissStacks * 30}%</div>`);
-    if (char.gamblerBacklashStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">反噬</span>${char.gamblerBacklashStacks} 層，下次敵方攻擊流程受擊傷害提高 ${char.gamblerBacklashStacks * 20}%</div>`);
+    if (char.wagerDiceMissStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">懊悔</span>${char.wagerDiceMissStacks} 層，下次受擊流程受到的傷害提高 ${char.wagerDiceMissStacks * 30}%</div>`);
+    if (char.gamblerBacklashStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">反噬</span>${char.gamblerBacklashStacks} 層，下次受擊流程受到的傷害提高 ${char.gamblerBacklashStacks * 20}%</div>`);
     if (char.threat > 0) rows.push(`<div class="cct-row"><span class="cct-label">仇恨</span>${char.threat}/10，單體意圖更容易鎖定此角色；被單體攻擊命中後仇恨減半</div>`);
     return rows.join('');
   },
