@@ -9,7 +9,7 @@ const GameEventEncounters = {
     this._triggerCombat(cell);
   },
 
-  _settleTerrainCombatSmallReward(ev, enemy, attacker, roll, rollResult, combatLog = []) {
+  _settleTerrainCombatSmallReward(ev, enemy, attacker, roll, rollResult, combatLog = [], combatAnims = null) {
     let rewardDesc = '';
     const hasReward = Math.random() < (CONFIG.CAVE_ENEMY_WIN_REWARD_CHANCE || 0.25);
 
@@ -33,6 +33,7 @@ const GameEventEncounters = {
       desc: `${enemy.name} 被擊敗。${rewardDesc}`,
       combatLog,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
       dice: null,
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -120,7 +121,8 @@ const GameEventEncounters = {
       : '';
     const eventInfo = rescueClue || revealInfo;
     this._ensureInventory();
-    if (Math.random() < CONFIG.SUPPLY_EQUIPMENT_CHANCE) {
+    const rewardType = this._rollSupplyRewardType();
+    if (rewardType === 'item') {
       const equip = randomEquipment(G.day);
       const addResult = this._addInventoryItem(equip);
       const progress = this._resolveProgressEventForModal(ev, null);
@@ -140,6 +142,11 @@ const GameEventEncounters = {
       dice: progress.dice,
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
+    } else if (rewardType === 'gear') {
+      const gear = randomGear(G.day);
+      const progress = this._resolveProgressEventForModal(ev, null);
+      const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}${eventInfo}${progress.text}`;
+      this._openSupplyGearRewardModal(ev, gear, desc);
     } else if (ev.itemOnly) {
       const progress = this._resolveProgressEventForModal(ev, null);
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n沒有找到可帶走的道具。${eventInfo}`;
@@ -155,15 +162,27 @@ const GameEventEncounters = {
     } else {
       // Section.
       const heal = ev.heal || CONFIG.DEFAULT_SUPPLY_HEAL;
+      const healed = [];
       if (ev.healTarget === 'lowest') {
         const target = this._aliveSquad().sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
-        if (target) target.hp = Math.min(target.maxHp, target.hp + heal);
+        if (target) {
+          const before = target.hp;
+          target.hp = Math.min(target.maxHp, target.hp + heal);
+          if (target.hp > before) healed.push(`${target.name} +${target.hp - before}`);
+        }
       } else {
-        for (const char of this._aliveSquad()) char.hp = Math.min(char.maxHp, char.hp + heal);
+        for (const char of this._aliveSquad()) {
+          const before = char.hp;
+          char.hp = Math.min(char.maxHp, char.hp + heal);
+          if (char.hp > before) healed.push(`${char.name} +${char.hp - before}`);
+        }
       }
       const progress = this._resolveProgressEventForModal(ev, null);
-      this._log(`${ev.name}：恢復生命。`, 'reward');
-      const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n隊伍恢復 ${heal} HP。${eventInfo}`;
+      this._log(healed.length > 0 ? `${ev.name}：${healed.join('、')} HP。` : `${ev.name}：隊伍休整，但沒有人需要治療。`, healed.length > 0 ? 'reward' : 'dim');
+      const healText = healed.length > 0
+        ? `${ev.healTarget === 'lowest' ? '最低 HP 角色' : '隊伍'}恢復生命：${healed.join('、')}。`
+        : '隊伍短暫休整，但目前沒有人需要治療。';
+      const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${healText}${eventInfo}`;
       this._openModal({
         title: ev.name,
       desc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : `${preDesc}${progress.text}`,
@@ -184,7 +203,8 @@ const GameEventEncounters = {
     const eventInfo = rescueClue || revealInfo;
     this._ensureInventory();
 
-    if (Math.random() < CONFIG.SUPPLY_EQUIPMENT_CHANCE) {
+    const rewardType = this._rollSupplyRewardType();
+    if (rewardType === 'item') {
       const equip = randomEquipment(G.day);
       const addResult = this._addInventoryItem(equip);
       if (!addResult.added) {
@@ -202,6 +222,13 @@ const GameEventEncounters = {
       return;
     }
 
+    if (rewardType === 'gear') {
+      const gear = randomGear(G.day);
+      const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}${eventInfo}`;
+      this._openSupplyGearRewardModal(ev, gear, desc, nextDesc => this._manualProgressChoices(ev, nextDesc));
+      return;
+    }
+
     if (ev.itemOnly) {
       const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n你們翻找了一陣，但沒有找到能帶走的物資。`;
       this._openModal({
@@ -213,18 +240,84 @@ const GameEventEncounters = {
     }
 
     const heal = ev.heal || CONFIG.DEFAULT_SUPPLY_HEAL;
+    const healed = [];
     if (ev.healTarget === 'lowest') {
       const target = this._aliveSquad().sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
-      if (target) target.hp = Math.min(target.maxHp, target.hp + heal);
+      if (target) {
+        const before = target.hp;
+        target.hp = Math.min(target.maxHp, target.hp + heal);
+        if (target.hp > before) healed.push(`${target.name} +${target.hp - before}`);
+      }
     } else {
-      for (const char of this._aliveSquad()) char.hp = Math.min(char.maxHp, char.hp + heal);
+      for (const char of this._aliveSquad()) {
+        const before = char.hp;
+        char.hp = Math.min(char.maxHp, char.hp + heal);
+        if (char.hp > before) healed.push(`${char.name} +${char.hp - before}`);
+      }
     }
-    this._log(`${ev.name}：隊伍恢復生命。`, 'reward');
-    const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n沒有找到可用道具，但你們短暫休整，恢復了些許生命。`;
+    this._log(healed.length > 0 ? `${ev.name}：${healed.join('、')} HP。` : `${ev.name}：隊伍休整，但沒有人需要治療。`, healed.length > 0 ? 'reward' : 'dim');
+    const healText = healed.length > 0
+      ? `沒有找到可用道具，但你們短暫休整。恢復生命：${healed.join('、')}。`
+      : '沒有找到可用道具。你們短暫休整，但目前沒有人需要治療。';
+    const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${healText}`;
     this._openModal({
       title: ev.name,
       desc,
       choices: this._manualProgressChoices(ev, desc),
+    });
+  },
+
+  _rollSupplyRewardType() {
+    const itemChance = Math.max(0, CONFIG.SUPPLY_EQUIPMENT_CHANCE ?? 0.35);
+    const gearChance = Math.max(0, CONFIG.SUPPLY_GEAR_CHANCE ?? 0.15);
+    const roll = Math.random();
+    if (roll < itemChance) return 'item';
+    if (roll < itemChance + gearChance) return 'gear';
+    return 'heal';
+  },
+
+  _openSupplyGearRewardModal(ev, gear, desc, nextChoices = null) {
+    const choices = this._aliveSquad().map(char => ({
+      label: `${char.name}${char.gear ? `（替換 ${char.gear.name}）` : ''}`,
+      action: () => {
+        const current = char.gear;
+        char.gear = { ...gear };
+        const equipLine = `${char.name} 裝備「${gear.name}」${current ? `，替換「${current.name}」` : ''}。`;
+        this._log(`${ev.name}：${equipLine}`, 'reward');
+        if (typeof nextChoices === 'function') {
+          const nextDesc = `${desc}\n\n${equipLine}`;
+          this._openModal({
+            title: ev.name,
+            desc: nextDesc,
+            choices: nextChoices(nextDesc),
+          });
+          return;
+        }
+        this._closeModal();
+        Render.fullRender();
+      },
+    }));
+    choices.push({
+      label: `放棄「${gear.name}」`,
+      action: () => {
+        this._log(`${ev.name}：放棄角色裝備「${gear.name}」。`, 'dim');
+        if (typeof nextChoices === 'function') {
+          const nextDesc = `${desc}\n\n你們放棄了這件裝備。`;
+          this._openModal({
+            title: ev.name,
+            desc: nextDesc,
+            choices: nextChoices(nextDesc),
+          });
+          return;
+        }
+        this._closeModal();
+        Render.fullRender();
+      },
+    });
+    this._openModal({
+      title: ev.name,
+      desc,
+      choices,
     });
   },
 

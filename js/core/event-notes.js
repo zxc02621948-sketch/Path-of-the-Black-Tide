@@ -97,20 +97,20 @@ const GameEventNotes = {
     if (!ev.revealAltarClue) return '';
     const hiddenAltars = this._hiddenSiteCells('altar');
     if (hiddenAltars.length === 0) {
-      return this._revealNearbyFromEvent(ev.altarClueFallbackRange || 1);
+      return this._revealNearbyFromEvent(ev.altarClueFallbackRange || 3);
     }
 
     const revealedAltars = this._revealedAltarCount();
     const chance = revealedAltars === 0 ? 1 : (ev.altarClueChance ?? 0.6);
     if (Math.random() > chance) {
-      return '\n\n線索提到了古老神壇，但方向仍不完整。';
+      return '\n\n線索提到了能讓聖物共鳴的古老神壇，但方向仍不完整。';
     }
 
     const cell = this._nearestHiddenSiteCell('altar');
     if (!cell) return '';
     this._revealHiddenSite(cell);
     this._log(`線索揭露神壇位置 (${cell.x},${cell.y})。`, 'reward');
-    return `\n\n線索指向一座被黑霧遮蔽的神壇 (${cell.x},${cell.y})。`;
+    return `\n\n線索指向一座能讓聖物融合的古老神壇 (${cell.x},${cell.y})。`;
   },
 
   _hiddenSiteCells(type) {

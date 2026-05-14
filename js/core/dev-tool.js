@@ -238,8 +238,9 @@ const GameDevTool = {
         { label: '中型怪物', action: () => this._devChooseEnemyCombatCategory('medium') },
         { label: '強型怪物', action: () => this._devChooseEnemyCombatCategory('strong') },
         { label: '頭目怪物', action: () => this._devChooseEnemyCombatCategory('boss') },
+        { label: '尾王測試', action: () => this._devChooseFinalBossCombat() },
         { label: '聖物守護者', action: () => this._devChooseEnemyCombatCategory('echo') },
-        { label: '黑暗怪物', action: () => this._devChooseEnemyCombatCategory('dark') },
+        { label: '黑暗化身', action: () => this._devChooseEnemyCombatCategory('dark') },
         { label: '返回', action: () => this.openDevTool() },
       ],
     });
@@ -288,7 +289,7 @@ const GameDevTool = {
     if (category === 'echo') return enemies.filter(enemy => enemy.echoGuardian);
     if (category === 'boss') {
       return enemies.filter(enemy =>
-        (enemy.boss || enemy.rescueBoss || enemy.erosionBoss || enemy.treasureMimic) &&
+        (enemy.boss || enemy.rescueBoss || enemy.treasureMimic) &&
         !enemy.echoGuardian &&
         !enemy.devOnly
       );
@@ -320,16 +321,16 @@ const GameDevTool = {
   _devChooseDarkMonsterCombat() {
     if (typeof this._darkMonsterEnemy !== 'function') {
       this._openModal({
-        title: '測試工具：黑暗怪物',
-        desc: '目前無法建立黑暗怪物。',
+        title: '測試工具：黑暗化身',
+        desc: '目前無法建立黑暗化身。',
         choices: [{ label: '返回', action: () => this._devChooseEnemyCombat() }],
       });
       return;
     }
     const levels = [5, 10, 15];
     this._openModal({
-      title: '測試工具：黑暗怪物',
-      desc: '選擇黑暗怪物強度。',
+      title: '測試工具：黑暗化身',
+      desc: '選擇黑暗化身強度。',
       choices: levels.map(level => {
         const darkEnemy = this._darkMonsterEnemy({ id: `dev_${level}`, level }, { activeHunt: false });
         return {
@@ -339,6 +340,25 @@ const GameDevTool = {
             source: 'devDarkMonster',
             darkMonsterId: `dev_${level}`,
           }),
+        };
+      }).concat([{ label: '返回', action: () => this._devChooseEnemyCombat() }]),
+    });
+  },
+
+  _devChooseFinalBossCombat() {
+    const levels = [10, 15, 19];
+    this._openModal({
+      title: '測試工具：尾王測試',
+      desc: '選擇黑暗值。尾王會依黑暗增加生命與攻擊，測試戰鬥不會結算通關。',
+      choices: levels.map(level => {
+        const boss = typeof getFinalBossEnemy === 'function' ? getFinalBossEnemy(level) : null;
+        return {
+          label: `黑暗 ${level}：${boss?.icon || ''} ${boss?.name || '夜幕之瞳'}`,
+          detail: boss ? this._devEnemyCombatDetail(boss) : '找不到尾王資料',
+          action: () => {
+            if (!boss) return;
+            this._devStartEnemyCombat(boss, { source: 'devTest' });
+          },
         };
       }).concat([{ label: '返回', action: () => this._devChooseEnemyCombat() }]),
     });
@@ -356,11 +376,12 @@ const GameDevTool = {
 
   _devEnemyCombatDetail(enemy) {
     const tags = [];
-    if (enemy.darkMonster) tags.push('黑暗怪');
-    if (enemy.boss || enemy.rescueBoss || enemy.erosionBoss || enemy.treasureMimic) tags.push('特殊怪');
+    if (enemy.darkMonster) tags.push('黑暗化身');
+    if (enemy.boss || enemy.rescueBoss || enemy.treasureMimic) tags.push('特殊怪');
     if (enemy.nightOnly) tags.push('夜晚限定');
     const tagText = tags.length ? `｜${tags.join('、')}` : '';
-    return `HP ${enemy.hp}／攻擊 ${enemy.attack}／格檔 ${enemy.block || 0}／原生弱點 ${enemy.weakness}${tagText}`;
+    const weaknessText = Number.isFinite(enemy.weakness) ? enemy.weakness : (enemy.finalBoss ? '開眼顯現' : '無');
+    return `HP ${enemy.hp}／攻擊 ${enemy.attack}／格檔 ${enemy.block || 0}／原生弱點 ${weaknessText}${tagText}`;
   },
 
   _devStartEnemyCombat(enemy, opts = {}) {
@@ -460,6 +481,7 @@ const GameDevTool = {
       choices: [
         { label: '全隊恢復至滿血', action: () => this._devRestoreSquad() },
         { label: '指定角色恢復至滿血', action: () => this._devChooseRestoreCharacter() },
+        { label: '加入測試隊友', action: () => this._devChooseAddSquadMember() },
         { label: '指定角色倒下', danger: true, action: () => this._devChooseKillCharacter() },
         { label: '返回', action: () => this.openDevTool() },
       ],
@@ -495,6 +517,41 @@ const GameDevTool = {
     char.deathLocation = null;
     char.hp = char.maxHp;
     this._log(`測試工具：${char.name} 恢復至滿血。`, 'reward');
+    this._closeModal();
+    this._updateResonances();
+    Render.fullRender();
+  },
+
+  _devChooseAddSquadMember() {
+    if ((G.squad || []).length >= (CONFIG.MAX_SQUAD_SIZE || 3)) {
+      this._openModal({
+        title: '測試工具：加入隊友',
+        desc: `隊伍已達上限 ${CONFIG.MAX_SQUAD_SIZE || 3} 人。`,
+        choices: [{ label: '返回', action: () => this._devOpenSquadStateTool() }],
+      });
+      return;
+    }
+    const currentClasses = new Set((G.squad || []).map(char => char.cls));
+    const classes = Object.values(CHARACTER_CLASSES || {}).filter(cls => !currentClasses.has(cls.id));
+    this._openModal({
+      title: '測試工具：加入隊友',
+      desc: '選擇要加入隊伍的職業。新增角色會使用正式初始武器與滿血狀態。',
+      choices: classes.map(cls => ({
+        label: `${cls.icon} ${cls.name}`,
+        detail: cls.desc,
+        action: () => this._devAddSquadMember(cls.id),
+      })).concat([{ label: '返回', action: () => this._devOpenSquadStateTool() }]),
+    });
+  },
+
+  _devAddSquadMember(cls) {
+    if (!cls || !CHARACTER_CLASSES?.[cls]) return;
+    if ((G.squad || []).length >= (CONFIG.MAX_SQUAD_SIZE || 3)) return;
+    if ((G.squad || []).some(char => char.cls === cls)) return;
+    const usedNames = new Set((G.squad || []).map(char => char.name));
+    const char = this._spawnChar(cls, usedNames);
+    G.squad.push(char);
+    this._log(`測試工具：${char.name} 加入隊伍。`, 'reward');
     this._closeModal();
     this._updateResonances();
     Render.fullRender();

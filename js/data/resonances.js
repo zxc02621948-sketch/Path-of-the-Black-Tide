@@ -31,6 +31,37 @@ const RESONANCES = [
     },
     lore: '傷口不急著爆開，它只是讓每一次痛都更深。',
   },
+  {
+    id: 'greatsword_resonance',
+    name: '沉鐵劍律',
+    relics: ['iron_scabbard', 'silver_bee_pin'],
+    desc: '同身共鳴：融合沉鐵劍鞘 + 銀蜂針。',
+    bodyRequiresFused: 'iron_scabbard',
+    squadEffect: { type: 'none', desc: '此共鳴必須由同一角色同時持有兩件聖物才會啟動。' },
+    bodyEffect: {
+      type: 'greatsword_resonance',
+      extraMomentum: 5,
+      damagePerMomentum: 5,
+      damageBonus: 1,
+      desc: '銀蜂針不再觸發刺劍連擊，改為強化重劍：重劍命中後額外獲得 5 點氣勢；每 5 點氣勢，使重劍傷害 +1。',
+    },
+    lore: '細針不再追求連刺，而是替沉重的一劍校準落點。',
+  },
+  {
+    id: 'rapier_resonance',
+    name: '銀蜂劍律',
+    relics: ['silver_bee_pin', 'iron_scabbard'],
+    desc: '同身共鳴：融合銀蜂針 + 沉鐵劍鞘。',
+    bodyRequiresFused: 'silver_bee_pin',
+    squadEffect: { type: 'none', desc: '此共鳴必須由同一角色同時持有兩件聖物才會啟動。' },
+    bodyEffect: {
+      type: 'rapier_resonance',
+      guaranteedFollowUps: 2,
+      followDamageStep: 1,
+      desc: '沉鐵劍鞘不再觸發重劍，改為強化刺劍：每回合前 2 次刺劍連擊必定成功，且不降低後續連擊機率；本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
+    },
+    lore: '劍鞘壓住重量，只留下銀針般連續刺入的節奏。',
+  },
 ];
 
 function checkResonances(squad) {

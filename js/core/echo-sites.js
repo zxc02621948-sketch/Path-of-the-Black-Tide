@@ -135,7 +135,7 @@ const GameEchoSites = {
     return candidates;
   },
 
-  _settleEchoSiteVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc) {
+  _settleEchoSiteVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatAnims = null) {
     const siteId = cell.content?.echoSiteId;
     const site = (G.echoSites || []).find(item => item.id === siteId);
     const systemName = cell.content?.echoSystemName || site?.systemName || '共鳴';
@@ -153,6 +153,7 @@ const GameEchoSites = {
         desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n${siteName} 的聖物氣息已經散去。`,
         combatLog: logs,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+        combatAnims,
         dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -174,6 +175,7 @@ const GameEchoSites = {
       ].join('\n\n'),
       combatLog: logs,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
       choices: [{
         label: `拾取「${relic.name}」`,

@@ -210,7 +210,7 @@ const GameSiteActions = {
     }
 
     for (const char of dead) {
-      const reviveHp = Math.ceil(char.maxHp * 0.20);
+      const reviveHp = Math.ceil(char.maxHp * 0.50);
       choices.push({
         label: `救起 ${char.name}（${reviveHp} HP）`,
         action: () => {
@@ -227,6 +227,7 @@ const GameSiteActions = {
   },
 
   _triggerEmberPoint(cell) {
+    const injured = this._aliveSquad().filter(c => c.hp < c.maxHp);
     const choices = [
       {
         label: '殘火治療：全隊恢復 30% 最大 HP',
@@ -248,19 +249,32 @@ const GameSiteActions = {
           Render.fullRender();
         },
       },
-      {
-        label: '撤離',
-        action: () => {
-          this._log('隊伍選擇撤離。', 'important');
-          this._markRestUsed(cell);
-          this._closeModal();
-          this._endGame('evacuate');
-        },
-      },
     ];
 
+    if (injured.length > 0) {
+      choices.push({
+        label: '殘火急救：指定一名角色恢復 50% 最大 HP',
+        action: () => {
+          const targetChoices = injured.map(char => ({
+            label: `${char.name}（HP ${char.hp}/${char.maxHp}）`,
+            action: () => {
+              const before = char.hp;
+              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.50));
+              char.hp = Math.min(char.maxHp, char.hp + heal);
+              this._log(`殘火讓 ${char.name} 恢復 ${char.hp - before} HP。`, 'reward');
+              this._markRestUsed(cell);
+              this._closeModal();
+              Render.fullRender();
+            },
+          }));
+          targetChoices.push({ label: '返回', action: () => { this._closeModal(); this._triggerEmberPoint(cell); } });
+          this._openModal({ title: '殘火急救', desc: '選擇要治療的角色。', choices: targetChoices });
+        },
+      });
+    }
+
     for (const char of G.squad.filter(c => c.dead)) {
-      const reviveHp = Math.ceil(char.maxHp * 0.20);
+      const reviveHp = Math.ceil(char.maxHp * 0.50);
       choices.push({
         label: `救起 ${char.name}（${reviveHp} HP）`,
         action: () => {
@@ -272,7 +286,7 @@ const GameSiteActions = {
       });
     }
 
-    this._openModal({ title: '殘火點', desc: '黑夜中的殘火仍留有一點溫度。', choices });
+    this._openModal({ title: '殘火點', desc: '黑夜中的殘火仍留有一點溫度，可以治療或點燃火把。', choices });
   },
 };
 

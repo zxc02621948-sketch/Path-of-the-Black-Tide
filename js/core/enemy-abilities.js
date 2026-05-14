@@ -176,6 +176,16 @@ const EnemyAbilities = {
     return state.faces.includes(Number(rawFace));
   },
 
+  pollutedRollFace(char, rawFace, finalFace, sides = 6) {
+    if (!char) return null;
+    const state = this._dicePollutionState(char);
+    const raw = Number(rawFace);
+    const final = Number(finalFace);
+    if (Number.isFinite(raw) && state.faces.includes(raw)) return raw;
+    if (Number.isFinite(final) && state.faces.includes(final)) return final;
+    return null;
+  },
+
   polluteCharacter(char, ability, logs = []) {
     if (!char || char.dead || char.hp <= 0) return false;
     const state = this._dicePollutionState(char);
@@ -218,7 +228,148 @@ const EnemyAbilities = {
     return cleared;
   },
 
+  _finalBossState(enemy) {
+    this._ensureState(enemy);
+    if (!enemy.abilityState.finalBoss) enemy.abilityState.finalBoss = {};
+    return enemy.abilityState.finalBoss;
+  },
+
+  _finalBossPrepareRound(enemy, combat, ability, logs = []) {
+    if (!enemy || !combat) return null;
+    const state = this._finalBossState(enemy);
+    const round = Math.max(1, combat.round || 1);
+    if (state.preparedRound === round) return state;
+
+    state.preparedRound = round;
+    state.stance = round % 2 === 0 ? 'open' : 'closed';
+
+    if (state.stance === 'open') {
+      const faces = [1, 2, 3, 4, 5, 6].filter(face => face !== state.lastEyeWeakness);
+      const face = faces[Math.floor(Math.random() * faces.length)] || Math.ceil(Math.random() * 6);
+      state.lastEyeWeakness = face;
+      enemy.weakness = face;
+      enemy.finalBossEyeWeakness = face;
+      if (CombatStatus.getBlock(enemy) > 0) CombatStatus.clearBlock(enemy);
+      logs.push(`${enemy.name} 開眼，原生弱點顯現為 ${face}。`);
+      return state;
+    }
+
+    enemy.weakness = null;
+    enemy.finalBossEyeWeakness = null;
+    if (state.skipNextClosedBlock) {
+      state.skipNextClosedBlock = false;
+      logs.push('短暫破曉：本次閉眼沒有獲得格檔。');
+      return state;
+    }
+    const block = Math.max(0, ability.closedBlock || 5);
+    if (block > 0) {
+      CombatStatus.raiseBlock(enemy, block);
+      logs.push(`${enemy.name} 閉眼遮蔽，獲得格檔 ${block}。`);
+    }
+    return state;
+  },
+
+  _executionCountdownState(enemy, ability = {}) {
+    this._ensureState(enemy);
+    if (!enemy.abilityState.executionCountdown) {
+      enemy.abilityState.executionCountdown = {
+        remaining: Math.max(1, ability.turns || 5),
+        executed: false,
+      };
+    }
+    return enemy.abilityState.executionCountdown;
+  },
+
   handlers: {
+    execution_countdown: {
+      onCombatStart(ability, { enemy, logs }) {
+        const state = EnemyAbilities._executionCountdownState(enemy, ability);
+        logs.push(`${enemy.name} 準備處刑：倒數 ${state.remaining}。`);
+      },
+
+      resolveIntent(ability, { enemy, intent }) {
+        const state = EnemyAbilities._executionCountdownState(enemy, ability);
+        if (!state.executed && state.remaining <= 0) {
+          return { type: 'execution', weight: 1 };
+        }
+        return intent;
+      },
+
+      beforeEnemyAction(ability, { enemy, result, logs }) {
+        const state = EnemyAbilities._executionCountdownState(enemy, ability);
+        if (state.executed || state.remaining > 0) return;
+        state.executed = true;
+        enemy.rescueExecuted = true;
+        result.enemyAttackFlow = false;
+        result.counterDmg = 0;
+        result.aoeCounter = 0;
+        logs.push(`${enemy.name} 執行處刑，牢中的倖存者死亡。`);
+      },
+
+      afterEnemyAction(ability, { enemy, intent, logs }) {
+        const state = EnemyAbilities._executionCountdownState(enemy, ability);
+        if (state.executed || intent?.type === 'execution') return;
+        const before = state.remaining;
+        state.remaining = Math.max(0, before - 1);
+        logs.push(`${enemy.name} 的處刑倒數 ${before} → ${state.remaining}。`);
+      },
+    },
+
+    final_boss: {
+      onCombatStart(ability, { enemy, combat, logs }) {
+        const state = EnemyAbilities._finalBossState(enemy);
+        if (!state.scaled) {
+          const darkness = Math.max(0, Math.floor(Number.isFinite(enemy.finalBossDarkness) ? enemy.finalBossDarkness : ((typeof G !== 'undefined' && G?.darkness) || 0)));
+          state.scaled = true;
+          state.darkness = darkness;
+          const hpBonus = darkness * Math.max(0, ability.hpPerDarkness || 0);
+          const attackBonus = Math.floor(darkness / Math.max(1, ability.attackPerDarkness || 5));
+          if (!enemy.finalBossPrescaled) {
+            enemy.maxHp = Math.max(1, (enemy.maxHp || enemy.hp || 1) + hpBonus);
+            enemy.hp = Math.max(1, (enemy.hp || 1) + hpBonus);
+            enemy.attack = Math.max(0, (enemy.attack || 0) + attackBonus);
+          }
+          logs.push(`黑暗強化：黑暗 ${darkness}，${enemy.name} 最大生命 +${hpBonus}，攻擊 +${attackBonus}。`);
+        }
+        EnemyAbilities._finalBossPrepareRound(enemy, combat, ability, logs);
+      },
+
+      onRoundStart(ability, { enemy, combat, logs }) {
+        EnemyAbilities._finalBossPrepareRound(enemy, combat, ability, logs);
+      },
+
+      resolveIntent(ability, { enemy, combat }) {
+        const state = EnemyAbilities._finalBossPrepareRound(enemy, combat, ability, []);
+        if (state?.stance === 'open') return { type: 'attack', finalEye: true, name: '黑夜開眼' };
+        return { type: 'attack', name: '閉眼壓迫' };
+      },
+
+      beforeEnemyAction(ability, { enemy, intent, result, squad, logs }) {
+        if (!intent?.finalEye || result.counterDmg <= 0 || !result.counterTarget) return;
+        const state = EnemyAbilities._finalBossState(enemy);
+        const roll = Math.ceil(Math.random() * 6);
+        const bonus = Math.ceil(roll / 2);
+        result.enemyDiceRoll = roll;
+        result.counterDmg += bonus;
+        logs.push(`${enemy.name} 開眼擲骰 ${roll}，本次攻擊傷害 +${bonus}。`);
+
+        if (state.skipNextOpenSplash) {
+          state.skipNextOpenSplash = false;
+          logs.push('短暫破曉：本次開眼攻擊不造成濺射。');
+          return;
+        }
+
+        const splash = Math.max(0, ability.splashDamage || 0);
+        if (splash <= 0) return;
+        result.aoeCounter = splash;
+        result.aoeDamageByChar = {};
+        for (const char of EnemyAbilities._aliveSquad(squad)) {
+          result.aoeDamageByChar[char.id] = char.id === result.counterTarget.id ? 0 : splash;
+        }
+        logs.push(`${enemy.name} 開眼濺射，非目標隊友各受到 ${splash} 傷害。`);
+      },
+    },
+
     dice_pollution: {
       resolveIntent(ability, { combat }) {
         const round = combat?.round || 1;

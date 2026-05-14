@@ -2,6 +2,7 @@
 const GameCombatInventoryFlow = {
   openCombatBag() {
     if (!G.combat || G.phase === 'over') return;
+    if (G.combat.actionInProgress) return;
     if (!this._canUseCombatBag()) {
       this._showCombatModal();
       return;
@@ -13,6 +14,7 @@ const GameCombatInventoryFlow = {
 
   selectCombatBagItem(itemIndex) {
     if (!G.combat || G.phase === 'over') return;
+    if (G.combat.actionInProgress) return;
     this._ensureInventory();
     if (G.combat.itemUsedRound === G.combat.round) {
       this._showCombatModal();
@@ -33,6 +35,7 @@ const GameCombatInventoryFlow = {
 
   useCombatInventoryItemOnTarget(charId) {
     if (!G.combat || G.phase === 'over') return;
+    if (G.combat.actionInProgress) return;
     const char = G.squad.find(c => c.id === charId);
     if (!char || char.dead || char.hp <= 0) return;
     const idx = G.combat.pendingInventoryItemIndex;
@@ -53,6 +56,7 @@ const GameCombatInventoryFlow = {
 
   cancelCombatItemTargeting() {
     if (!G.combat) return;
+    if (G.combat.actionInProgress) return;
     G.combat.pendingInventoryItemIndex = null;
     G.combat.bagOpen = true;
     this._showCombatModal();

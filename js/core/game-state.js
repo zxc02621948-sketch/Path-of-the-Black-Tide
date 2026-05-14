@@ -66,17 +66,18 @@ const GameStateHelpers = {
     const devourAt = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
     const infos = {
       5: {
-        title: '黑暗怪已出現',
+        title: '黑暗化身已出現',
         desc: [
-          '黑暗凝成了追獵者。從現在開始，黑暗怪會在地圖上出現並朝小隊移動。',
+          '黑暗凝成了化身。從現在開始，黑暗化身會在地圖上出現並朝小隊移動。',
           '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
-          '擊敗追殺而來的黑暗怪可使黑暗 -1；主動討伐黑暗怪可使黑暗 -3，並震懾其他黑暗怪，使牠們的追殺延後 1 天。',
+          '黑暗化身本體固定，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後即使黑暗繼續上升，已存在的黑暗化身不會跟著即時變強。',
+          '擊敗追殺而來的黑暗化身可使黑暗 -1；主動討伐黑暗化身可使黑暗 -3，並震懾其他黑暗化身，使牠們的追殺延後 1 天。',
         ].join('\n\n'),
       },
       10: {
         title: '黑暗正在壯大',
         desc: [
-          '邊境的黑暗已經不再只是霧。黑暗怪會持續逼近，拖延會讓牠們更容易追上小隊。',
+          '邊境的黑暗已經不再只是霧。黑暗化身會持續逼近，拖延會讓牠們更容易追上小隊。',
           '每次結束今天前，請確認隊伍狀態、附近威脅，以及是否需要血祭、休息或主動清除黑暗。',
         ].join('\n\n'),
       },
@@ -84,7 +85,7 @@ const GameStateHelpers = {
         title: '黑暗逼近吞噬',
         desc: [
           `黑暗已經接近極限。若黑暗達到 ${devourAt}，邊境會吞噬一切，遊戲將直接結束。`,
-          '接下來每一次提高黑暗都可能造成致命後果。請優先降低黑暗、擊破黑暗怪，或準備撐到黎明。',
+          '接下來每一次提高黑暗都可能造成致命後果。請優先降低黑暗、擊破黑暗化身，或準備撐到黎明。',
         ].join('\n\n'),
       },
     };
@@ -98,8 +99,8 @@ const GameStateHelpers = {
       title: '黑夜降臨',
       desc: [
         `第 ${CONFIG.NIGHT_START_DAY || 10} 天開始，邊境進入黑夜。`,
-        `黑夜結束今天時，全隊會受到 ${CONFIG.NIGHT_END_HP_COST || 2} 點黑夜侵蝕。`,
-        '黑暗每日上升得更快，黑暗怪也會持續追蹤小隊。休息點會變成殘火點，可用來撤離；點燃火把能暫時提高黑夜視野。',
+        '黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。',
+        '黑暗每日上升得更快，黑暗化身也會持續追蹤小隊。休息點會變成殘火點，可用來治療、救起倒下隊友，或點燃火把暫時提高黑夜視野。',
       ].join('\n\n'),
       choices: [{ label: '進入黑夜', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -132,19 +133,6 @@ const GameStateHelpers = {
   },
 
   // Game Dark Monsters methods live in js/core/dark-monsters.js.
-
-  _maybeSpawnErosionBoss() {
-    if (G.erosionBossSpawned) return false;
-    G.erosionBossSpawned = true;
-
-    // Section.
-    const cell = G.map[G.playerY][G.playerX];
-    const boss = getErosionBossEnemy();
-    cell.content = { ...cell.content, enemy: boss, reward: 'erosion' };
-    this._log('黑暗侵蝕聚集成敵人，腐化頭目出現。', 'danger');
-    this._triggerCombat(cell);
-    return true;
-  },
 
   _checkLose() {
     const dead = G.squad.filter(c => c.hp <= 0 && !c.dead);
@@ -191,7 +179,25 @@ const GameStateHelpers = {
     if (!relic) return;
     const next = G.notes[relicId].length;
     const max  = extra ? relic.lore.length - 1 : Math.min(next, relic.lore.length - 1);
-    if (next <= max && relic.lore[next]) G.notes[relicId].push(next);
+    let changed = false;
+    for (let i = next; i <= max; i++) {
+      if (relic.lore[i] && !G.notes[relicId].includes(i)) {
+        G.notes[relicId].push(i);
+        changed = true;
+      }
+    }
+    if (changed) this._saveNotes();
+  },
+
+  _syncKnownRelicNotes() {
+    if (!G.notes) G.notes = {};
+    for (const relic of G.library || []) {
+      if (relic?.id) this._unlockNote(relic.id);
+    }
+    for (const char of G.squad || []) {
+      if (char.relic?.id) this._unlockNote(char.relic.id);
+      if (char.fusedRelic?.id) this._unlockNote(char.fusedRelic.id, true);
+    }
   },
 
   _getFirstLore(relicId) {
@@ -439,6 +445,7 @@ const GameStateHelpers = {
     const carrier = (carrierCls && G.squad.find(c => c.cls === carrierCls)) || G.squad[0];
     carrier.relic = { ...relic };
     this._applyRelicEquip(carrier, relic);
+    this._unlockNote(relic.id);
     this._saveLibrary();
     this._log(`${carrier.name} 從聖物庫攜帶「${relic.name}」出發。`, 'reward');
   },

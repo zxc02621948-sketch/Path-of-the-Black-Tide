@@ -75,7 +75,7 @@ const Render = {
         : '';
     }
     if (darknessLabel) darknessLabel.textContent = '\u9ed1\u6697';
-    if (lightChargesDisplay) lightChargesDisplay.textContent = `\u9ed1\u6697\u602a ${darkMonsters.length}\uff5c\u5371\u6025 ${criticalDarkMonsters}`;
+    if (lightChargesDisplay) lightChargesDisplay.textContent = `黑暗化身 ${darkMonsters.length}｜危急 ${criticalDarkMonsters}`;
     if (darknessFill) darknessFill.style.width = `${Math.min(100, (darkness / meterMax) * 100)}%`;
     if (darknessDisplay) {
       darknessDisplay.classList.toggle('light', false);
@@ -149,9 +149,6 @@ const Render = {
           if (cell.content?.reward === 'echo_site') {
             el.classList.add('echo-site-target');
           }
-          if (cell.content?.reward === 'erosion') {
-            el.classList.add('erosion-target');
-          }
           if (cell.corrupted) {
             el.classList.add('corrupted');
           }
@@ -177,6 +174,14 @@ const Render = {
             labelEl.className = 'cell-label';
             labelEl.textContent = label;
             el.appendChild(labelEl);
+          }
+
+          if (cell.droppedRelics?.length > 0) {
+            const dropBadge = document.createElement('div');
+            dropBadge.className = 'cell-drop-badge';
+            dropBadge.textContent = cell.droppedRelics.some(relic => relic?._droppedBy) ? '📦' : '💎';
+            dropBadge.title = cell.droppedRelics.some(relic => relic?._droppedBy) ? '此處有遺落物' : '此處有掉落聖物';
+            el.appendChild(dropBadge);
           }
 
           // Section.
@@ -343,13 +348,12 @@ const Render = {
     }
     if (cell.droppedRelics?.length > 0 && cell.type === 'empty') return cell.droppedRelics.some(relic => relic?._droppedBy) ? '📦' : '💎';
     if (cell.corrupted) return '☣️';
-    if (cell.content?.reward === 'erosion') return '🌫️';
     if (cell.content?.reward === 'rescue') return '🗝️';
     if (cell.content?.reward === 'echo_site') return '◆';
     if (cell.type === 'enemy')  return '⚔️';
     if (cell.type === 'chest')  return '🧰';
     if (cell.type === 'relic')  return '💎';
-    if (cell.type === 'rest')   return '';
+    if (cell.type === 'rest')   return G.phase === 'night' ? '🔥' : '';
     if (cell.type === 'altar')  return '';
     if (cell.type === 'forest') return '';
     if (cell.type === 'ruins')  return '';
@@ -367,7 +371,6 @@ const Render = {
     if (cell.type === 'altar' && cell.visited)  return '神壇';
     if (cell.type === 'rest')  return G.phase === 'night' ? '殘火' : '休息';
     if (cell.content?.reward === 'rescue') return '頭目';
-    if (cell.content?.reward === 'erosion') return '侵蝕';
     if (cell.content?.reward === 'echo_site') return cell.content?.echoSystemName || '共鳴';
     if (cell.type === 'enemy') return '';
     if (cell.type === 'relic') return '';
@@ -375,7 +378,12 @@ const Render = {
   },
 
   _cellTooltip(cell, isPlayer) {
-    if (isPlayer) return `小隊位置 (${cell.x}, ${cell.y})`;
+    if (isPlayer) {
+      if (cell.type === 'altar') return `小隊位置 (${cell.x}, ${cell.y})，可原地開啟神壇`;
+      if (cell.type === 'rest') return `小隊位置 (${cell.x}, ${cell.y})，可原地休息`;
+      if (cell.type === 'relic' || cell.droppedRelics?.length > 0) return `小隊位置 (${cell.x}, ${cell.y})，可原地拾取`;
+      return `小隊位置 (${cell.x}, ${cell.y})`;
+    }
     if (cell.reserved) return '已標記，再次進入可觸發保留的事件';
     if (cell.droppedRelics?.length > 0) {
       return cell.droppedRelics.some(relic => relic?._droppedBy)
@@ -386,13 +394,12 @@ const Render = {
     if (restCooldown > 0) return `休息點恢復中，還有 ${restCooldown} 天重新點燃`;
     if (cell.cleared) return '已探索';
     if (cell.corrupted) return '腐化空地，黑夜踏入會遭伏擊';
-    if (cell.content?.reward === 'erosion') return '侵蝕頭目，擊敗可使黑暗 -1';
     if (cell.content?.reward === 'rescue') return '救援頭目，擊敗後可解救角色';
     if (cell.content?.reward === 'echo_site') return `${cell.content?.echoSiteName || '共鳴遺址'}，擊敗守護者可獲得${cell.content?.echoSystemName || '共鳴'}聖物`;
     if (cell.type === 'enemy') return '敵人';
     if (cell.type === 'chest') return '寶箱';
     if (cell.type === 'relic') return '聖物';
-    if (cell.type === 'rest')  return G.phase === 'night' ? '殘火點，可撤離' : '休息點，回血';
+    if (cell.type === 'rest')  return G.phase === 'night' ? '殘火點，可治療或點燃火把' : '休息點，回血';
     if (cell.type === 'altar' && cell.visited) return '神壇，血祭 / 融合';
     if (cell.visited) return '已探索，無事';
     return '未知';
@@ -486,7 +493,10 @@ const Render = {
 
   _enemyIconHtml(enemy) {
     if (enemy?.iconImage) {
-      return `<img class="combat-enemy-img" src="${enemy.iconImage}" alt="${enemy.name}">`;
+      const flipClass = enemy.iconFlipX ? ' flip-x' : '';
+      const scaleClass = enemy.iconScale === 'large' ? ' large' : '';
+      const softClass = enemy.iconSoftEdge ? ' soft-edge' : '';
+      return `<img class="combat-enemy-img${flipClass}${scaleClass}${softClass}" src="${enemy.iconImage}" alt="${enemy.name}">`;
     }
     return enemy?.icon || '⚔️';
   },
@@ -626,11 +636,11 @@ const Render = {
         item.innerHTML = `
           <span class="relic-icon">${relic.icon}</span>
           <span class="relic-name">${relic.name}</span>
-          <span class="relic-effect">${relic.desc}</span>
+          <span class="relic-effect">${typeof relicEffectDesc === 'function' ? relicEffectDesc(relic, slot === 'fusedRelic') : relic.desc}</span>
           <span class="relic-holder">${char.name}${slot === 'fusedRelic' ? '（已融合）' : ''}</span>
           <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}', '${slot}')">查看</button>
         `;
-        item.title = relic.desc;
+        item.title = typeof relicEffectDesc === 'function' ? relicEffectDesc(relic, slot === 'fusedRelic') : relic.desc;
         list.appendChild(item);
       }
     }
@@ -649,8 +659,6 @@ const Render = {
 
     if (G.torchActive > 0)
       items.push(`火把照明：剩餘 ${G.torchActive} 次移動`);
-    if ((G.dawnWishProtection || 0) > 0)
-      items.push(`黎明祈願：剩餘 ${G.dawnWishProtection} 次黑夜侵蝕免疫`);
     for (const m of G.combatMods)
       items.push(`戰鬥道具：${m.type === 'attack_bonus' ? `攻擊骰 +${m.value}` : `受傷 -${m.value}`}（${m.source}）`);
     for (const m of G.rollMods)

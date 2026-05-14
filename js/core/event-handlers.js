@@ -12,6 +12,12 @@ const GameEventHandlers = {
     }
     if (!ev) { cell.cleared = true; Render.fullRender(); return; }
 
+    if (ev.type === 'echo_site_clue' && !this._isEchoSiteClueStillValid(ev)) {
+      ev = this._rerollTerrainEventWithoutEchoSite(cell);
+      if (!ev) { cell.cleared = true; Render.fullRender(); return; }
+      cell.content.event = ev;
+    }
+
     if (!ev.gamblerResolved && this._maybePromptGamblerEventReroll(cell, ev)) return;
 
     // Section.
@@ -128,12 +134,30 @@ const GameEventHandlers = {
   _rollTerrainEventForCell(cell) {
     const echoEvent = this._maybeCreateEchoSiteClueEvent();
     if (echoEvent) return echoEvent;
+    return this._rerollTerrainEventWithoutEchoSite(cell);
+  },
+
+  _rerollTerrainEventWithoutEchoSite(cell) {
     const terrainType = ['forest', 'ruins', 'cave'].includes(cell.type) ? cell.type : 'empty';
     return randomTerrainEvent(terrainType, {
       ...G,
       squadHasRelic: relicId => this._squadHasRelic(relicId),
       relicIdInRun: relicId => this._getRelicIdsInRun().has(relicId),
     });
+  },
+
+  _isEchoSiteClueStillValid(ev) {
+    if (!ev || ev.type !== 'echo_site_clue') return true;
+    if ((G.activeResonances || []).length > 0) return false;
+    if (this._activeEchoSites().length >= (CONFIG.ECHO_SITE_MAX_ACTIVE || 3)) return false;
+    if (!this._hasEchoSitePlacementCell()) return false;
+    const system = getEchoRelicSystemById(ev.echoSystemId);
+    if (!system) return false;
+    if (ev.reservedRelicId) {
+      const reserved = getRelicById(ev.reservedRelicId);
+      return !!reserved && this._getAvailableRelics([reserved]).length > 0;
+    }
+    return !!this._pickEchoSiteRelic(system);
   },
 
   // Treasure, chest, and fate table event methods live in js/core/event-treasure.js.
@@ -231,16 +255,11 @@ const GameEventHandlers = {
   },
 
   _eventDiceText(ev) {
-    if (!ev) return '';
-    if (ev.hideEventHeader) return '';
-    if (!ev.categoryRoll) return `${ev.categoryName || this._rarityLabel(ev.rarity)}\n${ev.categoryDesc || ''}\n\n`;
-    return `${ev.categoryName || this._rarityLabel(ev.rarity)}\n${ev.categoryDesc || ''}\n\n`;
+    return '';
   },
 
   _eventDiceInline(ev) {
-    if (!ev) return '';
-    if (ev.hideEventHeader) return '';
-    return ev.categoryName ? `${ev.categoryName}：` : '';
+    return '';
   },
 
   _rarityLabel(rarity) {

@@ -27,8 +27,8 @@ const CONFIG = {
   NIGHT_VISION_RANGE: 1,
   EXPLORER_VISION_BONUS: 1,   // 探索者額外視野
 
-  // 黑夜侵蝕 (黑夜結束今天時，每名角色扣此 HP)
-  NIGHT_END_HP_COST: 2,
+  // 黑夜侵蝕已改由黑暗值、黑暗化身與尾王強化承擔壓力。
+  NIGHT_END_HP_COST: 0,
   // 火把照明 (接下來幾次黑夜移動視野 +1)
   TORCH_SAFE_MOVES: 2,
 
@@ -65,7 +65,8 @@ const CONFIG = {
   EXPLORER_RESERVE_COOLDOWN_DAYS: 5,
 
   // 補給
-  SUPPLY_EQUIPMENT_CHANCE: 0.50,
+  SUPPLY_EQUIPMENT_CHANCE: 0.35,
+  SUPPLY_GEAR_CHANCE: 0.15,
   CAVE_ENEMY_WIN_REWARD_CHANCE: 0.25,
   MAX_EQUIPMENT_PER_CHAR: 2,
   MAX_INVENTORY_ITEMS: 3,
@@ -79,10 +80,8 @@ const CONFIG = {
   // 地圖生成格數（不得超過 MAP_SIZE * MAP_SIZE - 1 起點）
   MAP_ALTARS:      2,
   MAP_ALTAR_MIN_DISTANCE: 7,
-  MAP_ALTAR_POSITIONS: [
-    { x: 2, y: 2 },
-    { x: 9, y: 9 },
-  ],
+  MAP_ALTAR_MIN_START_DISTANCE: 4,
+  MAP_ALTAR_POSITIONS: [],
   MAP_REST_POINTS: 4,
   MAP_REST_MIN_DISTANCE: 4,
   REST_REFRESH_DAYS: 5,

@@ -70,6 +70,13 @@ const CLASS_AVATARS = {
   support: 'assets/portraits/avatar-support-xiaoci.png',
 };
 
+const CLASS_BATTLE_ART = {
+  warrior: 'assets/portraits/battle-warrior.png',
+  explorer: 'assets/portraits/battle-explorer.png',
+  scholar: 'assets/portraits/battle-scholar.png',
+  support: 'assets/portraits/battle-support.png',
+};
+
 const _CLASS_DEFAULT_WEAPON = {
   warrior: 'sword',
   explorer: 'bow',
@@ -112,6 +119,7 @@ function createCharacter(name, cls, id) {
     gear: _defaultGear(cls),
     portrait: CLASS_PORTRAITS[cls] || '',
     avatar: CLASS_AVATARS[cls] || '',
+    battleArt: CLASS_BATTLE_ART[cls] || '',
     flavor: '',
     firstAidUsed: false,
     safeMoveUsed: false,

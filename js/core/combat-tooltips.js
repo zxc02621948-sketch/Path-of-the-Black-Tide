@@ -25,9 +25,24 @@ const GameCombatTooltips = {
     if (enemy.exposed) states.push('揭露中');
     if (enemy.abilityState?.shellCharge > 0) states.push(`蓄撞 ${enemy.abilityState.shellCharge} 層`);
     if (enemy.abilityState?.poisonWeakened) states.push('毒粉潰散');
+    if (enemy.abilityState?.nextAttackReduction > 0) states.push(`下次攻擊 -${enemy.abilityState.nextAttackReduction}`);
+    if (enemy.abilityState?.executionCountdown && !enemy.abilityState.executionCountdown.executed) {
+      states.push(`處刑倒數 ${enemy.abilityState.executionCountdown.remaining}`);
+    }
+    const abilityNotes = [];
+    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'dice_pollution')) {
+      abilityNotes.push('每次行動都會污染骰面：污染孢子污染隨機隊友，撲擊污染被攻擊目標，污潮污染隨機隊友。污染骰面無法被改骰，擲出時傷害歸零並讓牠回血。');
+    }
+    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'final_boss')) {
+      abilityNotes.push('黑夜輪轉：閉眼回合遮蔽核心弱點並獲得格檔；開眼回合顯現 1 個核心原生弱點，攻擊追加半個骰數並濺射其他隊友。破除開眼弱點會讓下一次閉眼失去格檔，下一次開眼不濺射。');
+    }
+    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'execution_countdown')) {
+      abilityNotes.push('處刑倒數：倒數歸零後，下一次行動會處刑牢中的倖存者。處刑不傷害隊伍，但救援會失敗；命中原生弱點可讓倒數 +1。');
+    }
     const titleText = `${enemy.icon || ''} ${enemy.name}`.trim();
     const descText = [
       enemy.desc || enemy.lore || '',
+      abilityNotes.length ? `能力：${abilityNotes.join('\n')}` : '',
       `HP ${enemy.hp}/${enemy.maxHp || enemy.hp}　攻擊 ${enemy.attack || 0}　格檔 ${block}`,
       `原生弱點：${nativeText}`,
       enemy.weaknessEffect?.desc ? `破除效果：${enemy.weaknessEffect.desc}` : '',

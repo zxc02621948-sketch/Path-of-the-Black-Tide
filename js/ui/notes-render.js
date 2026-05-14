@@ -4,6 +4,9 @@ const RenderNotes = {
     const modal = document.getElementById('notes-modal');
     const content = document.getElementById('notes-content');
     if (!modal || !content) return;
+    if (typeof Game !== 'undefined' && typeof Game._syncKnownRelicNotes === 'function') {
+      Game._syncKnownRelicNotes();
+    }
     content.innerHTML = '';
 
     const totalNotes = Object.values(G.notes || {}).reduce((sum, entries) => sum + entries.length, 0);
@@ -166,10 +169,11 @@ const RenderNotes = {
       {
         title: '地圖與事件',
         items: [
-          ['行動', '白天移動與探索會消耗行動。夜晚黑暗怪會追擊隊伍，黑夜結束今天時全隊會受到黑夜侵蝕。'],
+          ['行動', '白天移動與探索會消耗行動。夜晚黑暗化身會追擊隊伍，黑夜結束今天時黑暗會更快壯大。'],
+          ['黑暗化身', '黑暗化身使用固定基底，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。擊敗追殺黑暗化身可使黑暗 -1；主動討伐可使黑暗 -3，並讓其他黑暗化身追殺延後 1 天。'],
           ['休息點', '休息點可以恢復生命；使用過的休息點會依照規則重新變為可用。'],
           ['神壇', '神壇每日可用一次。血祭需探索骰判定；融合聖物消耗 1 行動且必定成功。'],
-          ['藏寶圖', '藏寶圖會指引一處寶箱位置。黑暗怪不應吞掉已生成的寶箱獎勵。'],
+          ['藏寶圖', '藏寶圖會指引一處寶箱位置。黑暗化身不應吞掉已生成的寶箱獎勵。'],
         ],
       },
     ];
@@ -238,12 +242,14 @@ const RenderNotes = {
       if (!relic?.id || relic.effect?.type === 'unlock_library') continue;
       const display = this._relicDisplay(relic);
       const total = display.lore.length;
+      const unlocked = this._unlockedRelicLore(relic, display);
+      const isUnlocked = unlocked.length > 0;
       const item = document.createElement('div');
-      item.className = 'relic-note-icon';
+      item.className = `relic-note-icon${isUnlocked ? '' : ' locked'}`;
       item.innerHTML = `
-        <span class="relic-note-emoji">${display.icon}</span>
-        <span class="relic-note-name">${display.name}</span>
-        <span class="relic-note-count">${total}/${total}</span>
+        <span class="relic-note-emoji">${isUnlocked ? display.icon : '?'}</span>
+        <span class="relic-note-name">${isUnlocked ? display.name : '未知聖物'}</span>
+        <span class="relic-note-count">${isUnlocked ? `${unlocked.length}/${total}` : '0/?'}</span>
       `;
       item.addEventListener('click', () => {
         container.innerHTML = '';
@@ -377,6 +383,14 @@ const RenderNotes = {
         ['傷口', '每層傷口通常會使該單位受到傷害提高 5%；折磨共鳴保留敵人身上的這個增傷，並在 6 層以上進一步放大持有者傷害。'],
         ['多段攻擊', '多次命中能更快堆高傷口，也更容易吃到折磨的長線增傷。'],
       ],
+      greatsword_resonance: [
+        ['氣勢', '氣勢會提高持有者的基礎攻擊力。氣勢 1 等於基礎攻擊 +1，持續到本場戰鬥結束。'],
+        ['重劍', '高骰視為重劍；沉鐵劍律不提高觸發率，但會讓重劍命中後獲得更多氣勢。'],
+      ],
+      rapier_resonance: [
+        ['刺劍', '低骰視為刺劍；銀蜂劍律讓每回合前 2 次刺劍連擊必定成功，且不降低後續連擊機率。'],
+        ['連擊增傷', '銀蜂劍律下，本次刺劍每成功連擊 1 次，後續連擊傷害 +1。'],
+      ],
       star_hunter_eye: [
         ['原生弱點', '弓命中原生弱點後可追加攻擊，鷹眼暫時原生弱點也能支援這個節奏。'],
         ['追加攻擊', '追加攻擊不觸發敵人行動，也不觸發敵人的原生弱點破除效果，但仍會消耗本回合追擊次數。'],
@@ -405,6 +419,8 @@ const RenderNotes = {
 
   _renderRelicLoreDetail(container, relic) {
     const display = this._relicDisplay(relic);
+    const unlockedLore = this._unlockedRelicLore(relic, display);
+    const isUnlocked = unlockedLore.length > 0;
 
     const back = document.createElement('button');
     back.className = 'btn-secondary btn-small notes-back-btn';
@@ -417,17 +433,26 @@ const RenderNotes = {
 
     const title = document.createElement('div');
     title.className = 'relic-lore-title';
-    title.textContent = `${display.icon} ${display.name}`;
+    title.textContent = isUnlocked ? `${display.icon} ${display.name}` : '? 未知聖物';
     container.appendChild(title);
 
-    container.appendChild(this._createRelicEffectBlock(display.desc, display.fusedDesc));
+    if (isUnlocked) {
+      container.appendChild(this._createRelicEffectBlock(display.desc, display.fusedDesc));
+    }
 
     const list = document.createElement('div');
     list.className = 'relic-lore-list';
-    for (let i = 0; i < display.lore.length; i++) {
+    if (unlockedLore.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'relic-lore-entry';
+      empty.innerHTML = '<span class="relic-lore-num">未解鎖</span><span class="relic-lore-text">取得這件聖物後，探險筆記會記錄它的來歷。</span>';
+      list.appendChild(empty);
+    }
+    for (const item of unlockedLore) {
       const entry = document.createElement('div');
       entry.className = 'relic-lore-entry';
-      entry.innerHTML = `<span class="relic-lore-num">${i + 1}</span><span class="relic-lore-text">${display.lore[i]}</span>`;
+      const label = this._relicLoreLabel(item.index, display.lore.length);
+      entry.innerHTML = `<span class="relic-lore-num">${label}</span><span class="relic-lore-text">${item.text}</span>`;
       list.appendChild(entry);
     }
     if (display.locationHint) {
@@ -437,6 +462,23 @@ const RenderNotes = {
       list.appendChild(hint);
     }
     container.appendChild(list);
+  },
+
+  _unlockedRelicLore(relic = {}, display = null) {
+    const data = display || this._relicDisplay(relic);
+    const lore = Array.isArray(data.lore) ? data.lore : [];
+    if (!relic?.id || lore.length === 0) return [];
+    const unlocked = Array.isArray(G.notes?.[relic.id]) ? G.notes[relic.id] : [];
+    return unlocked
+      .filter(index => Number.isInteger(index) && index >= 0 && index < lore.length)
+      .sort((a, b) => a - b)
+      .map(index => ({ index, text: lore[index] }));
+  },
+
+  _relicLoreLabel(index, total = 0) {
+    if (index === 0) return '聖物記述';
+    if (index === 1 && total >= 2) return '共鳴線索';
+    return `記述 ${index + 1}`;
   },
 
   _createRelicEffectBlock(desc, fusedDesc = '') {
@@ -508,16 +550,16 @@ const RenderNotes = {
       war_banner: {
         name: '戰爭旗',
         icon: '⚑',
-        desc: '主戰攻擊前，可選擇舉起戰爭旗，旗面自動決定。戰吼面：全隊擊中傷害依階級提高。創傷面：每回合第一次擊中時依階級施加傷口。',
-        fusedDesc: '融合後此旗不會舉旗失敗。非執旗者舉起時直接成為二階；執旗者舉起時，1-4 為二階，5-6 為三階。',
+        desc: '主戰攻擊前，可選擇舉起戰爭旗，旗面自動決定。戰吼面：全隊擊中傷害依旗階 +1/+2/+3。創傷面：每回合第一次擊中時施加 1/2/3 層傷口。非執旗者舉旗為 1 階，若此旗已融合則為 2 階。執旗者舉旗以本次攻擊骰判定：1-2 失敗，3-4 為 2 階，5-6 為 3 階；若此旗已融合，1-4 為 2 階，5-6 為 3 階。',
+        fusedDesc: '主戰攻擊前，可選擇舉起戰爭旗，旗面自動決定。戰吼面：全隊擊中傷害依旗階 +1/+2/+3。創傷面：每回合第一次擊中時施加 1/2/3 層傷口。融合後此旗不會舉旗失敗；非執旗者舉起時直接成為 2 階，執旗者舉起時 1-4 為 2 階，5-6 為 3 階。',
         lore: ['布面殘破，號令卻仍能讓隊伍重新排成一線。'],
         locationHint: '支援路線事件或普通聖物中可能出現。',
       },
       eagle_banner: {
         name: '鷹眼旗',
         icon: '⚑',
-        desc: '主戰攻擊前，可選擇舉起鷹眼旗，旗面自動決定。破綻面：每回合附加鷹眼破綻，高階命中時額外增傷。原生面：命中原生弱點時增傷，高階可新增鷹眼暫時原生弱點。',
-        fusedDesc: '融合後此旗不會舉旗失敗。非執旗者舉起時直接成為二階；執旗者舉起時，1-4 為二階，5-6 為三階。',
+        desc: '主戰攻擊前，可選擇舉起鷹眼旗，旗面自動決定。破綻面：每回合附加 1 個鷹眼破綻；命中該破綻時 1/2/3 階額外傷害 +0/+2/+3。原生面：命中任一原生弱點時傷害 +3/+3/+4；2 階若最終骰面大於 3，新增 1 個鷹眼暫時原生弱點 2 回合；3 階若最終骰面大於 2，新增 1 個鷹眼暫時原生弱點 3 回合。鷹眼旗產生的弱點同時只能存在 1 個，且可互相覆蓋。非執旗者舉旗為 1 階，若此旗已融合則為 2 階。執旗者舉旗以本次攻擊骰判定：1-2 失敗，3-4 為 2 階，5-6 為 3 階；若此旗已融合，1-4 為 2 階，5-6 為 3 階。',
+        fusedDesc: '主戰攻擊前，可選擇舉起鷹眼旗，旗面自動決定。破綻面：每回合附加 1 個鷹眼破綻；命中該破綻時 1/2/3 階額外傷害 +0/+2/+3。原生面：命中任一原生弱點時傷害 +3/+3/+4；2 階若最終骰面大於 3，新增 1 個鷹眼暫時原生弱點 2 回合；3 階若最終骰面大於 2，新增 1 個鷹眼暫時原生弱點 3 回合。融合後此旗不會舉旗失敗；非執旗者舉起時直接成為 2 階，執旗者舉起時 1-4 為 2 階，5-6 為 3 階。',
         lore: ['旗尖所指之處，連陰影都露出裂縫。'],
         locationHint: '支援路線事件或普通聖物中可能出現。',
       },
@@ -540,10 +582,26 @@ const RenderNotes = {
       exorcism_ring: {
         name: '驅邪戒',
         icon: '💍',
-        desc: '淨化判定失敗時可重骰一次。',
-        fusedDesc: '淨化判定不再重骰，改為必定成功。',
+        desc: '每天第一次探索骰若未達成功門檻，會自動重骰一次，並採用重骰結果。',
+        fusedDesc: '每天第一次探索骰必定成功：若骰面低於成功門檻，將最終骰面提高到該門檻。',
         lore: ['戒面刻著細小符文，靠近黑暗時會微微發熱。'],
         locationHint: '黑夜聖物獎勵中可能出現。',
+      },
+      iron_scabbard: {
+        name: '沉鐵劍鞘',
+        icon: '▰',
+        desc: '持有者使用劍系武器主戰時，高骰視為重劍。重劍命中後，自身基礎攻擊 +3，直到戰鬥結束。',
+        fusedDesc: '重劍命中後，自身基礎攻擊改為 +5，直到戰鬥結束。',
+        lore: ['劍鞘比劍更沉。拔劍時，手腕會記住那份重量。'],
+        locationHint: '普通聖物獎勵中可能出現。',
+      },
+      silver_bee_pin: {
+        name: '銀蜂針',
+        icon: '◇',
+        desc: '持有者使用劍系武器主戰時，低骰視為刺劍。刺劍命中後觸發連擊：第一次連擊必定成功，之後每次連擊機率 -20%；連擊傷害為本次傷害的 50%。',
+        fusedDesc: '刺劍連擊機率改為每次 -10%，最低 10%。',
+        lore: ['針尾銀亮，像一隻停在劍柄上的蜂。出劍越快，嗡鳴越細。'],
+        locationHint: '普通聖物獎勵中可能出現。',
       },
       eagle_eye_feather: {
         name: '鷹眼羽飾',
@@ -564,24 +622,24 @@ const RenderNotes = {
       pain_mask: {
         name: '痛苦面具',
         icon: '🎭',
-        desc: '主戰時，攻擊 4 層以上傷口的敵人，每 4 層傷口額外造成 1 點傷害。',
-        fusedDesc: '保留原效果；若敵人傷口達 15 層，會引爆傷口造成額外固定傷害。',
+        desc: '主戰造成傷害時，每 4 點原始傷害附加 1 層傷口。',
+        fusedDesc: '主戰造成傷害時，每 4 點原始傷害附加 1 層傷口。若敵人傷口達 15 層，會引爆並消耗所有傷口，每層造成 2 點固定傷害。',
         lore: ['面具內側沒有臉，只有咬緊的痛。'],
         locationHint: '普通聖物獎勵中可能出現。',
       },
       pain_splinter_badge: {
         name: '痛苦徽記',
         icon: '🩸',
-        desc: '攻擊 5 層以上傷口的敵人時，最終傷害提高 20%。',
-        fusedDesc: '最終傷害提高 30%，並將傷口上限提高至 20。',
+        desc: '攻擊骰最終骰面為 6 時，附加 2 層傷口。攻擊 5 層以上傷口的敵人時，最終傷害提高 20%。',
+        fusedDesc: '攻擊骰最終骰面為 6 時，附加 3 層傷口。攻擊 5 層以上傷口的敵人時，最終傷害提高 30%，並將傷口上限提高至 20。',
         lore: ['徽記像乾涸的傷疤，碰到鮮血時又重新發亮。'],
         locationHint: '普通聖物獎勵中可能出現。',
       },
       black_iron_crown: {
         name: '黑鐵王冠',
         icon: '👑',
-        desc: '黑暗怪狩獵時削弱黑暗怪。黑暗等級越高，效果越明顯。',
-        fusedDesc: '對黑暗怪額外提高傷害，並保留削弱效果。',
+        desc: '主動討伐黑暗化身時，若黑暗化身等級高於 5，戰鬥等級 -2，最低降至 5。被動追殺不會降低等級。',
+        fusedDesc: '保留主動討伐時戰鬥等級 -2，最低 5；主動討伐黑暗化身時，全隊對黑暗化身造成的傷害 +10%，至少 +1。',
         lore: ['它不是為王準備的，而是為仍敢直視黑夜的人。'],
         locationHint: '黑夜聖物獎勵中可能出現。',
       },
@@ -591,22 +649,22 @@ const RenderNotes = {
     return {
       name: data.name || relic.name || relic.id || '未知聖物',
       icon: data.icon || relic.icon || '◆',
-      desc: data.desc || relic.desc || '尚無說明。',
-      fusedDesc: data.fusedDesc || (relic.fusedEffect ? '融合後效果已套用。' : ''),
-      lore: data.lore || relic.lore || [],
+      desc: relic.desc || data.desc || '尚無說明。',
+      fusedDesc: (typeof relicFusionDesc === 'function' ? relicFusionDesc(relic) : '') || data.fusedDesc || (relic.fusedEffect ? '融合後效果已套用。' : ''),
+      lore: relic.lore || data.lore || [],
       locationHint: data.locationHint || relic.locationHint || '',
     };
   },
 
   _weaponDisplay(weapon = {}) {
     const overrides = {
-      sword: ['劍', '⚔️', '主戰時，傷害 +1。'],
+      sword: ['劍', '⚔️', '主戰時，最終骰面 1-3 傷害 +1；4 以上傷害 +2。'],
       bow: ['弓', '🏹', '主戰時，命中原生弱點後，可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 2 次。'],
       dagger: ['匕首', '🗡️', '主戰時，命中弱點時額外 +2 傷害。'],
       battle_drum: ['戰鼓', '🥁', '主戰攻擊後，敲響戰鼓：接下來 2 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
       healing_staff: ['祈癒杖', '+', '主戰時，命中原生弱點後，全隊恢復生命。'],
       katana: ['太刀', '⚔️', '主戰造成傷害時，施加 1 層傷口。'],
-      sword_plus: ['進階劍', '⚔️', '主戰時，傷害 +2。'],
+      sword_plus: ['裁衡劍', '⚔️', '主戰時，最終骰面 1-3 傷害 +2；4 以上傷害 +4。'],
       bow_plus: ['逐星弓', '🏹', '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。'],
       dagger_plus: ['影牙匕首', '🗡️', '主戰時，命中弱點額外 +2 傷害；未命中任何弱點時，額外造成等同最終骰面的傷害。'],
       battle_drum_plus: ['進階戰鼓', '🥁', '主戰攻擊後，接下來 3 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
@@ -626,7 +684,13 @@ const RenderNotes = {
       shield: ['盾牌', '🛡️', '主戰攻擊時，獲得等同骰面一半的格檔，向下取整，最低 1。'],
       grappling_hook: ['鉤索', '🪝', '主戰攻擊時，若原本未命中任何弱點，最終骰面 +1 並重新判定命中。每回合限一次；若因此命中原生弱點，不會觸發弓追擊。'],
       telescope: ['望遠鏡', '🔭', '若裝備者不是主戰者，敵人新增 1 個破綻。'],
+      guard_charm: ['守衛護符', '🛡️', '若裝備者不是主戰者，主戰者攻擊時，裝備者獲得 1 格檔，並使裝備者仇恨 +1。'],
+      targeting_pennant: ['瞄準旗標', '🎯', '若裝備者不是主戰者，主戰者本次攻擊命中敵人原生弱點時，傷害 +2。追擊不觸發此效果。'],
       bandage: ['繃帶包', '🩹', '主戰攻擊後，治療生命比例最低的隊友 3 HP。每場戰鬥限一次。'],
+      first_aid_pouch: ['急救藥囊', '💊', '戰鬥開始時，生命低於一半的隊友各恢復 2 HP。每場戰鬥觸發一次。'],
+      night_pack: ['黑夜行囊', '🎒', '戰鬥開始時，若目前為黑夜，全隊恢復 1 HP；若黑暗達 10 以上，改為恢復 2 HP。'],
+      kindling_bell: ['引火鈴', '🔔', '若裝備者不是主戰者，回合結束時，若主戰者仇恨至少 5，主戰者仇恨歸 0，裝備者仇恨變為 2。'],
+      cracked_dice_pendant: ['裂骰墜飾', '🎲', '主戰攻擊骰原始骰面為 1 或 6 時，傷害 +3；若為 1，攻擊後自身受到 1 傷害。'],
       serrated_oil: ['鋸齒油', '🧴', '主戰攻擊時，若最終骰面至少為 5 且造成傷害，額外施加 1 層傷口。每回合限一次。'],
       corrosive_oil: ['腐蝕油', '🧪', '主戰命中任一弱點且敵人至少 5 層傷口時，消耗 1 層傷口並造成 3 點固定傷害。每回合限一次。'],
       bone_dice_bag: ['骨骰袋', '🎲', '每場戰鬥前 2 次，攻擊骰 1/2/3 會翻為 6/5/4。若因此觸發搏命者雙數，免疫該次反噬與減傷。'],
@@ -672,6 +736,22 @@ const RenderNotes = {
         desc: '同身：融合痛苦徽記 + 痛苦面具。',
         body: '持有者攻擊 6 層以上傷口的敵人時，該次擊中最終傷害額外提高 20%。',
         detail: ['偏向穩定放大，適合多段攻擊或高基礎傷害。'],
+      },
+      {
+        id: 'greatsword_resonance',
+        name: '沉鐵劍律',
+        relics: ['iron_scabbard', 'silver_bee_pin'],
+        desc: '同身：融合沉鐵劍鞘 + 銀蜂針。',
+        body: '銀蜂針不再觸發刺劍連擊，改為強化重劍。重劍命中後額外獲得 5 點氣勢；每 5 點氣勢，使重劍傷害 +1。',
+        detail: ['此共鳴不補重劍觸發率，也不提供低骰刺劍效果；銀蜂針在這條共鳴中只是重劍的校準與補償。'],
+      },
+      {
+        id: 'rapier_resonance',
+        name: '銀蜂劍律',
+        relics: ['silver_bee_pin', 'iron_scabbard'],
+        desc: '同身：融合銀蜂針 + 沉鐵劍鞘。',
+        body: '沉鐵劍鞘不再觸發重劍，改為強化刺劍。每回合前 2 次刺劍連擊必定成功，且不降低後續連擊機率；本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
+        detail: ['此共鳴不提供高骰重劍效果；沉鐵劍鞘在這條共鳴中只是刺劍的壓制與補償。'],
       },
       {
         id: 'star_hunter_eye',

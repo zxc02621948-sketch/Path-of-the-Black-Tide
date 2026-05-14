@@ -144,6 +144,20 @@ const GameRelicResonance = {
           '戰鬥中可同時維持 1 面戰爭旗與 1 面鷹眼旗。',
           '再次舉起同一件旗時，會覆蓋該旗目前的旗面；不同旗可並存。',
         ].join('\n');
+      case 'greatsword_resonance':
+        return [
+          `${res.bodyChar?.name || '持有者'} 融合沉鐵劍鞘並攜帶銀蜂針。`,
+          '銀蜂針不再觸發刺劍連擊，改為強化重劍。',
+          '重劍命中後額外獲得 5 點氣勢。',
+          '每 5 點氣勢，使重劍傷害 +1。',
+        ].join('\n');
+      case 'rapier_resonance':
+        return [
+          `${res.bodyChar?.name || '持有者'} 融合銀蜂針並攜帶沉鐵劍鞘。`,
+          '沉鐵劍鞘不再觸發重劍，改為強化刺劍。',
+          '每回合前 2 次刺劍連擊必定成功，且不降低後續連擊機率。',
+          '本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
+        ].join('\n');
       default:
         return res.effect?.desc || '共鳴效果已啟動。';
     }

@@ -197,7 +197,7 @@ const GameInventory = {
         { label: '遺物祈願：獲得隨機聖物', action: () => this._openWishRelic(idx) },
         { label: '武裝祈願：裝備二選一', action: () => this._openWishGear(idx) },
         { label: '兵刃祈願：升級一名隊友武器', action: () => this._openWishWeaponUpgrade(idx) },
-        { label: '黎明祈願：2 次黑夜免扣血，黑暗 -2', action: () => this._useWishDawn(idx) },
+        { label: '黎明祈願：黑暗 -2', action: () => this._useWishDawn(idx) },
         { label: '返回', action: () => { this._closeModal(); Render.fullRender(); } },
       ],
     });
@@ -294,7 +294,7 @@ const GameInventory = {
     if (!char || !relic) return;
     if (char.relic) {
       this._removeRelicEffect(char, char.relic);
-      this._dropRelicAt(G.playerX, G.playerY, char.relic, char.name, 'relic');
+      this._dropRelicAt(G.playerX, G.playerY, char.relic);
       this._log(`${char.name} 放下原本攜帶的聖物。`, 'dim');
     }
     char.relic = { ...relic };
@@ -387,9 +387,8 @@ const GameInventory = {
 
   _useWishDawn(idx) {
     this._consumeWishChest(idx);
-    G.dawnWishProtection = (G.dawnWishProtection || 0) + 2;
     this._applyDarkness(-2, '黎明祈願');
-    this._log(`黎明祈願：接下來 ${G.dawnWishProtection} 次黑夜結束今天不會受到黑夜侵蝕。`, 'reward');
+    this._log('黎明祈願：黑暗 -2。', 'reward');
     this._closeModal();
     Render.fullRender();
   },

@@ -39,8 +39,15 @@ const MapGen = {
       }
     }
 
-    for (const { x, y } of altarPositions) {
-      grid[y][x].hiddenSite = { type: 'altar', altarUsedDay: 0 };
+    for (let i = 0; i < altarPositions.length; i++) {
+      const { x, y } = altarPositions[i];
+      if (i === 0) {
+        grid[y][x].type = 'altar';
+        grid[y][x].altarHidden = false;
+        grid[y][x].altarUsedDay = 0;
+      } else {
+        grid[y][x].hiddenSite = { type: 'altar', altarUsedDay: 0 };
+      }
     }
 
     const restPlaced = [];
@@ -134,28 +141,29 @@ const MapGen = {
   _altarPositions(size) {
     const count = CONFIG.MAP_ALTARS || 2;
     const minDistance = CONFIG.MAP_ALTAR_MIN_DISTANCE || 7;
-    const configured = Array.isArray(CONFIG.MAP_ALTAR_POSITIONS) ? CONFIG.MAP_ALTAR_POSITIONS : [];
-    const valid = [];
-    for (const p of configured
-      .filter(p => Number.isInteger(p.x) && Number.isInteger(p.y))
-      .filter(p => p.x >= 0 && p.y >= 0 && p.x < size && p.y < size)) {
-      if (valid.every(existing => this.distance(existing.x, existing.y, p.x, p.y) >= minDistance)) {
-        valid.push(p);
+    const minStartDistance = CONFIG.MAP_ALTAR_MIN_START_DISTANCE || 4;
+    const cx = Math.floor(size / 2);
+    const cy = Math.floor(size / 2);
+    const candidates = [];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (x === cx && y === cy) continue;
+        if (this.distance(x, y, cx, cy) < minStartDistance) continue;
+        candidates.push({ x, y });
       }
-      if (valid.length >= count) break;
     }
-    if (valid.length >= count) return valid;
-    for (const fallback of [
-      { x: 2, y: 2 },
-      { x: size - 3, y: size - 3 },
-    ]) {
-      if (fallback.x >= 0 && fallback.y >= 0 && fallback.x < size && fallback.y < size &&
-          valid.every(existing => this.distance(existing.x, existing.y, fallback.x, fallback.y) >= minDistance)) {
-        valid.push(fallback);
+    this._shuffle(candidates);
+
+    for (let requiredDistance = minDistance; requiredDistance >= 1; requiredDistance--) {
+      const valid = [];
+      for (const p of candidates) {
+        if (valid.every(existing => this.distance(existing.x, existing.y, p.x, p.y) >= requiredDistance)) {
+          valid.push(p);
+        }
+        if (valid.length >= count) return valid;
       }
-      if (valid.length >= count) break;
     }
-    return valid.slice(0, count);
+    return candidates.slice(0, count);
   },
 
   distance(x1, y1, x2, y2) {

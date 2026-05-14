@@ -21,6 +21,9 @@ const ENEMIES = [
   {
     id: 'shadow_worm',
     icon: '🪱',
+    iconImage: 'assets/enemies/shadow-worm.png',
+    iconFlipX: true,
+    iconScale: 'large',
     tier: 'weak',
     tierUpDays: 3,
     weakness: 3,
@@ -42,6 +45,8 @@ const ENEMIES = [
   {
     id: 'rot_crawler',
     icon: '🦂',
+    iconImage: 'assets/enemies/rot-crawler.png',
+    iconScale: 'large',
     tier: 'weak',
     tierUpDays: 3,
     weakness: 5,
@@ -65,6 +70,8 @@ const ENEMIES = [
   {
     id: 'plague_moth',
     icon: '🦋',
+    iconImage: 'assets/enemies/plague-moth.png',
+    iconScale: 'large',
     tier: 'weak',
     tierUpDays: 3,
     weakness: 2,
@@ -88,6 +95,8 @@ const ENEMIES = [
   {
     id: 'rot_knight',
     icon: '💀',
+    iconImage: 'assets/enemies/rot-knight.png',
+    iconFlipX: true,
     tier: 'medium',
     tierUpDays: 6,
     weakness: 4,
@@ -110,6 +119,10 @@ const ENEMIES = [
   {
     id: 'shadow_hunter',
     icon: '👁️',
+    iconImage: 'assets/enemies/shadow-hunter.png',
+    iconFlipX: true,
+    iconScale: 'large',
+    iconSoftEdge: true,
     tier: 'medium',
     tierUpDays: 6,
     weakness: 1,
@@ -133,20 +146,24 @@ const ENEMIES = [
 
   {
     id: 'dice_corruptor',
+    name: '深污腐骰宿主',
     icon: '☣️',
+    cardBgImage: 'assets/enemies/dice-corruptor-bg.png',
+    hideIconInCombat: true,
     tier: 'strong',
-    tierUpDays: 10,
+    unique: true,
+    noRetreat: true,
+    desc: '污染已滲入牠周圍的每一次擲骰。每次行動都會污染骰面，拖得越久，滿污染後的反噬越危險。',
+    hp: 92,
+    block: 0,
+    attack: 6,
     weakness: 3,
     weaknessEffect: { type: 'clear_dice_pollution', desc: '污染核心破裂，全隊各清除 1 個污染骰面' },
     abilities: [{ type: 'dice_pollution', heal: 6, empoweredSelfDamage: 1, empoweredMax: 3 }],
     nightOnly: false,
-    lore: '牠不吞食血肉，而是污染骰運。被牠注視過的人會在熟悉的骰面上看見黑斑，下一次命運落在那裡時，攻擊只會餵飽牠。',
+    lore: '牠不吞食血肉，而是污染骰運。牠每次行動都會污染一名隊友的骰面：污染孢子會污染隨機隊友，撲擊會污染被攻擊目標，污潮會污染隨機隊友。',
     intents: [
       { type: 'pollute', weight: 1 },
-    ],
-    tiers: [
-      { name: '腐骰宿主', desc: '寄生在骰運上的污染怪。會污染隊友骰面，讓攻擊歸零並為自身回血。', hp: 78, block: 0, attack: 5 },
-      { name: '深污腐骰宿主', desc: '污染已滲入牠周圍的每一次擲骰。拖得越久，滿污染後的反噬越危險。', hp: 92, block: 0, attack: 6 },
     ],
   },
 
@@ -154,36 +171,36 @@ const ENEMIES = [
     id: 'cage_warden',
     name: '囚籠看守',
     icon: '🗝️',
-    desc: '拖著鏽鐵鑰匙的看守，身後傳來被囚者的低聲呼救',
-    hp: 38,
+    desc: '拖著鏽鐵鑰匙的看守，身後傳來被囚者的低聲呼救。若拖得太久，牠會處刑牢中的倖存者。',
+    hp: 36,
     block: 3,
-    attack: 4,
+    attack: 5,
     weakness: 5,
-    weaknessEffect: { type: 'block_break', desc: '鑰匙束被擊落，看守暫時無法格檔，直到我方下一回合結束' },
+    weaknessEffect: { type: 'block_break', desc: '鑰匙束被擊落，看守暫時無法格檔，直到我方下一回合結束，處刑倒數 +1' },
     nightOnly: false,
     boss: true,
     rescueBoss: true,
+    abilities: [{ type: 'execution_countdown', turns: 5, delayOnBreak: 1 }],
     lore: '它不像在巡邏，更像是在清點還活著的人。',
     intents: [
-      { type: 'attack',       weight: 2 },
-      { type: 'block',        weight: 2 },
+      { type: 'attack',       weight: 3 },
       { type: 'block_attack', weight: 1 },
-      { type: 'aoe',          weight: 1 },
     ],
   },
 
   {
     id: 'abyss_warden',
-    name: '深淵守衛',
+    name: '黑暗化身',
     icon: '🌑',
-    desc: '只在黑夜中現身，格檔極高，正面強攻幾乎無效',
-    hp: 150,
-    block: 5,
-    attack: 6,
+    desc: '只在黑夜中現身的追獵者。牠會隨黑暗層數強化，但本體不再依天數升階。',
+    hp: 30,
+    block: 4,
+    attack: 4,
     weakness: 6,
-    weaknessEffect: { type: 'fear', desc: '守衛發出驚懼氣息，此擊無視格檔' },
+    weaknessEffect: { type: 'weaken_next_attack', amount: 1, desc: '黑霧裂解，此擊無視格檔，且黑暗化身下一次攻擊 -1' },
     nightOnly: true,
-    lore: '沒有人知道它來自哪裡。有人說黑夜本身就是它的家。',
+    darkMonsterBase: true,
+    lore: '沒有人知道它來自哪裡。有人說黑夜本身就是它的家。黑暗化身生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%；每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。',
     intents: [
       { type: 'block',        weight: 3 },
       { type: 'block_attack', weight: 1 },
@@ -191,26 +208,6 @@ const ENEMIES = [
     ],
   },
 
-  {
-    id: 'erosion_warden',
-    name: '侵蝕之喉',
-    icon: '🌫️',
-    desc: '黑暗凝聚的形體，擊敗它可減少黑暗',
-    hp: 150,
-    block: 3,
-    attack: 6,
-    weakness: 6,
-    weaknessEffect: { type: 'fear', desc: '黑霧潰散，此擊無視格檔' },
-    nightOnly: false,
-    boss: true,
-    erosionBoss: true,
-    lore: '它不守衛任何東西。它本身就是侵蝕的入口。',
-    intents: [
-      { type: 'aoe',         weight: 2 },
-      { type: 'dice_attack', weight: 2 },
-      { type: 'attack',      weight: 1 },
-    ],
-  },
   {
     id: 'treasure_mimic',
     name: '寶箱擬態怪',
@@ -237,6 +234,8 @@ const ENEMIES = [
     id: 'echo_guardian_wound',
     name: '痛痕守護者',
     icon: '🩸',
+    cardBgImage: 'assets/enemies/wound-guardian-bg.png',
+    hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，身上纏滿不會癒合的黑色傷痕。',
     hp: 90,
     block: 0,
@@ -261,6 +260,8 @@ const ENEMIES = [
     id: 'echo_guardian_eagle',
     name: '裂隙凝視者',
     icon: '🔍',
+    cardBgImage: 'assets/enemies/rift-gazer-bg.png',
+    hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，眼中浮著細碎裂光，像在等待破綻張開。',
     hp: 50,
     block: 0,
@@ -285,6 +286,8 @@ const ENEMIES = [
     id: 'echo_guardian_fate',
     name: '擲命守衛',
     icon: '🎲',
+    cardBgImage: 'assets/enemies/fate-guardian-bg.png',
+    hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，掌心反覆滾動著沒有落點的黑骰。',
     hp: 50,
     block: 0,
@@ -308,6 +311,8 @@ const ENEMIES = [
     id: 'echo_guardian_banner',
     name: '殘旗守衛',
     icon: '⚑',
+    cardBgImage: 'assets/enemies/banner-guardian-bg.png',
+    hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，背後殘旗無風自揚，像仍在號令早已消失的軍勢。',
     hp: 60,
     block: 6,
@@ -324,6 +329,31 @@ const ENEMIES = [
     ],
     abilities: [
       { type: 'banner_guardian', woundStacks: 2, damageBonus: 2, switchBlock: 6 },
+    ],
+  },
+
+  {
+    id: 'night_heart',
+    name: '夜幕之瞳',
+    icon: '🌑',
+    cardBgImage: 'assets/enemies/night-eye-bg.png',
+    hideIconInCombat: true,
+    desc: '第 20 天黎明前，夜幕之瞳在黑霧深處睜開。它閉眼時遮蔽自身弱點並凝成格檔，開眼時露出一瞬破綻，隨後降下足以奪命的黑光。',
+    hp: 90,
+    block: 0,
+    attack: 3,
+    weakness: null,
+    weaknessEffect: { type: 'final_dawn_break', desc: '短暫破曉：下一次閉眼不獲得格檔，下一次開眼攻擊不造成濺射' },
+    nightOnly: false,
+    boss: true,
+    finalBoss: true,
+    noRetreat: true,
+    lore: '那不是怪物的眼睛，而是黑夜本身第一次注視你們。',
+    abilities: [
+      { type: 'final_boss', hpPerDarkness: 4, attackPerDarkness: 5, closedBlock: 4, splashDamage: 1 },
+    ],
+    intents: [
+      { type: 'attack', weight: 1 },
     ],
   },
 
@@ -377,6 +407,7 @@ function intentLabel(intent, enemy) {
     case 'block_attack': return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${atk} 傷`;
     case 'aoe':          return `🌊 全體攻擊　各 ${aoe} 傷`;
     case 'dice_attack':  return `🎲 擲骰攻擊　骰數傷害`;
+    case 'pollute':      return '☣️ 污染 1 名隊友的骰面';
     case 'idle':         return '… 不攻擊';
     default:             return '❓ 未知意圖';
   }
@@ -385,6 +416,36 @@ function intentLabel(intent, enemy) {
 // ── 查詢 ──────────────────────────────────────────────────────
 function getEnemyById(id) {
   return ENEMIES.find(e => e.id === id) || null;
+}
+
+function getFinalBossEnemy(darkness = null) {
+  const boss = getEnemyById('night_heart');
+  if (!boss) return null;
+  const value = Math.max(0, Math.floor(Number.isFinite(darkness) ? darkness : ((typeof G !== 'undefined' && G?.darkness) || 0)));
+  return {
+    ...boss,
+    hp: (boss.hp || 1) + value * 5,
+    attack: (boss.attack || 0) + Math.floor(value / 5),
+    finalBossDarkness: value,
+    finalBossPrescaled: true,
+  };
+}
+
+function getDarkMonsterEnemy(darkness = null) {
+  const base = getEnemyById('abyss_warden');
+  if (!base) return randomEnemyForDay(true);
+  const value = Math.max(0, Math.floor(Number.isFinite(darkness) ? darkness : ((typeof G !== 'undefined' && G?.darkness) || 0)));
+  const hpMultiplier = 1 + value * 0.1;
+  const attackBonus = Math.floor(value / 5);
+  return {
+    ...base,
+    hp: Math.max(1, Math.round((base.hp || 1) * hpMultiplier)),
+    maxHp: Math.max(1, Math.round((base.hp || 1) * hpMultiplier)),
+    attack: (base.attack || 0) + attackBonus,
+    darkMonsterLevel: value,
+    darkMonsterHpMultiplier: hpMultiplier,
+    darkMonsterAttackBonus: attackBonus,
+  };
 }
 
 function getDayEnemies() {
@@ -397,10 +458,19 @@ function getNightEnemies() {
 
 function randomEnemyForDay(isNight, dayOverride = null) {
   const day = dayOverride || (typeof G !== 'undefined' && G?.day) || 1;
-  const allowedTiers = day >= 13 ? ['weak', 'medium', 'strong'] : (day <= 3 ? ['weak'] : ['weak', 'medium']);
-  const pool = (isNight ? getNightEnemies() : getDayEnemies())
-    .filter(e => !e.boss && !e.rescueBoss && !e.erosionBoss)
-    .filter(e => allowedTiers.includes(e.tier));
+  const defeatedUnique = new Set((typeof G !== 'undefined' && Array.isArray(G.defeatedUniqueEnemies)) ? G.defeatedUniqueEnemies : []);
+  const baseTiers = day <= 3 ? ['weak'] : ['weak', 'medium'];
+  const source = isNight ? getNightEnemies() : getDayEnemies();
+  const strongPool = !isNight && day >= 10
+    ? source
+      .filter(e => e.tier === 'strong' && !e.boss && !defeatedUnique.has(e.id))
+    : [];
+  if (strongPool.length > 0 && Math.random() < 0.08) {
+    return { ...strongPool[Math.floor(Math.random() * strongPool.length)] };
+  }
+  const pool = source
+    .filter(e => !e.boss && !e.rescueBoss)
+    .filter(e => baseTiers.includes(e.tier));
   const base = pool[Math.floor(Math.random() * pool.length)];
   return resolveEnemyTier(base, day);
 }
@@ -412,11 +482,6 @@ function randomEnemy(isNight) {
 function getRescueBossEnemy() {
   const boss = ENEMIES.find(e => e.rescueBoss);
   return boss ? { ...boss } : randomEnemy(false);
-}
-
-function getErosionBossEnemy() {
-  const boss = ENEMIES.find(e => e.erosionBoss);
-  return boss ? { ...boss } : randomEnemy(true);
 }
 
 function getTreasureMimicEnemy() {

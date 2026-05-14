@@ -150,7 +150,7 @@ const GameEventTreasure = {
     });
   },
 
-  _settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '') {
+  _settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
     const baseChance = CONFIG.TREASURE_MIMIC_GEAR_DROP_CHANCE ?? 0.5;
     const boostedChance = CONFIG.TREASURE_MIMIC_WEAKNESS_GEAR_DROP_CHANCE ?? 0.8;
     const chance = enemy?.gearDropBoost ? boostedChance : baseChance;
@@ -163,6 +163,7 @@ const GameEventTreasure = {
         desc: `${enemy.name} 被擊敗。${finalHitDesc ? `\n${finalHitDesc}` : ''}\n\n箱體碎裂，裡面的裝備也跟著毀壞。`,
         combatLog,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+        combatAnims,
         dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -176,6 +177,7 @@ const GameEventTreasure = {
       desc: `${enemy.name} 被擊敗。${finalHitDesc ? `\n${finalHitDesc}` : ''}\n\n箱體崩裂後留下可用的裝備。\n\n${gear.icon} ${gear.name}\n${gear.desc}${enemy?.gearDropBoost ? '\n\n命中原生弱點使掉落率提高。' : ''}`,
       combatLog,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
       choices: [{
         label: `分配「${gear.name}」`,
@@ -356,11 +358,19 @@ const GameEventTreasure = {
   },
 
   _awardWagerDiceFromFateTable(gambler) {
-    const newly = this._awardWagerDice(gambler) || [];
-    this._openModal({
+    const relic = getEventRelicById('wager_dice') || getRelicById('wager_dice');
+    if (!relic) {
+      this._openModal({
+        title: '命運賭桌：空無一物',
+        desc: '賭桌上的骰子碎成粉末，什麼也沒有留下。',
+        choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+      });
+      return;
+    }
+    this._openFateTableRelicAssignModal({
       title: '命運賭桌：取得賭命骰子',
-      desc: gambler.name + ' 收下賭桌上的骰子。黑暗中的笑聲逐漸遠去。' + this._resonanceActivatedText(newly),
-      choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+      intro: gambler.name + ' 收下賭桌上的骰子。黑暗中的笑聲逐漸遠去。',
+      relic,
     });
   },
 
@@ -371,17 +381,55 @@ const GameEventTreasure = {
       return;
     }
     const relic = weightedRelicPick(pool);
-    const newly = this._grantFateTableRelic(gambler, relic) || [];
-    this._openModal({
+    this._openFateTableRelicAssignModal({
       title: '命運賭桌：隨機聖物',
-      desc: gambler.name + ' 推開賭桌上的骰子，黑霧凝成另一件聖物。\n\n獲得「' + relic.name + '」。\n' + relic.desc + this._resonanceActivatedText(newly),
-      choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+      intro: gambler.name + ' 推開賭桌上的骰子，黑霧凝成另一件聖物。',
+      relic,
+    });
+  },
+
+  _openFateTableRelicAssignModal({ title, intro, relic }) {
+    if (!relic) return;
+    const carriers = relic.scholarOnly
+      ? this._aliveSquad().filter(c => c.cls === 'scholar')
+      : this._aliveSquad();
+    const choices = carriers.map(char => ({
+      label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
+      detail: char.relic ? `目前效果：${char.relic.desc}` : '',
+      action: () => {
+        const result = this._grantFateTableRelic(char, relic);
+        this._openModal({
+          title: `${title}：完成`,
+          desc: [
+            `${char.name} 獲得聖物「${relic.name}」。`,
+            result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+            this._resonanceActivatedText(result?.newly || []),
+          ].filter(Boolean).join('\n'),
+          choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+        });
+      },
+    }));
+    choices.push({
+      label: '放棄聖物',
+      action: () => {
+        this._log(`命運賭桌：放棄聖物「${relic.name}」。`, 'dim');
+        this._closeModal();
+        Render.fullRender();
+      },
+    });
+
+    this._openModal({
+      title,
+      desc: `${intro}\n\n獲得「${relic.name}」。\n${relic.desc}`,
+      choices,
     });
   },
 
   _grantFateTableRelic(char, relic) {
-    if (!char || !relic) return [];
+    if (!char || !relic) return { newly: [], replaced: null };
+    let replaced = null;
     if (char.relic) {
+      replaced = { ...char.relic };
       this._removeRelicEffect(char, char.relic);
       this._dropRelicAt(G.playerX, G.playerY, char.relic);
       this._log(char.name + ' 原本的聖物掉落在原地。', 'dim');
@@ -391,13 +439,7 @@ const GameEventTreasure = {
     this._unlockNote(relic.id);
     const newly = this._updateResonances();
     this._log(char.name + ' 獲得聖物「' + relic.name + '」。', 'reward');
-    return newly;
-  },
-
-  _awardWagerDice(gambler) {
-    const relic = getEventRelicById('wager_dice') || getRelicById('wager_dice');
-    if (!relic) return [];
-    return this._grantFateTableRelic(gambler, relic);
+    return { newly, replaced };
   },
 
   _removeGamblerAtFateTable(gambler) {

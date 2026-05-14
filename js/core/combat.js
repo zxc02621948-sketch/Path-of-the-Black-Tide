@@ -1,6 +1,6 @@
 ﻿// Combat rules used by Game.
 const CombatRules = {
-  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
+  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, deferEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
     const rawRoll = rollResult.value;
     const diceRaw = rollResult.raw ?? rollResult.value;
     const logs = [];
@@ -46,8 +46,18 @@ const CombatRules = {
     if (resonanceAttackBonus > 0) logs.push(`共鳴攻擊骰 +${resonanceAttackBonus}`);
     if (equipAttackBonus > 0) logs.push(`道具攻擊骰 +${equipAttackBonus}`);
 
-    const baseAttack = (attacker.attack || 0) + (battleDrumAttackBonus || 0);
+    const greatswordResonance = (typeof G !== 'undefined' ? (G.activeResonances || []) : [])
+      .find(res => res?.effect?.type === 'greatsword_resonance' && res?.bodyChar?.id === attacker.id) || null;
+    const rapierResonance = (typeof G !== 'undefined' ? (G.activeResonances || []) : [])
+      .find(res => res?.effect?.type === 'rapier_resonance' && res?.bodyChar?.id === attacker.id) || null;
+    const greatswordRelic = rapierResonance ? null : [attacker.relic, attacker.fusedRelic]
+      .find(relic => relic?.effect?.type === 'greatsword_stance') || null;
+    const rapierRelic = greatswordResonance ? null : [attacker.relic, attacker.fusedRelic]
+      .find(relic => relic?.effect?.type === 'rapier_stance') || null;
+    const greatswordMomentum = Math.max(0, attacker._greatswordMomentum || 0);
+    const baseAttack = (attacker.attack || 0) + (battleDrumAttackBonus || 0) + greatswordMomentum;
     if (battleDrumAttackBonus > 0) logs.push(`戰鼓：主戰者攻擊 +${battleDrumAttackBonus}`);
+    if (greatswordMomentum > 0) logs.push(`氣勢：${attacker.name} 基礎攻擊 +${greatswordMomentum}`);
     const diceDamageRate = weapon?.effect?.type === 'battle_drum'
       ? (weapon.effect.diceDamageRate ?? 0.5)
       : 1;
@@ -160,6 +170,9 @@ const CombatRules = {
       roll = Math.min(maxRoll, roll + (attacker.gear.effect.value || 1));
       attacker._grapplingHookUsedRound = true;
       grapplingHookAssisted = true;
+      rollResult.grapplingHookAdjusted = { from: beforeHook, to: roll };
+      rollResult.displayValue = roll;
+      rollResult.floored = true;
       logs.push(`${attacker.gear.name}：未命中弱點，攻擊骰面 ${beforeHook} → ${roll}`);
       realWeaknessHit = allowFinalNativeWeakness && activeNativeWeaknesses.includes(roll);
       luckyTempMultipleHits = rollResult.dodecaLuckyDice
@@ -179,55 +192,16 @@ const CombatRules = {
     let starBreakerFixedDamage = 0;
 
     const applyNativeWeaknessEffect = (prefix = '弱點') => {
-      const eff = enemy.weaknessEffect || {};
-      if (eff.type === 'stun') stunned = true;
-      if (eff.type === 'block_break') {
-        enemy.blockBroken = true;
-        enemy.blockBrokenUntilRound = (round || 1) + 1;
-        CombatStatus.clearBlock(enemy);
-        if (enemy.abilityState?.shellCharge) {
-          logs.push(`${prefix}：蓄撞 ${enemy.abilityState.shellCharge} → 0。`);
-          enemy.abilityState.shellCharge = 0;
-        }
-        logs.push(`${prefix}：敵人格檔暫時破除。`);
-      }
-      if (eff.type === 'fear') {
-        CombatStatus.clearBlock(enemy);
-        logs.push(`${prefix}：本次無視格檔。`);
-      }
-      if (eff.type === 'poison_weaken') {
-        if (!enemy.abilityState) enemy.abilityState = {};
-        enemy.abilityState.poisonWeakened = true;
-        logs.push(`${prefix}：毒粉潰散，本場戰鬥毒粉傷害 -1。`);
-      }
-      if (eff.type === 'expose') {
-        enemy.exposed = true;
-        enemy.exposedUntilRound = (round || 1) + Math.max(1, eff.duration || 1);
-        logs.push(`${prefix}：敵人被揭露。`);
-      }
-      if (eff.type === 'gear_drop_boost') {
-        enemy.gearDropBoost = true;
-        logs.push(`${prefix}：箱扣鬆脫，勝利後角色裝備掉落率提高。`);
-      }
-      if (eff.type === 'suppress_pain_growth') {
-        if (!enemy.abilityState) enemy.abilityState = {};
-        enemy.abilityState.painGrowthSuppressed = true;
-        logs.push(`${prefix}：痛痕滋長被破除，牠不再於每回合開始自然累積傷口。`);
-      }
-      if (eff.type === 'clear_gaze_weaknesses') {
-        for (const char of squad || []) CombatStatus.clearNativeWeaknesses(char, { source: 'gaze' });
-        logs.push(`${prefix}：裂隙凝視被打斷，我方全體由裂隙凝視產生的原生弱點清除。`);
-      }
-      if (eff.type === 'add_fate_unlucky') {
-        const added = EnemyAbilities._addFateUnluckyFace(enemy);
-        logs.push(added
-          ? `${prefix}：命運偏折，擲命守衛新增厄運面 ${added}。`
-          : `${prefix}：命運偏折，但擲命守衛已沒有可新增的厄運面。`);
-      }
-      if (eff.type === 'clear_dice_pollution') {
-        EnemyAbilities.clearOneDicePollutionFromAll(squad, logs);
-      }
-      return eff;
+      const result = WeaknessEffects.apply({
+        enemy,
+        squad,
+        logs,
+        round,
+        prefix,
+        nativeWeaknessFace,
+      });
+      if (result.stunned) stunned = true;
+      return result.effect;
     };
 
     if (realWeaknessHit) {
@@ -283,6 +257,15 @@ const CombatRules = {
           logs.push(`裂星破滅：破壞原生弱點 ${nativeWeaknessFace}，造成 10 點固定傷害`);
         } else {
           logs.push('裂星破滅：沒有可破壞的原生弱點。');
+        }
+      }
+      if (!suppressEnemyAction) {
+        const rearNativeBonus = supporters
+          .filter(c => c.gear?.effect?.type === 'rear_native_damage_bonus')
+          .reduce((sum, c) => sum + Math.max(0, c.gear.effect.value || 0), 0);
+        if (rearNativeBonus > 0) {
+          damage += rearNativeBonus;
+          logs.push(`後排標定：命中原生弱點，傷害 +${rearNativeBonus}`);
         }
       }
       for (const activeBanner of banners) {
@@ -351,6 +334,25 @@ const CombatRules = {
       round,
     });
     damage = Math.max(0, playerDamageState.damage || 0);
+    if (playerDamageState.pollutionTriggered) {
+      starBreakerFixedDamage = 0;
+    }
+    const greatswordStrike = !!greatswordRelic &&
+      weapon?.family === 'sword' &&
+      roll >= Math.max(1, greatswordRelic.effect?.minRoll || 4) &&
+      damage > 0;
+    if (greatswordStrike) {
+      logs.push(`${greatswordRelic.name}：高骰 ${roll}，本擊視為重劍。`);
+      if (greatswordResonance) {
+        const per = Math.max(1, greatswordResonance.effect?.damagePerMomentum || 5);
+        const bonusEach = Math.max(0, greatswordResonance.effect?.damageBonus || 1);
+        const bonus = Math.floor(greatswordMomentum / per) * bonusEach;
+        if (bonus > 0) {
+          damage += bonus;
+          logs.push(`${greatswordResonance.name}：氣勢 ${greatswordMomentum}，重劍傷害 +${bonus}。`);
+        }
+      }
+    }
 
     const gamblerFace = roll;
     const gamblerEvenBacklash = attacker.cls === 'scholar' && gamblerFace % 2 === 0;
@@ -445,6 +447,25 @@ const CombatRules = {
       damage += weapon.effect.value;
       logs.push(`劍：+${weapon.effect.value}，傷害 ${damage}`);
     }
+    if (weapon?.effect?.type === 'sword_high_low' && damage > 0) {
+      const lowMax = weapon.effect.lowMax || 3;
+      const bonus = roll <= lowMax ? (weapon.effect.lowBonus || 0) : (weapon.effect.highBonus || 0);
+      if (bonus > 0) {
+        damage += bonus;
+        logs.push(`${weapon.name}：${roll <= lowMax ? '低骰' : '高骰'} +${bonus}，傷害 ${damage}`);
+      }
+    }
+    if (attacker.gear?.effect?.type === 'edge_face_damage' && damage > 0) {
+      const effect = attacker.gear.effect;
+      const faces = Array.isArray(effect.faces) ? effect.faces : [];
+      if (faces.includes(diceRaw)) {
+        const bonus = Math.max(0, effect.damage || 0);
+        if (bonus > 0) {
+          damage += bonus;
+          logs.push(`${attacker.gear.name}：原始骰面 ${diceRaw}，傷害 +${bonus}`);
+        }
+      }
+    }
 
     if (luckyTempMultipleHits.length > 0 && damage > 0) {
       const bonus = luckyTempMultipleHits.length * 8;
@@ -467,7 +488,7 @@ const CombatRules = {
     if (fusedBlackIronCrown && damage > 0) {
       const bonus = Math.max(1, Math.ceil(damage * 0.10));
       damage += bonus;
-      logs.push(`黑鐵冠融合：對黑暗怪傷害 +${bonus}，傷害 ${damage}`);
+      logs.push(`黑鐵冠融合：對黑暗化身傷害 +${bonus}，傷害 ${damage}`);
     }
 
     const painSplinterBadge = attacker.fusedRelic?.effect?.type === 'wound_damage_bonus'
@@ -497,6 +518,9 @@ const CombatRules = {
       const predictedSerratedOil = attacker.gear?.effect?.type === 'serrated_oil' ? attacker.gear.effect : null;
       if (predictedSerratedOil && !attacker._serratedOilUsedRound && roll >= (predictedSerratedOil.rollMin || 5)) {
         predictedWoundGain += predictedSerratedOil.stacks || 1;
+      }
+      if (painSplinterBadge?.effect?.woundOnRoll && roll === painSplinterBadge.effect.woundOnRoll) {
+        predictedWoundGain += Math.max(0, painSplinterBadge.effect.woundStacks || 0);
       }
     }
     const explodeAtWounds = painResonanceActive ? 10 : painMask?.effect?.explodeAtWounds;
@@ -539,6 +563,7 @@ const CombatRules = {
       }
     }
 
+    const preBlockDamage = damage;
     if (CombatStatus.getBlock(enemy) > 0 && damage > 0) {
       const blockResult = CombatStatus.consumeBlock(enemy, damage);
       damage = blockResult.damage;
@@ -568,6 +593,13 @@ const CombatRules = {
       CombatStatus.raiseBlock(attacker, playerBlockValue);
       logs.push(`${attacker.gear.name}：${attacker.name} 獲得格檔 ${playerBlockValue}`);
     }
+    if (attacker.gear?.effect?.type === 'edge_face_damage' && diceRaw === attacker.gear.effect.backlashFace) {
+      const backlash = Math.max(0, attacker.gear.effect.backlashDamage || 0);
+      if (backlash > 0) {
+        attacker.hp = Math.max(0, attacker.hp - backlash);
+        logs.push(`${attacker.gear.name}：原始骰面 ${diceRaw}，${attacker.name} 受到 ${backlash} 點反噬傷害`);
+      }
+    }
 
     if (attacker.cls === 'explorer' && !realWeaknessHit && !resonanceWeaknessHit && !enemy.suspiciousFlaw && enemy.suspiciousFlawMarkedRound !== round) {
       enemy.suspiciousFlaw = true;
@@ -577,6 +609,71 @@ const CombatRules = {
 
     logs.push(`最終傷害：${damage}`);
     enemy.hp = Math.max(0, enemy.hp - damage);
+    let rapierFollowHits = 0;
+    const rapierDamageEvents = [];
+    if (greatswordStrike) {
+      const bonus = Math.max(1, greatswordRelic.effect?.attackBonus || 3);
+      const before = Math.max(0, attacker._greatswordMomentum || 0);
+      attacker._greatswordMomentum = before + bonus;
+      logs.push(`${greatswordRelic.name}：重劍命中，${attacker.name} 基礎攻擊 +${bonus}（氣勢 ${before} → ${attacker._greatswordMomentum}）。`);
+      if (greatswordResonance) {
+        const extra = Math.max(0, greatswordResonance.effect?.extraMomentum || 0);
+        if (extra > 0) {
+          const beforeExtra = Math.max(0, attacker._greatswordMomentum || 0);
+          attacker._greatswordMomentum = beforeExtra + extra;
+          logs.push(`${greatswordResonance.name}：重劍共鳴，額外氣勢 +${extra}（${beforeExtra} → ${attacker._greatswordMomentum}）。`);
+        }
+      }
+    }
+    const rapierStrike = !!rapierRelic &&
+      weapon?.family === 'sword' &&
+      roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
+      damage > 0 &&
+      enemy.hp > 0;
+    if (rapierStrike) {
+      const rate = Math.max(0, rapierRelic.effect?.damageRate ?? 0.5);
+      const followBaseDamage = Math.max(damage, preBlockDamage);
+      const followDamage = Math.max(1, Math.floor(followBaseDamage * rate));
+      const chanceStep = Math.max(1, rapierRelic.effect?.chanceStep || 10);
+      const minChance = Math.max(0, rapierRelic.effect?.minChance || 0);
+      const maxFollowUps = Math.max(1, rapierRelic.effect?.maxFollowUps || 10);
+      const guaranteedFollowUps = Math.max(0, rapierResonance?.effect?.guaranteedFollowUps || 0);
+      const followDamageStep = Math.max(0, rapierResonance?.effect?.followDamageStep || 0);
+      let chanceAttempts = 0;
+      logs.push(`${rapierRelic.name}：低骰 ${roll}，本擊視為刺劍。`);
+      if (followBaseDamage > damage) {
+        logs.push(`${rapierRelic.name}：連擊以格檔前傷害 ${followBaseDamage} 計算。`);
+      }
+      for (let i = 1; i <= maxFollowUps && enemy.hp > 0; i++) {
+        const guaranteedUsed = Math.max(0, attacker._rapierGuaranteedFollowUpsUsed || 0);
+        const guaranteed = guaranteedUsed < guaranteedFollowUps;
+        const chance = guaranteed ? 100 : Math.max(minChance, 100 - chanceAttempts * chanceStep);
+        const success = guaranteed || chance >= 100 || Math.random() * 100 < chance;
+        if (!success) {
+          logs.push(`${rapierRelic.name}：第 ${i} 次連擊機率 ${chance}%，連擊停止。`);
+          break;
+        }
+        if (guaranteed) {
+          attacker._rapierGuaranteedFollowUpsUsed = guaranteedUsed + 1;
+        } else {
+          chanceAttempts++;
+        }
+        const currentFollowDamage = followDamage + (followDamageStep * rapierFollowHits);
+        const followHpBefore = enemy.hp;
+        enemy.hp = Math.max(0, enemy.hp - currentFollowDamage);
+        rapierDamageEvents.push({
+          type: 'rapier',
+          damage: currentFollowDamage,
+          from: followHpBefore,
+          to: enemy.hp,
+        });
+        damage += currentFollowDamage;
+        rapierFollowHits++;
+        logs.push(guaranteed
+          ? `${rapierResonance.name}：第 ${guaranteedUsed + 1} 次刺劍連擊必定成功，造成 ${currentFollowDamage} 傷害。`
+          : `${rapierRelic.name}：第 ${i} 次連擊成功（${chance}%），造成 ${currentFollowDamage} 傷害。`);
+      }
+    }
     if (corrosiveOilDamage > 0) {
       enemy.hp = Math.max(0, enemy.hp - corrosiveOilDamage);
       logs.push(`腐蝕傷害：${corrosiveOilDamage}`);
@@ -615,6 +712,13 @@ const CombatRules = {
         woundGain += serratedOil.stacks || 1;
         attacker._serratedOilUsedRound = true;
         logs.push(`${attacker.gear.name}：攻擊骰面 ${roll}，額外施加 ${serratedOil.stacks || 1} 層傷口`);
+      }
+      if (painSplinterBadge?.effect?.woundOnRoll && roll === painSplinterBadge.effect.woundOnRoll) {
+        const badgeWounds = Math.max(0, painSplinterBadge.effect.woundStacks || 0);
+        if (badgeWounds > 0) {
+          woundGain += badgeWounds;
+          logs.push(`${painSplinterBadge.name}：攻擊骰面 ${roll}，附加 ${badgeWounds} 層傷口`);
+        }
       }
       if (woundGain > 0) {
         const beforeWounds = Math.max(0, Math.min(woundMax, enemy.wounds || 0));
@@ -660,6 +764,7 @@ const CombatRules = {
     let counterDmg = 0;
     let aoeCounter = 0;
     let enemyDiceRoll = null;
+    const incomingDamageEvents = [];
     let enemyAttackFlow = !suppressEnemyAction && !stunned && !enemyDead &&
       ['attack', 'block_attack', 'dice_attack', 'aoe'].includes(intent?.type);
     if (enemyAttackFlow) {
@@ -691,7 +796,7 @@ const CombatRules = {
       fateLuckyFace: null,
       fateUnluckyFaces: null,
     };
-    if (!enemyDead) {
+    if (!enemyDead && !suppressEnemyAction && !stunned) {
       EnemyAbilities.beforeEnemyAction(enemyActionResult, {
         attacker,
         enemy,
@@ -706,6 +811,17 @@ const CombatRules = {
     enemyDiceRoll = enemyActionResult.enemyDiceRoll;
     enemyAttackFlow = !!enemyActionResult.enemyAttackFlow;
     const aoeDamageByChar = enemyActionResult.aoeDamageByChar || null;
+    if (enemyAttackFlow && (counterDmg > 0 || aoeCounter > 0)) {
+      const attackReduction = Math.max(0, enemy.abilityState?.nextAttackReduction || 0);
+      if (attackReduction > 0) {
+        const beforeSingle = counterDmg;
+        const beforeAoe = aoeCounter;
+        counterDmg = Math.max(0, counterDmg - attackReduction);
+        aoeCounter = Math.max(0, aoeCounter - attackReduction);
+        enemy.abilityState.nextAttackReduction = 0;
+        logs.push(`${enemy.name} 黑霧裂解：下一次攻擊 -${attackReduction}（${beforeSingle > 0 ? `${beforeSingle} → ${counterDmg}` : `全體 ${beforeAoe} → ${aoeCounter}`}）。`);
+      }
+    }
 
     if (counterDmg > 0) {
       const armorReduce = (combatMods || []).filter(m => m.type === 'damage_reduce').reduce((s, m) => s + m.value, 0);
@@ -735,12 +851,20 @@ const CombatRules = {
           damageLabel: '受擊傷害',
           resultLabel: '反擊',
         });
+        const beforeHp = counterTarget.hp;
         counterTarget.hp = Math.max(0, counterTarget.hp - counterDmg);
+        incomingDamageEvents.push({
+          type: 'counter',
+          targetId: counterTarget.id,
+          damage: counterDmg,
+          from: beforeHp,
+          to: counterTarget.hp,
+        });
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
         logs.push(`${enemy.name} 的反擊被完全抵消。`);
       }
-    } else if (suppressEnemyAction && !enemyDead) {
+    } else if (suppressEnemyAction && !enemyDead && !deferEnemyAction) {
       logs.push('追加攻擊不觸發敵人行動。');
     } else if (stunned) {
       logs.push(`${enemy.name} 被震懾，無法行動。`);
@@ -781,11 +905,15 @@ const CombatRules = {
       fateLuckyFace: enemyActionResult.fateLuckyFace || null,
       fateUnluckyFaces: Array.isArray(enemyActionResult.fateUnluckyFaces) ? enemyActionResult.fateUnluckyFaces : [],
       enemyAttackFlow,
+      enemyActionDeferred: !!deferEnemyAction && !enemyDead && !stunned,
+      incomingDamageEvents,
       weaknessHit,
       realWeaknessHit,
       eagleFeatherNativeHit,
       resonanceWeaknessHit,
       grapplingHookAssisted,
+      rapierFollowHits,
+      rapierDamageEvents,
       stunned,
       enemyDead,
       logs,

@@ -5,12 +5,14 @@ const GameCharacterDetails = {
     const char = G.squad.find(c => c.id === charId);
     const relic = slot === 'fusedRelic' ? char?.fusedRelic : char?.relic;
     if (!char || !relic) return;
-    const fusionNote = slot === 'fusedRelic' ? this._fusionBonusDesc(relic) : '';
+    const isFused = slot === 'fusedRelic';
+    const desc = typeof relicEffectDesc === 'function' ? relicEffectDesc(relic, isFused) : relic.desc;
+    const fusionNote = !isFused && typeof relicFusionDesc === 'function' ? relicFusionDesc(relic) : '';
     this._openModal({
       title: `${relic.icon} ${relic.name}`,
       desc: [
-        relic.desc,
-        fusionNote ? `融合效果：${fusionNote}` : '',
+        desc,
+        fusionNote ? `融合後：${fusionNote}` : '',
         relic.locationHint ? `取得線索：${relic.locationHint}` : '',
       ].filter(Boolean).join('\n'),
       choices: [{ label: '關閉', action: () => this._closeModal() }],
@@ -27,7 +29,7 @@ const GameCharacterDetails = {
       : '<div class="character-detail-portrait fallback">' + cls.icon + '</div>';
     const weapon = char.weapon ? char.weapon.icon + ' ' + char.weapon.name + '：' + char.weapon.desc : '無';
     const gear = char.gear ? char.gear.icon + ' ' + char.gear.name + '：' + char.gear.desc : '無';
-    const relic = char.relic ? char.relic.icon + ' ' + char.relic.name + '：' + char.relic.desc : '無';
+    const relic = char.relic ? char.relic.icon + ' ' + char.relic.name + '：' + this._relicDescText(char.relic, false) : '無';
     const fused = char.fusedRelic ? this._characterFusedRelicText(char.fusedRelic) : '無';
     const sideInfo = this._characterDetailSideInfo(char, cls);
     const resonanceInfo = this._characterResonanceDetailHtml(char);
@@ -41,8 +43,12 @@ const GameCharacterDetails = {
 
   _characterFusedRelicText(relic) {
     if (!relic) return '無';
-    const fusionNote = this._fusionBonusDesc(relic);
-    return relic.icon + ' ' + relic.name + '：' + relic.desc + (fusionNote ? '<br>融合效果：' + fusionNote : '');
+    return relic.icon + ' ' + relic.name + '：' + this._relicDescText(relic, true);
+  },
+
+  _relicDescText(relic, fused = false) {
+    if (typeof relicEffectDesc === 'function') return relicEffectDesc(relic, fused);
+    return relic?.desc || '';
   },
 
   _characterDetailSideInfo(char, cls) {
@@ -76,6 +82,8 @@ const GameCharacterDetails = {
     if (res.id === 'star_hunter_eye') return '條件：已融合鷹眼羽飾 + 鷹眼透鏡。';
     if (res.id === 'star_breaker_eye') return '條件：已融合鷹眼透鏡 + 鷹眼羽飾。';
     if (res.id === 'dual_banner_formation') return '條件：戰爭旗 + 鷹眼旗，且其中一面已融合。';
+    if (res.id === 'greatsword_resonance') return '條件：已融合沉鐵劍鞘 + 銀蜂針。';
+    if (res.id === 'rapier_resonance') return '條件：已融合銀蜂針 + 沉鐵劍鞘。';
     const relics = (res.relics || []).map(id => getRelicById(id)?.name || id).join(' + ');
     return relics ? '條件：' + relics + '。' : '';
   },

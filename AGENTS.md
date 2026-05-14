@@ -23,6 +23,68 @@ This project contains a lot of Traditional Chinese player-facing text. Treat tex
 - Internal identifiers may remain English, for example `tempWeakness`, if changing them would risk logic regressions.
 - Avoid duplicate fields such as two `name` or `desc` properties in one object.
 
+## Work Modes And Search Scope
+
+Choose the lightest workflow that fits the user's request. Do not treat every task like a fresh codebase audit.
+
+### Small Edit Mode
+
+Use for narrowly scoped changes such as:
+
+- Adding or swapping one image asset.
+- Updating one numeric value.
+- Changing one short player-facing sentence.
+- Adjusting a few CSS rules.
+- Updating one cache-busting query string.
+
+Rules:
+
+- Search only the directly relevant file or identifier.
+- Do not scan the whole project unless the identifier cannot be found locally.
+- Do not reread architecture files or unrelated modules.
+- Run only the checks for files actually edited, plus `scripts/check-mojibake.js` when text/data changed.
+- If the edit is asset-only plus a data path/cache update, prefer `node --check` for the edited JS file and defer broader checks unless risk increases.
+
+### Batch Asset Mode
+
+Use when adding several monster, relic, equipment, icon, or background images in a row.
+
+Rules:
+
+- The user may provide the monster/item name and already place the image in the target folder.
+- For each asset, only rename/move the file, add the data field, and update cache if needed.
+- Do not run the full check suite after every single image.
+- Run one final `scripts/check-mojibake.js` and relevant `node --check` commands after the batch.
+- Keep filenames stable, lowercase where practical, and descriptive, for example `rot-crawler.png` or `banner-guardian-bg.png`.
+
+### Feature Mode
+
+Use for new mechanics, enemy abilities, equipment effects, resonances, combat flow, UI behavior, or save-state behavior.
+
+Rules:
+
+- Start by reading the relevant local modules.
+- Expand search only when a shared rule, event path, or rendering contract needs confirmation.
+- Prefer existing patterns and helper APIs.
+- Run checks for every JS file edited and any required data/notes checks.
+
+### Review Or Cleanup Mode
+
+Use when the user asks whether anything remains, whether old logic is still present, or whether a rule is consistent across the project.
+
+Rules:
+
+- This is the correct time for broader `rg` searches and cross-file inspection.
+- Report what was searched and what remains uncertain.
+- Keep fixes scoped to the discovered issue unless the user asks for a larger cleanup.
+
+### Speed Discipline
+
+- If a task is clearly in Small Edit Mode or Batch Asset Mode, avoid extra commentary and extra probing.
+- Prefer one targeted `rg` over multiple exploratory commands.
+- Avoid PowerShell `Get-Content` for Traditional Chinese snippets; use `rg -n` or Node UTF-8 reads.
+- When in doubt, choose the narrower search first, then widen only if blocked.
+
 ## Required Checks After Text/Data Edits
 
 Run these after editing player-facing text, data files, or notes:

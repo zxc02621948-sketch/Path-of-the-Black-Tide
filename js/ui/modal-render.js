@@ -12,6 +12,8 @@ const RenderModal = {
     const contentEl = modal.querySelector('.modal-content');
     const titleEl = document.getElementById('modal-title');
     const descEl = document.getElementById('modal-desc');
+    delete descEl.dataset.combatResultDeferred;
+    contentEl.querySelectorAll(':scope > .combat-tools, :scope > .combat-bag-panel').forEach(el => el.remove());
     contentEl.classList.toggle('combat-modal', !!cfg.combat);
     contentEl.classList.toggle('narrative-modal', !cfg.combat && (cfg.desc || '').length > 900);
     contentEl.classList.toggle('character-detail-content', !!cfg.characterDetail);
@@ -89,6 +91,10 @@ const RenderModal = {
       const combatScene = { ...cfg.combat, playerDice: cfg.dice || null, enemyDice: cfg.enemyDice || null };
       sceneEl.innerHTML = this._combatSceneHtml(combatScene);
       descEl.before(sceneEl);
+      const combatTools = sceneEl.querySelector('.combat-tools');
+      if (combatTools) contentEl.appendChild(combatTools);
+      const combatBagPanel = sceneEl.querySelector('.combat-bag-panel');
+      if (combatBagPanel) contentEl.appendChild(combatBagPanel);
 
       // Section.
       const enemyCard = sceneEl.querySelector('.hoverable-enemy');
@@ -194,7 +200,7 @@ const RenderModal = {
     }
 
     choicesEl.innerHTML = '';
-    const combatActionsEl = combatSceneEl?.querySelector('.combat-actions');
+    const combatActionsEl = cfg.combat ? contentEl.querySelector('.combat-actions') : null;
     if (combatActionsEl) combatActionsEl.innerHTML = '';
     const actionHost = combatActionsEl || choicesEl;
     for (const choice of (cfg.choices || [])) {
@@ -235,22 +241,49 @@ const RenderModal = {
     // Section.
     if (cfg.combatAnims) {
       const delay = Number.isFinite(cfg.combatAnims.delay) ? cfg.combatAnims.delay : 120;
-      const hasEnemyAnim = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
-      const lockMs = delay + (cfg.combatAnims.enemyBlock ? 220 : 0) + 720;
-      if (hasEnemyAnim && combatActionsEl) {
-        const buttons = [...combatActionsEl.querySelectorAll('button')];
-        const selectableUnits = [...combatSceneEl.querySelectorAll('.combat-unit.selectable')];
+      const playerDamageEvents = Array.isArray(cfg.combatAnims.playerDamageEvents) ? cfg.combatAnims.playerDamageEvents : [];
+      const incomingDamageEvents = Array.isArray(cfg.combatAnims.incomingDamageEvents) ? cfg.combatAnims.incomingDamageEvents : [];
+      const playerFollowHits = Math.max(0, cfg.combatAnims.playerFollowHits || 0, playerDamageEvents.length);
+      const playerFollowStepMs = 380;
+      const hasCombatAnim = playerFollowHits > 0 || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
+      const lockMs = delay + playerFollowHits * playerFollowStepMs + (cfg.combatAnims.enemyBlock ? 220 : 0) + 720;
+      if (playerDamageEvents.length > 0) {
+        this._deferCombatResultText(descEl, delay + playerFollowHits * playerFollowStepMs + 120);
+      }
+      if (hasCombatAnim && combatActionsEl) {
+        const buttons = [...new Set([
+          ...combatSceneEl.querySelectorAll('button'),
+          ...choicesEl.querySelectorAll('button'),
+        ])];
+        const selectableUnits = [...combatSceneEl.querySelectorAll('.combat-unit.selectable, .combat-unit.item-target')];
+        combatSceneEl.classList.add('combat-anim-locked-scene');
         buttons.forEach(btn => { btn.disabled = true; });
         selectableUnits.forEach(unit => unit.classList.add('combat-anim-locked'));
         if (G.combat) G.combat.actionInProgress = true;
         setTimeout(() => {
+          combatSceneEl.classList.remove('combat-anim-locked-scene');
           buttons.forEach(btn => { btn.disabled = false; });
           selectableUnits.forEach(unit => unit.classList.remove('combat-anim-locked'));
           if (G.combat) G.combat.actionInProgress = false;
         }, lockMs);
       }
-      setTimeout(() => this._triggerCounterAnims(cfg.combatAnims), delay);
+      this._preparePlayerDamageSequence(playerDamageEvents);
+      this._prepareIncomingDamageSequence(incomingDamageEvents);
+      setTimeout(() => this._triggerCounterAnims({ ...cfg.combatAnims, playerFollowStepMs }), delay);
     }
+  },
+
+  _deferCombatResultText(descEl, revealMs = 0) {
+    if (!descEl || descEl.dataset.combatResultDeferred) return;
+    const originalHtml = descEl.innerHTML;
+    const token = `${Date.now()}-${Math.random()}`;
+    descEl.dataset.combatResultDeferred = token;
+    descEl.innerHTML = '<div class="combat-result-pending">連刺中...</div>';
+    setTimeout(() => {
+      if (descEl.dataset.combatResultDeferred !== token) return;
+      descEl.innerHTML = originalHtml;
+      delete descEl.dataset.combatResultDeferred;
+    }, Math.max(0, revealMs || 0));
   },
 
   _openChoiceDetailModal(parentCfg, choice) {
@@ -453,17 +486,88 @@ const RenderModal = {
     }, 24);
   },
 
-  _triggerCounterAnims({ counterTarget, aoe, enemyBlock }) {
-    const enemyCard = document.querySelector('.combat-enemy-card');
-    if (!counterTarget && !aoe && !enemyBlock) return;
+  _preparePlayerDamageSequence(events = []) {
+    const cleanEvents = events.filter(event => Number.isFinite(event?.from) && Number.isFinite(event?.to));
+    if (cleanEvents.length === 0) return;
+    this._setDisplayedEnemyHp(cleanEvents[0].from);
+  },
 
-    // 敵人反擊前先晃動提示
-    if (enemyBlock && enemyCard) {
-      enemyCard.classList.add('anim-block-up');
-      setTimeout(() => enemyCard.classList.remove('anim-block-up'), 430);
+  _setDisplayedEnemyHp(value) {
+    const fill = document.querySelector('.combat-enemy-hp-fill');
+    const text = document.querySelector('.combat-enemy-hp-text');
+    const max = Number(text?.dataset.maxHp || 0);
+    const hp = Math.max(0, Math.round(value || 0));
+    if (fill && max > 0) {
+      const pct = Math.max(0, Math.min(100, (hp / max) * 100));
+      fill.style.width = `${pct}%`;
+      fill.classList.toggle('critical', pct <= 25);
+      fill.classList.toggle('low', pct > 25 && pct <= 50);
+    }
+    if (text && max > 0) text.textContent = `${hp}/${max}`;
+  },
+
+  _prepareIncomingDamageSequence(events = []) {
+    const cleanEvents = events.filter(event => event?.targetId && Number.isFinite(event.from) && Number.isFinite(event.to));
+    for (const event of cleanEvents) this._setDisplayedAllyHp(event.targetId, event.from);
+  },
+
+  _setDisplayedAllyHp(charId, value) {
+    const unit = document.querySelector(`.combat-unit[data-char-id="${charId}"]`);
+    if (!unit) return;
+    const fill = unit.querySelector('.combat-ally-hp-fill');
+    const text = unit.querySelector('.combat-ally-hp-text');
+    const max = Number(text?.dataset.maxHp || 0);
+    const hp = Math.max(0, Math.round(value || 0));
+    if (fill && max > 0) {
+      const pct = Math.max(0, Math.min(100, (hp / max) * 100));
+      fill.style.width = `${pct}%`;
+      fill.classList.toggle('critical', pct <= 25);
+      fill.classList.toggle('low', pct > 25 && pct <= 50);
+    }
+    if (text && max > 0) text.textContent = `${hp}/${max}`;
+    unit.classList.toggle('down', hp <= 0);
+  },
+
+  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], playerFollowStepMs = 380, counterTarget, aoe, enemyBlock }) {
+    const enemyCard = document.querySelector('.combat-enemy-card');
+    const damageEvents = Array.isArray(playerDamageEvents) ? playerDamageEvents : [];
+    const incomingEvents = Array.isArray(incomingDamageEvents) ? incomingDamageEvents : [];
+    const followHits = Math.max(0, playerFollowHits || 0, damageEvents.length);
+    const followStep = Math.max(260, playerFollowStepMs || 380);
+    if (!followHits && !counterTarget && !aoe && !enemyBlock) return;
+
+    for (let i = 0; i < followHits; i++) {
+      setTimeout(() => {
+        const attackerEl = playerAttacker
+          ? document.querySelector(`.combat-unit[data-char-id="${playerAttacker}"]`)
+          : null;
+        if (attackerEl) {
+          attackerEl.classList.add('anim-lunge');
+          setTimeout(() => attackerEl.classList.remove('anim-lunge'), 340);
+        }
+        if (enemyCard) {
+          setTimeout(() => {
+            enemyCard.classList.add('anim-hit');
+            setTimeout(() => enemyCard.classList.remove('anim-hit'), 300);
+          }, 120);
+        }
+        const damageEvent = damageEvents[i];
+        if (damageEvent && Number.isFinite(damageEvent.to)) {
+          setTimeout(() => this._setDisplayedEnemyHp(damageEvent.to), 170);
+        }
+      }, i * followStep);
     }
 
-    const attackDelay = enemyBlock ? 220 : 0;
+    // 敵人反擊前先晃動提示
+    const followDelay = followHits * followStep;
+    if (enemyBlock && enemyCard) {
+      setTimeout(() => {
+      enemyCard.classList.add('anim-block-up');
+      setTimeout(() => enemyCard.classList.remove('anim-block-up'), 430);
+      }, followDelay);
+    }
+
+    const attackDelay = followDelay + (enemyBlock ? 220 : 0);
     if ((counterTarget || aoe) && enemyCard) {
       setTimeout(() => {
         enemyCard.classList.add('anim-pulse-left');
@@ -478,12 +582,17 @@ const RenderModal = {
           el.classList.add('anim-hit');
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         });
+        for (const event of incomingEvents) {
+          if (event?.targetId && Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
+        }
       } else if (counterTarget) {
         const el = document.querySelector(`.combat-unit[data-char-id="${counterTarget}"]`);
         if (el) {
           el.classList.add('anim-hit');
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         }
+        const event = incomingEvents.find(item => item?.targetId === counterTarget);
+        if (event && Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
       }
     }, attackDelay + 270);
   },
@@ -506,7 +615,7 @@ const RenderModal = {
     const selectable = !!combat.selectable;
     const itemTargeting = !!combat.itemTargeting;
 
-    const squadHtml = combat.squad.map(char => {
+    let squadHtml = combat.squad.map(char => {
       const cls = CHARACTER_CLASSES[char.cls];
       const hpPct = char.maxHp > 0 ? (char.hp / char.maxHp) * 100 : 0;
       const hpClass = hpPct <= 25 ? 'critical' : hpPct <= 50 ? 'low' : '';
@@ -530,6 +639,16 @@ const RenderModal = {
       const blockBadgeHtml = block > 0 && !isDown
         ? this._combatAllyBlockBadgeHtml(char, block)
         : '';
+      const pollutionFaces = Array.isArray(char.dicePollution?.faces) ? char.dicePollution.faces : [];
+      const pollutionEmpowered = Math.max(0, char.dicePollution?.empowered || 0);
+      const pollutionHtml = pollutionFaces.length > 0 && !isDown ? `
+        <button type="button" class="combat-status-badge dice-pollution"
+          onclick="event.stopPropagation()"
+          title="污染骰面：${pollutionFaces.join('、')}${pollutionEmpowered > 0 ? `；強化污染 ${pollutionEmpowered} 層` : ''}">
+          <span>☣️</span>
+          <strong>${pollutionFaces.join('.')}${pollutionEmpowered > 0 ? `+${pollutionEmpowered}` : ''}</strong>
+        </button>
+      ` : '';
       const remorseStacks = char.wagerDiceMissStacks || 0;
       const remorseHtml = remorseStacks > 0 && !isDown ? `
         <button type="button" class="combat-status-badge remorse"
@@ -572,30 +691,49 @@ const RenderModal = {
       const clickAttr = itemTargeting && !isDown
         ? `onclick="Game.useCombatInventoryItemOnTarget('${char.id}')"`
         : (selectable && !isDown ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
+      const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
       return `
         <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${itemTargeting && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
           data-char-id="${char.id}" ${clickAttr}>
+          ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           <div class="combat-unit-main">
             <span class="combat-sprite">${cls.icon}</span>
             <span class="combat-name">${char.name}</span>
             ${gazeBadgeHtml}
             ${woundBadgeHtml}
             ${blockBadgeHtml}
+            ${pollutionHtml}
             ${remorseHtml}
             ${backlashHtml}
             ${wagerHtml}
             ${bannerHtml}
           </div>
           <div class="combat-stat-line">攻擊 ${char.attack ?? cls.attack ?? 0}${threat > 0 ? `　仇恨 ${threat}/10` : ''}</div>
-          ${threat > 0 ? `<div class="combat-threat-meter" title="仇恨 ${threat}/10"><span style="width:${Math.min(100, threat * 10)}%"></span></div>` : ''}
+          <div class="combat-threat-meter${threat > 0 ? '' : ' empty'}" title="${threat > 0 ? `仇恨 ${threat}/10` : ''}"><span style="width:${Math.min(100, threat * 10)}%"></span></div>
           <div class="combat-hp-row">
-            <div class="combat-hp-bar"><div class="combat-hp-fill ${hpClass}" style="width:${hpPct}%"></div></div>
-            <span>${char.hp}/${char.maxHp}</span>
+            <div class="combat-hp-bar"><div class="combat-hp-fill combat-ally-hp-fill ${hpClass}" style="width:${hpPct}%"></div></div>
+            <span class="combat-ally-hp-text" data-max-hp="${char.maxHp}">${char.hp}/${char.maxHp}</span>
           </div>
           ${showPlayerDice ? this._combatDicePips(combat.playerDice.value, 'player', char.cls, combat.playerDice.sides, this._d12DiceType(combat.playerDice)) : ''}
         </${tag}>
       `;
     }).join('');
+    const maxSquadSlots = (typeof CONFIG !== 'undefined' && CONFIG.MAX_SQUAD_SIZE) || 3;
+    for (let i = combat.squad.length; i < maxSquadSlots; i++) {
+      squadHtml += `
+        <div class="combat-unit ally empty-slot" aria-hidden="true">
+          <div class="combat-unit-main">
+            <span class="combat-sprite">＋</span>
+            <span class="combat-name">空位</span>
+          </div>
+          <div class="combat-stat-line">可救援隊友</div>
+          <div class="combat-hp-row">
+            <div class="combat-hp-bar"><div class="combat-hp-fill" style="width:0%"></div></div>
+            <span>--/--</span>
+          </div>
+        </div>
+      `;
+    }
 
     const bagItems = (combat.inventory || []).filter(entry => entry.item && entry.item.useInCombat !== false);
     const intentArrowHtml = this._combatIntentArrowHtml(combat);
@@ -613,6 +751,11 @@ const RenderModal = {
       </div>
     ` : '';
 
+    const enemyCardBgStyle = combat.enemy.cardBgImage
+      ? ` style="--enemy-card-bg: url('${combat.enemy.cardBgImage}')"`
+      : '';
+    const enemyCardBgClass = combat.enemy.cardBgImage ? ' has-card-bg' : '';
+
     return `
       <div class="combat-tools">
         <div class="combat-actions"></div>
@@ -620,35 +763,39 @@ const RenderModal = {
       </div>
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy">
-        ${combat.enemyDice ? this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides) : ''}
-        <div class="combat-side-label">敵人</div>
+      ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}"${enemyCardBgStyle}>
+        <div class="combat-side-label" aria-hidden="true"></div>
         <div class="combat-enemy-figure">
           <div class="combat-enemy-stance-column">
             ${this._combatEnemyIntentHtml(combat.intent)}
             <div class="combat-enemy-stance-divider" aria-hidden="true"></div>
             ${this._combatEnemyBlockPanelHtml(combat.enemy)}
+            ${this._combatEnemyAttackPanelHtml(combat.enemy)}
           </div>
           <button type="button" class="combat-enemy-sprite combat-enemy-detail-button"
             onclick="event.stopPropagation(); Game.showCombatEnemyDetail(event)"
             title="查看敵人詳情">
-            ${this._enemyIconHtml(combat.enemy)}
+            ${combat.enemy.hideIconInCombat ? '' : this._enemyIconHtml(combat.enemy)}
           </button>
           ${this._combatEnemyStatusIconsHtml(combat.enemy)}
         </div>
         <div class="combat-enemy-name">${combat.enemy.name}</div>
         <div class="combat-hp-row">
-          <div class="combat-hp-bar"><div class="combat-hp-fill ${enemyHpClass}" style="width:${enemyHpPct}%"></div></div>
-          <span>${combat.enemy.hp}/${combat.enemy.maxHp}</span>
+          <div class="combat-hp-bar"><div class="combat-hp-fill combat-enemy-hp-fill ${enemyHpClass}" style="width:${enemyHpPct}%"></div></div>
+          <span class="combat-enemy-hp-text" data-max-hp="${combat.enemy.maxHp}">${combat.enemy.hp}/${combat.enemy.maxHp}</span>
         </div>
-        ${this._combatWeaknessRowHtml(combat.enemy)}
-        <div class="combat-stat-line">攻擊 ${combat.enemy.attack}</div>
-        ${combat.enemy.disabledNativeWeaknesses?.length ? `<div class="combat-weakness-effect">裂星破壞：${combat.enemy.disabledNativeWeaknesses.map(w => `${Dice.face(w)} ${w}`).join('、')}</div>` : ''}
-        ${combat.enemy.suspiciousFlaw ? `<div class="combat-weakness-effect">可疑弱點：探索者可消耗，差 1 視為命中原生弱點</div>` : ''}
-        ${combat.enemy.eagleNativeWeakness ? `<div class="combat-weakness-effect">鷹眼暫時原生弱點：${Dice.face(combat.enemy.eagleNativeWeakness.value)} ${combat.enemy.eagleNativeWeakness.value}</div>` : ''}
-        ${fateGambleHtml}
-        ${bannerGuardianHtml}
-        ${weaknessDescHtml}
+        <div class="combat-enemy-divider" aria-hidden="true"></div>
+        <div class="combat-enemy-info-panel">
+          ${this._combatWeaknessRowHtml(combat.enemy)}
+          ${this._combatInfoEffectHtml(combat.enemy.disabledNativeWeaknesses?.length ? `裂星破壞：${combat.enemy.disabledNativeWeaknesses.map(w => `${Dice.face(w)} ${w}`).join('、')}` : '')}
+          ${this._combatInfoEffectHtml(combat.enemy.suspiciousFlaw ? '可疑弱點：探索者可消耗，差 1 視為命中原生弱點' : '')}
+          ${this._combatInfoEffectHtml(combat.enemy.eagleNativeWeakness ? `鷹眼暫時原生弱點：${Dice.face(combat.enemy.eagleNativeWeakness.value)} ${combat.enemy.eagleNativeWeakness.value}` : '')}
+          ${this._combatInfoEffectHtml(combat.enemy.executionCountdown && !combat.enemy.executionCountdown.executed ? `處刑倒數：${combat.enemy.executionCountdown.remaining}` : '')}
+          ${this._combatInfoEffectHtml(fateGambleHtml)}
+          ${this._combatInfoEffectHtml(bannerGuardianHtml)}
+          ${this._combatInfoEffectHtml(weaknessDescHtml)}
+        </div>
       </div>
       <div class="combat-center">
         <div class="combat-vs">VS</div>
@@ -705,8 +852,16 @@ const RenderModal = {
       ...this._combatNativeWeaknessBadgesHtml(enemy),
       ...this._combatTempWeaknessBadgesHtml(enemy),
     ];
-    if (badges.length === 0) return '';
+    if (badges.length === 0) {
+      return '';
+    }
     return `<div class="combat-weakness-icon-row">${badges.join('')}</div>`;
+  },
+
+  _combatInfoEffectHtml(content) {
+    if (!content) return '';
+    if (String(content).includes('combat-weakness-effect')) return content;
+    return `<div class="combat-weakness-effect">${content}</div>`;
   },
 
   _combatNativeWeaknessBadgesHtml(enemy) {
@@ -867,6 +1022,11 @@ const RenderModal = {
     `;
   },
 
+  _combatEnemyAttackPanelHtml(enemy) {
+    const attack = Number(enemy?.attack || 0);
+    return `<div class="combat-enemy-attack-panel" title="敵人基礎攻擊力">攻 ${attack}</div>`;
+  },
+
   _combatEnemyBlockPanelHtml(enemy) {
     const block = Math.max(0, enemy?.currentBlock || enemy?.block || 0);
     return `
@@ -934,8 +1094,8 @@ const RenderModal = {
     rows.push(`<div class="cct-row"><span class="cct-label">被動</span>${cls.passiveDesc}</div>`);
     if (char.weapon) rows.push(`<div class="cct-row"><span class="cct-label">武器</span>${char.weapon.icon} ${char.weapon.name}：${char.weapon.desc}</div>`);
     if (char.gear)   rows.push(`<div class="cct-row"><span class="cct-label">裝備</span>${char.gear.icon} ${char.gear.name}：${char.gear.desc}</div>`);
-    if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${char.relic.icon} ${char.relic.name}：${char.relic.desc}</div>`);
-    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>✨ ${char.fusedRelic.icon} ${char.fusedRelic.name}：${char.fusedRelic.desc}</div>`);
+    if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${char.relic.icon} ${char.relic.name}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.relic, false) : char.relic.desc}</div>`);
+    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>✨ ${char.fusedRelic.icon} ${char.fusedRelic.name}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.fusedRelic, true) : char.fusedRelic.desc}</div>`);
     const resonances = (G.activeResonances || []).filter(res => res.isBody && res.bodyChar?.id === char.id);
     for (const res of resonances) {
       rows.push(`<div class="cct-row"><span class="cct-label">共鳴</span>${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}</div>`);

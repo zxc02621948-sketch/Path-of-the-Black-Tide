@@ -158,6 +158,16 @@ const CombatStatus = {
     return cleared;
   },
 
+  clearIncomingRiskState(unit) {
+    if (!unit) return;
+    unit._wagerDiceMissStacks = 0;
+    unit._wagerDicePenaltyRate = 0;
+    unit._wagerDicePenaltyPendingClear = false;
+    unit._gamblerBacklashStacks = 0;
+    unit._gamblerBacklashRate = 0;
+    unit._gamblerBacklashPendingClear = false;
+  },
+
   nativeWeaknesses(unit, source = 'gaze') {
     if (!unit) return [];
     if (source === 'gaze') {

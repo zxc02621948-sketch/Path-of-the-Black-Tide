@@ -5,17 +5,18 @@ const GameDiceFlow = {
       ? this._rollDodecaCombat(char)
       : Dice.roll(diceType, char);
     let value = base.value;
-    const pollutionLocked = diceType === 'combat' &&
-      typeof EnemyAbilities !== 'undefined' &&
-      EnemyAbilities.isPollutedRoll?.(char, base.raw, base.sides || 6);
+    const pollutedFace = diceType === 'combat' && typeof EnemyAbilities !== 'undefined'
+      ? EnemyAbilities.pollutedRollFace?.(char, base.raw, base.value, base.sides || 6)
+      : null;
+    const pollutionLocked = !!pollutedFace;
     if (pollutionLocked) {
       return {
         ...base,
-        value: base.raw,
+        value: pollutedFace,
         floored: false,
         pollutionLocked: true,
         pollutedFaceHit: true,
-        pollutedFace: base.raw,
+        pollutedFace,
         charId: char?.id || null,
         charCls: char?.cls || null,
       };

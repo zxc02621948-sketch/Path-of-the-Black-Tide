@@ -12,7 +12,7 @@ const GameDarkMonsters = {
       cleared: false,
       content: { enemy },
     };
-    this._log(`黑暗怪 Lv.${monster.level || 0} 發動被動追殺。`, 'danger');
+    this._log(`黑暗化身 Lv.${monster.level || 0} 發動被動追殺。`, 'danger');
     this._triggerCombat(cell, {
       source: 'darkMonsterPassive',
       darkMonsterId: monster.id,
@@ -36,7 +36,7 @@ const GameDarkMonsters = {
     const levelNote = enemy.darkMonsterCombatLevel !== enemy.darkMonsterOriginalLevel
       ? `（黑鐵冠：戰鬥等級視為 Lv.${enemy.darkMonsterCombatLevel}）`
       : '';
-    this._log(`主動討伐黑暗怪 Lv.${monster.level || 0}${levelNote}。`, 'danger');
+    this._log(`主動討伐黑暗化身 Lv.${monster.level || 0}${levelNote}。`, 'danger');
     this._triggerCombat(cell, {
       source: 'darkMonsterActive',
       darkMonsterId: monster.id,
@@ -100,19 +100,21 @@ const GameDarkMonsters = {
     const combatLevel = opts.activeHunt
       ? this._darkMonsterActiveCombatLevel(originalLevel)
       : originalLevel;
-    const enemy = typeof randomEnemyForDay === 'function'
-      ? randomEnemyForDay(true, Math.max(1, combatLevel))
-      : randomEnemy(true);
+    const enemy = typeof getDarkMonsterEnemy === 'function'
+      ? getDarkMonsterEnemy(combatLevel)
+      : (typeof randomEnemyForDay === 'function'
+        ? randomEnemyForDay(true, Math.max(1, combatLevel))
+        : randomEnemy(true));
     const crownNote = combatLevel !== originalLevel
       ? `\n\n\u9ed1\u9435\u51a0\u58d3\u5236\uff1a\u672c\u5834\u6230\u9b25\u8996\u70ba Lv.${combatLevel}\u3002`
       : '';
     return {
       ...enemy,
       id: `dark_monster_${monster.id}`,
-      name: `\u9ed1\u6697\u8ffd\u7375\u8005 Lv.${originalLevel}`,
+      name: `黑暗化身 Lv.${originalLevel}`,
       icon: 'D',
       iconImage: 'assets/enemies/dark-monster-icon.png',
-      desc: `\u5f9e\u9ed1\u6697 ${originalLevel} \u4e2d\u51dd\u7d50\u51fa\u7684\u8ffd\u6bba\u8005\u3002${crownNote}`,
+      desc: `從黑暗 ${originalLevel} 中凝結出的化身。牠的強度由生成當下的黑暗層數決定：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。${crownNote}`,
       darkMonster: true,
       darkMonsterOriginalLevel: originalLevel,
       darkMonsterCombatLevel: combatLevel,
@@ -163,7 +165,7 @@ const GameDarkMonsters = {
         monster.pendingChase = false;
       }
     }
-    this._log('主動討伐勝利：黑暗 -3，其他黑暗怪追殺倒數 +1。', 'reward');
+    this._log('主動討伐勝利：黑暗 -3，其他黑暗化身追殺倒數 +1。', 'reward');
     Render.fullRender();
   },
 
@@ -205,6 +207,7 @@ const GameDarkMonsters = {
       const nx = monster.x + stepX;
       const ny = monster.y + stepY;
       if (!this._isValidDarkMonsterCell(nx, ny)) continue;
+      if (this._darkMonsterOccupies(nx, ny, monster)) continue;
       monster.x = nx;
       monster.y = ny;
       return true;
@@ -216,12 +219,23 @@ const GameDarkMonsters = {
     return !!G.map?.[y]?.[x];
   },
 
+  _darkMonsterOccupies(x, y, except = null) {
+    if (!Array.isArray(G.darkMonsters)) return false;
+    return G.darkMonsters.some(monster =>
+      monster &&
+      monster !== except &&
+      monster.x === x &&
+      monster.y === y
+    );
+  },
+
   _pickDarkMonsterSpawnCell() {
     const candidates = [];
     for (const row of (G.map || [])) {
       for (const cell of row || []) {
         if (!cell) continue;
         if (cell.x === G.playerX && cell.y === G.playerY) continue;
+        if (this._darkMonsterOccupies(cell.x, cell.y)) continue;
         candidates.push(cell);
       }
     }

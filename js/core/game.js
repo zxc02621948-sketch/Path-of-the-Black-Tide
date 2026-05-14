@@ -17,7 +17,6 @@ const Game = {
       darkness: 0,
       lightCharges: 0,
       darkMonsters: [],
-      erosionBossSpawned: false,
       darknessMilestones: {},
       nightIntroShown: false,
       pendingSystemModals: [],
@@ -78,6 +77,7 @@ const Game = {
     if (G.libraryUnlocked && G.library.length > 0) {
       this._log(`聖物庫中有 ${G.library.length} 件聖物可用。`, 'reward');
     }
+    this._syncKnownRelicNotes();
 
     this._updateResonances();
     Render.fullRender();
@@ -88,6 +88,30 @@ const Game = {
     if (G.modal || G.phase === 'over' || G.mapMoveLocked) return;
     if (this._triggerPendingDarkMonsterChase()) return;
     this._refreshRestPoints();
+
+    if (x === G.playerX && y === G.playerY) {
+      const currentCell = G.map?.[y]?.[x];
+      if (!currentCell?.revealed) return;
+      if (currentCell.type === 'altar') {
+        currentCell.visited = true;
+        this._triggerAltar(currentCell);
+        return;
+      }
+      if (currentCell.droppedRelics?.length > 0) {
+        this._triggerRelic(currentCell);
+        return;
+      }
+      if (currentCell.type === 'relic') {
+        this._triggerRelic(currentCell);
+        return;
+      }
+      if (currentCell.type === 'rest' && G.actionsLeft > 0) {
+        currentCell.visited = true;
+        this._triggerRest(currentCell);
+        return;
+      }
+      return;
+    }
 
     if (!MapGen.isAdjacent(G.playerX, G.playerY, x, y)) { return; }
     if (!G.map[y][x].revealed) { return; }
@@ -196,7 +220,7 @@ const Game = {
   _enterNight() {
     G.phase = 'night';
     this._log('黑夜降臨，邊境變得更加危險。', 'night');
-    this._log(`黑夜結束今天時，全隊會受到 ${CONFIG.NIGHT_END_HP_COST || 2} 點黑夜侵蝕。`, 'night');
+    this._log('黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。', 'night');
 
     // 夜晚只放置目前的黑夜聖物；舊黑夜遺匣流程已移除。
     this._placeNightRelics();
@@ -210,11 +234,6 @@ const Game = {
     if (G.phase !== 'night') return false;
     const damage = CONFIG.NIGHT_END_HP_COST ?? 2;
     if (damage <= 0) return false;
-    if ((G.dawnWishProtection || 0) > 0) {
-      G.dawnWishProtection = Math.max(0, (G.dawnWishProtection || 0) - 1);
-      this._log(`黎明祈願庇護隊伍，免除本次黑夜侵蝕。剩餘 ${G.dawnWishProtection} 次。`, 'reward');
-      return false;
-    }
 
     const damaged = [];
     for (const char of this._aliveSquad()) {
@@ -231,14 +250,29 @@ const Game = {
   _triggerDawn() {
     G.phase = 'dawn';
     G.actionsLeft = 0;
-    this._log('第 20 天黎明到來，你們撐過了黑夜邊境。', 'important');
-    this._endGame('dawn');
+    if (G.finalBossDefeated) {
+      this._endGame('dawn');
+      return;
+    }
+    const boss = typeof getFinalBossEnemy === 'function' ? getFinalBossEnemy(G.darkness || 0) : null;
+    if (!boss) {
+      this._log('第 20 天黎明到來，你們撐過了黑夜邊境。', 'important');
+      this._endGame('dawn');
+      return;
+    }
+    G.finalBossSpawned = true;
+    this._log('第 20 天黎明前，夜幕之瞳在黑霧深處睜開。', 'danger');
+    this._triggerCombat({
+      type: 'enemy',
+      cleared: false,
+      content: { enemy: boss, reward: 'final_boss' },
+    }, { source: 'finalBoss' });
   },
 
   // Section.
   // Section.
   _triggerCell(cell) {
-    if (cell.droppedRelics?.length > 0 && (cell.cleared || cell.type === 'empty')) {
+    if (cell.droppedRelics?.length > 0 && (cell.cleared || cell.type === 'empty' || cell.visited)) {
       this._triggerRelic(cell);
       return;
     }
@@ -421,11 +455,15 @@ const Game = {
   },
 
   _commitRelicReplace(char, relic, clearRelic) {
+    const replaced = char.relic ? { ...char.relic } : null;
     this._removeRelicEffect(char, char.relic);
+    if (replaced) {
+      this._dropRelicAt(G.playerX, G.playerY, replaced);
+    }
     char.relic = { ...relic };
     this._applyRelicEquip(char, relic);
     clearRelic();
-    this._log(`${char.name} 改為攜帶聖物「${relic.name}」。`, 'reward');
+    this._log(`${char.name} 改為攜帶聖物「${relic.name}」。${replaced ? `原本的「${replaced.name}」掉落在原地。` : ''}`, 'reward');
     this._closeModal();
     const newly = this._updateResonances({ announceModal: true });
     if (!newly.length) Render.fullRender();

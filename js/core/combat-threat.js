@@ -63,6 +63,7 @@ const GameCombatThreat = {
 
   _combatIntentLabel(intent, enemy) {
     if (!intent) return '';
+    if (intent.type === 'pollute') return `${intent.name || '污染孢子'}：污染 1 名隊友骰面`;
     if (intent.type === 'self_wound') return `${intent.name || '撕裂自身'}　傷口 +${intent.amount || 0}`;
     if (intent.type === 'banner_switch') {
       const next = intent.toStance === 'damage' ? '戰吼旗' : '創傷旗';
