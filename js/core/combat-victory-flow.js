@@ -218,7 +218,7 @@ const GameCombatVictoryFlow = {
     let droppedRelic = null;
     const canDropRelic = this._canCombatDropRelic(enemy, combatReward);
     const pool = canDropRelic
-      ? this._getAvailableRelics(G.phase === 'night' ? getNightRelics() : getDayRelics())
+      ? this._getAvailableRelics(this._relicRewardPoolForPhase())
       : [];
     if (pool.length > 0 && Math.random() < CONFIG.COMBAT_RELIC_DROP_CHANCE) {
       droppedRelic = weightedRelicPick(pool);

@@ -13,8 +13,6 @@ const GameEchoSites = {
 
     const system = this._pickEchoSiteSystem();
     if (!system) return null;
-    const relic = this._pickEchoSiteRelic(system);
-    if (!relic) return null;
 
     return {
       id: `echo_site_clue_${system.id}`,
@@ -27,7 +25,6 @@ const GameEchoSites = {
       hideEventHeader: true,
       noReserve: true,
       echoSystemId: system.id,
-      reservedRelicId: relic.id,
       desc: [
         system.clueText || '你們找到一段殘缺的聖物線索。',
         `它指向一處被黑暗守住的遺址，裡面殘留著「${system.name}」的氣息。`,
@@ -61,7 +58,7 @@ const GameEchoSites = {
 
   _triggerEchoSiteClue(cell, ev) {
     const system = getEchoRelicSystemById(ev.echoSystemId);
-    const relic = getRelicById(ev.reservedRelicId);
+    const relic = this._pickEchoSiteRelic(system);
     const target = system && relic ? this._placeEchoSite(system, relic) : null;
     if (!target) {
       this._openModal({

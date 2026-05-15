@@ -324,6 +324,7 @@ const GameStateHelpers = {
 
   _reduceIncomingDamage(char, amount, allowCarriedIron = false, allowWagerPenalty = false, logs = null) {
     let damage = Math.max(0, amount);
+    damage = CombatStatus.applyBannerBearerDamageReduction(char, damage, logs);
     return CombatStatus.applyIncomingRiskBonuses(char, damage, {
       allowRemorse: allowWagerPenalty,
       allowBacklash: allowWagerPenalty,
@@ -365,7 +366,31 @@ const GameStateHelpers = {
 
   _getAvailableRelics(pool) {
     const used = this._getRelicIdsInRun();
-    return pool.filter(r => !used.has(r.id));
+    const strict = pool.filter(r => !used.has(r.id));
+    if (strict.length > 0) return strict;
+
+    const heldOrReserved = new Set();
+    for (const char of G.squad) {
+      if (char.relic) heldOrReserved.add(char.relic.id);
+      if (char.fusedRelic) heldOrReserved.add(char.fusedRelic.id);
+    }
+    for (const row of G.map) {
+      for (const cell of row) {
+        for (const r of (cell.droppedRelics || [])) heldOrReserved.add(r.id);
+      }
+    }
+    for (const site of (G.echoSites || [])) {
+      if (!site.defeated && site.reservedRelicId) heldOrReserved.add(site.reservedRelicId);
+    }
+    return pool.filter(r => !heldOrReserved.has(r.id));
+  },
+
+  _relicRewardPoolForPhase(phase = G.phase) {
+    const day = getDayRelics();
+    if (phase !== 'night') return day;
+    const night = getNightRelics();
+    const nightAvailable = this._getAvailableRelics(night);
+    return nightAvailable.length > 0 ? night : [...night, ...day];
   },
 
   _dedupeMapRelics() {

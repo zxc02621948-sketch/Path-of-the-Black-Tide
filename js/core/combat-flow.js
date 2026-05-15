@@ -89,6 +89,17 @@ const GameCombatFlow = {
 
     const resonanceAttackBonus = 0;
 
+    if (!opts.bowFollowUp) {
+      const roundStart = this._applyRoundStartBannerDamageIfNeeded(attacker);
+      if (roundStart?.victory) return;
+      if (roundStart?.logs?.length) {
+        G.combat._pendingRoundStartLogs = [
+          ...(G.combat._pendingRoundStartLogs || []),
+          ...roundStart.logs,
+        ];
+      }
+    }
+
     if (!forcedRollResult) {
       if (!opts.bowFollowUp && !opts.bannerPrompted && this._canRaiseBannerBeforeAttack(attacker)) {
         this._promptRaiseBannerBeforeAttack(attacker, opts);
@@ -158,6 +169,10 @@ const GameCombatFlow = {
     if (supportTacticalDamageBonus > 0) G.combat.supportTacticalDamageRound = G.combat.round;
     const deferBowEnemyAction = !opts.bowFollowUp && attacker.weapon?.effect?.type === 'bow_followup';
     const preCombatLogs = [];
+    if (G.combat._pendingRoundStartLogs?.length) {
+      preCombatLogs.push(...G.combat._pendingRoundStartLogs);
+      G.combat._pendingRoundStartLogs = [];
+    }
     if (!opts.bowFollowUp) {
       preCombatLogs.push(...this._applyRearGuardGear(attacker));
     }
@@ -530,15 +545,18 @@ const GameCombatFlow = {
     let text = parts.length > 0 ? parts.join('；') : '目前沒有可替換的旗面';
     if (supportRoll) {
       return entry.fused
-        ? `${text}。執旗者舉起融合旗：1-4 二階，5-6 三階。`
-        : `${text}。執旗者舉旗需判定：1-2 失敗，3-4 二階，5-6 三階。`;
+        ? `${text}。輔助舉起融合旗：1-4 二階，5-6 三階。`
+        : `${text}。輔助舉旗需判定：1-2 失敗，3-4 二階，5-6 三階。`;
     }
     return entry.fused
-      ? `${text}。融合旗由非執旗者舉起時直接二階。`
+      ? `${text}。融合旗由非輔助舉起時直接二階。`
       : `${text}。`;
   },
 
   _bannerFaceEffectText(face, baseValue) {
+    if (face.type === 'banner_round_damage') {
+      return `每回合開始時造成 ${baseValue} 點固定傷害`;
+    }
     if (face.type === 'hit_damage_bonus') {
       return `全隊擊中傷害 +${baseValue}`;
     }
@@ -671,6 +689,7 @@ const GameCombatFlow = {
   },
 
   _combatBannerShortName(banner) {
+    if (banner.faceType === 'banner_round_damage') return '戰吼旗';
     if (banner.faceType === 'hit_damage_bonus') return '戰吼旗';
     if (banner.faceType === 'first_hit_wound') return '創傷旗';
     if (banner.faceType === 'eagle_temp_weakness') return '破綻旗';
@@ -680,6 +699,9 @@ const GameCombatFlow = {
 
   _combatBannerDetailText(banner) {
     const value = this._bannerLevelValue(banner.values, banner.level);
+    if (banner.faceType === 'banner_round_damage') {
+      return `目前 ${banner.level} 階。每回合開始時對敵人造成 ${value} 點固定傷害。`;
+    }
     if (banner.faceType === 'hit_damage_bonus') {
       return `目前 ${banner.level} 階。全隊擊中時，本次傷害 +${value}。`;
     }
@@ -699,6 +721,73 @@ const GameCombatFlow = {
   _bannerLevelValue(values, level = 1) {
     const list = Array.isArray(values) ? values : [];
     return list[Math.max(0, (level || 1) - 1)] || 0;
+  },
+
+  _applyRoundStartBannerDamage(enemy, logs = null) {
+    if (!enemy || enemy.hp <= 0) return null;
+    const banners = this._activeCombatBanners();
+    const warcry = banners.find(banner => banner.faceType === 'banner_round_damage');
+    if (!warcry) return null;
+    const owner = G.squad.find(char => char.id === warcry.ownerId && !char.dead && char.hp > 0) || null;
+    let damage = this._bannerLevelValue(warcry.values, warcry.level);
+    if (damage <= 0) return null;
+    const dual = owner ? (G.activeResonances || []).find(res =>
+      res?.effect?.type === 'dual_banner_formation' && res?.bodyChar?.id === owner.id
+    ) : null;
+    const ownerBannerCount = owner ? banners.filter(banner => banner.ownerId === owner.id).length : 0;
+    if (dual && ownerBannerCount >= 2) {
+      const rate = Math.max(0, dual.effect?.warcryDamageRate ?? 0.5);
+      const bonus = Math.floor(damage * rate);
+      damage += bonus;
+      if (logs) logs.push(`雙旗戰陣：雙旗並立，戰吼旗傷害 +${bonus}。`);
+    }
+    const before = enemy.hp;
+    enemy.hp = Math.max(0, enemy.hp - damage);
+    if (logs) logs.push(`${warcry.name}・${warcry.faceName}：回合開始造成 ${damage} 點固定傷害（${before} → ${enemy.hp}）。`);
+    return { banner: warcry, owner, damage, enemyDead: enemy.hp <= 0 };
+  },
+
+  _applyRoundStartBannerDamageIfNeeded(actor = null) {
+    if (!G.combat?.enemy || G.combat.enemy.hp <= 0) return null;
+    const round = G.combat.round || 1;
+    if (G.combat._warcryBannerDamageRound === round) return null;
+    G.combat._warcryBannerDamageRound = round;
+
+    const logs = [];
+    const result = this._applyRoundStartBannerDamage(G.combat.enemy, logs);
+    if (!result) return logs.length ? { logs } : null;
+    if (!result.enemyDead) return { logs };
+
+    const attacker = result.owner || actor || this._aliveSquad()[0] || null;
+    if (!attacker) return { logs };
+    const combatResult = {
+      damage: result.damage,
+      weaknessHit: false,
+      logs,
+      incomingDamageEvents: [],
+      enemyBlockGain: 0,
+      counterDmg: 0,
+      counterTargetId: null,
+      counterTargetName: null,
+      aoeCounter: 0,
+      aoeDamageByChar: null,
+      enemyDiceRoll: null,
+      enemyAttackFlow: false,
+      enemyDead: true,
+    };
+    this._handleCombatVictory({
+      attacker,
+      enemy: G.combat.enemy,
+      cell: G.combat.cell,
+      reward: G.combat.reward,
+      source: G.combat.source,
+      darkMonsterId: G.combat.darkMonsterId,
+      darkMonsterRef: G.combat.darkMonsterRef,
+      combatResult,
+      roll: 0,
+      rollResult: { raw: 0, value: 0, sides: 6, charCls: attacker.cls },
+    });
+    return { logs, victory: true };
   },
 
   _activeCombatBanners() {
@@ -838,6 +927,7 @@ const GameCombatFlow = {
         logs.push(`輔助戰術支援：${attacker.name} 受擊傷害 -${deferred.supportTacticalDamageReduce}，剩餘 ${counterDmg}`);
       }
       counterDmg = CombatStatus.applyWoundTakenBonus(counterTarget, counterDmg, logs);
+      counterDmg = CombatStatus.applyBannerBearerDamageReduction(counterTarget, counterDmg, logs);
       if (CombatStatus.getBlock(counterTarget) > 0) {
         const blockResult = CombatStatus.consumeBlock(counterTarget, counterDmg);
         counterDmg = blockResult.damage;
@@ -1121,6 +1211,15 @@ const GameCombatFlow = {
     const target = G.squad.find(c => c.id === charId);
     if (!target || target.dead || target.hp <= 0) return;
 
+    const roundStart = this._applyRoundStartBannerDamageIfNeeded(target);
+    if (roundStart?.victory) return;
+    if (roundStart?.logs?.length) {
+      G.combat._pendingRoundStartLogs = [
+        ...(G.combat._pendingRoundStartLogs || []),
+        ...roundStart.logs,
+      ];
+    }
+
     G.combat.actionInProgress = true;
     G.combat.guardTargeting = false;
     G.combat.bagOpen = false;
@@ -1148,7 +1247,11 @@ const GameCombatFlow = {
       return;
     }
     const block = Math.max(1, roll || 0);
-    const logs = [`守勢骰 ${Dice.face(roll)}（${roll}）：${target.name} 獲得格檔 ${block}。`];
+    const logs = [
+      ...(G.combat._pendingRoundStartLogs || []),
+      `守勢骰 ${Dice.face(roll)}（${roll}）：${target.name} 獲得格檔 ${block}。`,
+    ];
+    G.combat._pendingRoundStartLogs = [];
     const guardBlockByChar = {};
     CombatStatus.raiseBlock(target, block);
     guardBlockByChar[target.id] = CombatStatus.getBlock(target);

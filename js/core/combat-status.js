@@ -88,6 +88,26 @@ const CombatStatus = {
     return damage;
   },
 
+  applyBannerBearerDamageReduction(unit, amount, logs = null) {
+    let damage = Math.max(0, amount || 0);
+    if (!unit || damage <= 0 || typeof G === 'undefined' || !G.combat) return damage;
+    const res = (G.activeResonances || []).find(item =>
+      item?.effect?.type === 'dual_banner_formation' && item?.bodyChar?.id === unit.id
+    );
+    if (!res) return damage;
+    const banners = Array.isArray(G.combat.banners)
+      ? G.combat.banners.filter(Boolean)
+      : (G.combat.banner ? [G.combat.banner] : []);
+    const count = banners.filter(banner => banner.ownerId === unit.id).length;
+    if (count <= 0) return damage;
+    const rate = Math.max(0, res.effect?.bearerDamageReductionPerBanner ?? 0.2);
+    const reduction = Math.floor(damage * Math.min(0.95, count * rate));
+    if (reduction <= 0) return damage;
+    damage = Math.max(0, damage - reduction);
+    if (logs) logs.push(`雙旗戰陣：${unit.name} 受旗陣守護，傷害 -${reduction}，剩餘 ${damage}`);
+    return damage;
+  },
+
   addRemorse(unit, stacks = 1, opts = {}) {
     if (!unit) return { before: 0, after: 0, added: 0 };
     const maxStacks = Math.max(0, opts.maxStacks ?? 3);

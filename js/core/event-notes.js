@@ -97,7 +97,10 @@ const GameEventNotes = {
     if (!ev.revealAltarClue) return '';
     const hiddenAltars = this._hiddenSiteCells('altar');
     if (hiddenAltars.length === 0) {
-      return this._revealNearbyFromEvent(ev.altarClueFallbackRange || 3);
+      const nearby = this._revealNearbyFromEvent(ev.altarClueFallbackRange || 3);
+      return nearby.includes('附近沒有新的重要線索')
+        ? this._revealNearestValuableFromEvent()
+        : nearby;
     }
 
     const revealedAltars = this._revealedAltarCount();
@@ -111,6 +114,31 @@ const GameEventNotes = {
     this._revealHiddenSite(cell);
     this._log(`線索揭露神壇位置 (${cell.x},${cell.y})。`, 'reward');
     return `\n\n線索指向一座能讓聖物融合的古老神壇 (${cell.x},${cell.y})。`;
+  },
+
+  _revealNearestValuableFromEvent() {
+    let best = null;
+    let bestDist = Infinity;
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (!cell || cell.revealed || cell.cleared) continue;
+        if (!this._isValuableRevealCell(cell)) continue;
+        const dist = MapGen.distance(G.playerX, G.playerY, cell.x, cell.y);
+        if (dist < bestDist) {
+          best = cell;
+          bestDist = dist;
+        }
+      }
+    }
+    if (!best) return '\n\n附近沒有新的重要線索可揭露。';
+    if (best.hiddenSite) {
+      this._revealHiddenSite(best);
+    } else {
+      best.revealed = true;
+      if (best.type === 'altar') best.altarHidden = false;
+    }
+    this._log(`線索揭露遠處值得調查的位置 (${best.x},${best.y})。`, 'reward');
+    return `\n\n線索指向遠處一處值得調查的位置 (${best.x},${best.y})。`;
   },
 
   _hiddenSiteCells(type) {

@@ -142,6 +142,8 @@ const GameRelicResonance = {
         return [
           `${res.bodyChar?.name || '持有者'} 同時持有戰爭旗與鷹眼旗，且其中一面已融合。`,
           '戰鬥中可同時維持 1 面戰爭旗與 1 面鷹眼旗。',
+          '雙旗並立時，戰吼旗固定傷害提高 50%。',
+          '場上每有 1 面由持有者展開的旗，持有者受到的傷害降低 20%。',
           '再次舉起同一件旗時，會覆蓋該旗目前的旗面；不同旗可並存。',
         ].join('\n');
       case 'greatsword_resonance':
@@ -223,7 +225,9 @@ const GameRelicResonance = {
           relics: ['war_banner', 'eagle_banner'],
           effect: {
             type: 'dual_banner_formation',
-            desc: `${char.name} 可同時維持 1 面戰爭旗與 1 面鷹眼旗。`,
+            warcryDamageRate: 0.5,
+            bearerDamageReductionPerBanner: 0.2,
+            desc: `${char.name} 可同時維持 1 面戰爭旗與 1 面鷹眼旗。雙旗並立時，戰吼旗固定傷害提高 50%；場上每有 1 面由 ${char.name} 展開的旗，${char.name} 受到的傷害降低 20%。`,
           },
         });
       }

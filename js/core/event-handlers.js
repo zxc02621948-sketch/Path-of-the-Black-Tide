@@ -153,10 +153,6 @@ const GameEventHandlers = {
     if (!this._hasEchoSitePlacementCell()) return false;
     const system = getEchoRelicSystemById(ev.echoSystemId);
     if (!system) return false;
-    if (ev.reservedRelicId) {
-      const reserved = getRelicById(ev.reservedRelicId);
-      return !!reserved && this._getAvailableRelics([reserved]).length > 0;
-    }
     return !!this._pickEchoSiteRelic(system);
   },
 
@@ -169,7 +165,7 @@ const GameEventHandlers = {
   // Note and discovery event methods live in js/core/event-notes.js.
 
   _triggerRandomRelicFind(cell, ev = null) {
-    const pool = this._getAvailableRelics(G.phase === 'night' ? getNightRelics() : getDayRelics());
+    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase());
     if (pool.length > 0) {
       if (ev) this._log(`${this._eventDiceInline(ev)}${ev.desc}`, 'reward');
       if (ev && pool.length > 1) {

@@ -83,7 +83,7 @@ const WEAPONS = [
     id: 'dagger',
     name: '匕首',
     icon: '🗡️',
-    desc: '主戰時，命中弱點時，額外 +2 傷害。',
+    desc: '主戰時，命中弱點與破綻時，額外 +2 傷害。',
     effect: { type: 'weakness_bonus', value: 2 },
   },
   {
@@ -141,7 +141,7 @@ WEAPONS.push(
     tier: 2,
     name: '影牙匕首',
     icon: '🗡️',
-    desc: '主戰時，命中弱點時額外 +2 傷害。若本次攻擊未命中任何弱點，額外造成等同於最終骰面的傷害。',
+    desc: '主戰時，命中弱點與破綻時額外 +2 傷害。若本次攻擊未命中任何弱點或破綻，額外造成等同於最終骰面的傷害。',
     effect: { type: 'shadow_fang_dagger', weaknessBonus: 2 },
   },
   {

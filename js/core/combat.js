@@ -186,9 +186,13 @@ const CombatRules = {
     }
     const gamblerTempWeaknessHit = !rollResult.dodecaLuckyDice && !realWeaknessHit && !tempWeaknessHit &&
       !!(enemy.gamblerTempWeakness && roll === enemy.gamblerTempWeakness);
+    const scholarOddFlawHit = attacker.cls === 'scholar' &&
+      roll % 2 === 1 &&
+      !tempWeaknessHit &&
+      !gamblerTempWeaknessHit;
     const eagleFeatherNativeHit = !!eagleFeatherNativeCandidate && allowFinalNativeWeakness && !realWeaknessHit && weapon?.effect?.type === 'bow_followup';
     const nativeWeaknessFace = suspiciousFlawSource || (activeNativeWeaknesses.includes(roll) ? roll : diceRaw);
-    const weaknessHit = realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit || tempWeaknessHit || gamblerTempWeaknessHit;
+    const weaknessHit = realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit || tempWeaknessHit || gamblerTempWeaknessHit || scholarOddFlawHit;
     let starBreakerFixedDamage = 0;
 
     const applyNativeWeaknessEffect = (prefix = '弱點') => {
@@ -294,10 +298,12 @@ const CombatRules = {
       logs.push(allowNativeWeaknessEffect
         ? `共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，觸發「${eff.desc || ''}」。`
         : `追擊命中共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，不觸發破除效果。`);
-    } else if (tempWeaknessHit) {
+    } else if (tempWeaknessHit || scholarOddFlawHit) {
       const bonus = rollResult.dodecaLuckyDice ? 3 : 1;
       damage += bonus;
-      logs.push(`命中破綻，傷害 +${bonus}`);
+      logs.push(scholarOddFlawHit
+        ? `搏命者：單數攻擊視為命中破綻，傷害 +${bonus}`
+        : `命中破綻，傷害 +${bonus}`);
       const eagleTempHit = enemy.eagleTempWeakness && (
         roll === enemy.eagleTempWeakness ||
         (rollResult.dodecaLuckyDice && roll % enemy.eagleTempWeakness === 0)
@@ -310,6 +316,12 @@ const CombatRules = {
         damage += eagleTempBonus;
         logs.push(`${eagleTempBanner.name}・${eagleTempBanner.faceName}：命中鷹眼破綻，傷害 +${eagleTempBonus}`);
       }
+    }
+
+    if (scholarOddFlawHit && (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit)) {
+      const bonus = rollResult.dodecaLuckyDice ? 3 : 1;
+      damage += bonus;
+      logs.push(`搏命者：單數攻擊額外視為命中破綻，傷害 +${bonus}`);
     }
 
     if (gamblerTempWeaknessHit) {
@@ -838,6 +850,7 @@ const CombatRules = {
         logs.push(`弓：未造成傷害，反擊 -${weapon.effect.value}，剩餘 ${counterDmg}`);
       }
       counterDmg = CombatStatus.applyWoundTakenBonus(counterTarget, counterDmg, logs);
+      counterDmg = CombatStatus.applyBannerBearerDamageReduction(counterTarget, counterDmg, logs);
       if (CombatStatus.getBlock(counterTarget) > 0) {
         const blockResult = CombatStatus.consumeBlock(counterTarget, counterDmg);
         counterDmg = blockResult.damage;

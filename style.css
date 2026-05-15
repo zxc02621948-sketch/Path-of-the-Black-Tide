@@ -4912,6 +4912,28 @@ body::before {
   filter: brightness(1.38) saturate(1.08);
 }
 
+.char-card.cls-scholar::before {
+  content: "";
+  position: absolute;
+  inset: 14px 0 10px;
+  z-index: 0;
+  pointer-events: none;
+  background: url("assets/ui/squad-card-scholar-emblem.png") center / auto 86% no-repeat;
+  opacity: .72;
+  filter: brightness(1.38) saturate(1.08);
+}
+
+.char-card.cls-support::before {
+  content: "";
+  position: absolute;
+  inset: 14px 0 10px;
+  z-index: 0;
+  pointer-events: none;
+  background: url("assets/ui/squad-card-support-emblem.png") center / auto 84% no-repeat;
+  opacity: .72;
+  filter: brightness(1.38) saturate(1.08);
+}
+
 .char-card::after {
   content: "";
   position: absolute;
