@@ -43,7 +43,7 @@ const GameCombatTooltips = {
     const descText = [
       enemy.desc || enemy.lore || '',
       abilityNotes.length ? `能力：${abilityNotes.join('\n')}` : '',
-      `HP ${enemy.hp}/${enemy.maxHp || enemy.hp}　攻擊 ${enemy.attack || 0}　格檔 ${block}`,
+      `HP ${enemy.hp}/${enemy.maxHp || enemy.hp}　攻擊 ${enemy.attack || 0}`,
       `原生弱點：${nativeText}`,
       enemy.weaknessEffect?.desc ? `破除效果：${enemy.weaknessEffect.desc}` : '',
       extrasText,

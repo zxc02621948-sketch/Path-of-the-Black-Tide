@@ -80,7 +80,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 
   function getLibraryRelics() {
-    const unlocked = localStorage.getItem('bbn_library_unlocked') === 'true';
+    const unlocked = localStorage.getItem('bbn_library_unlocked') !== 'false';
     if (!unlocked) return [];
     return safeParseStorage('bbn_library', []).filter(r => r?.effect?.type !== 'unlock_library' && !!getRelicById(r.id));
   }
@@ -141,7 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   // ─── 檢查聖物庫狀態，決定是否顯示筆記按鈕 ───────────────
-  const lib = localStorage.getItem('bbn_library_unlocked') === 'true';
+  const lib = localStorage.getItem('bbn_library_unlocked') !== 'false';
   const notes = safeParseStorage('bbn_notes', {});
   const visitedTerrains = safeParseStorage('bbn_terrain', []);
   const hasNotes = Object.keys(notes).length > 0 || visitedTerrains.length > 0;

@@ -32,6 +32,7 @@ const GameCombatFlow = {
       round: 1,
       itemUsedRound: 0,
       rollItemUsedRound: 0,
+      guardReadyRound: 1,
       luckyStarUses: 0,
       bowFollowUps: 0,
       wagerDice: null,
@@ -46,6 +47,7 @@ const GameCombatFlow = {
       starHunterEyeRound: 0,
       bagOpen: false,
       pendingInventoryItemIndex: null,
+      guardTargeting: false,
       intent: null,
       actionInProgress: false,
     };
@@ -62,20 +64,20 @@ const GameCombatFlow = {
     const { enemy } = G.combat;
 
     const modDesc = G.combatMods.length > 0 ? '\n\n戰鬥調整存在。' : '';
-    const weaknessText = Number.isFinite(enemy.weakness)
-      ? `${enemy.weakness}（${enemy.weaknessEffect?.desc || ''}）`
-      : (enemy.finalBoss ? '閉眼遮蔽中，開眼時顯現' : '無');
 
     this._openModal({
       title: `遭遇：${enemy.name}`,
-      desc: `${enemy.desc}\n\nHP ${enemy.hp}/${enemy.maxHp} / 格檔 ${CombatStatus.getBlock(enemy)} / 攻擊 ${enemy.attack}\n原生弱點：${weaknessText}${modDesc}`,
+      desc: `${enemy.desc}\n\nHP ${enemy.hp}/${enemy.maxHp} / 攻擊 ${enemy.attack}${modDesc}`,
       combat: {
         ...this._buildCombatScene(enemy, null, this._combatStatusText()),
         selectable: !this._combatItemTargeting() && !G.combat.actionInProgress,
         itemTargeting: this._combatItemTargeting(),
+        guardTargeting: this._combatGuardTargeting(),
         showBag: !!G.combat.bagOpen,
         inventory: this._combatInventoryView(),
         canUseBag: this._canUseCombatBag(),
+        canGuard: this._canUseCombatGuard(),
+        guardCooldown: this._combatGuardCooldown(),
         rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
       },
       choices: this._combatActionChoices(),
@@ -227,9 +229,11 @@ const GameCombatFlow = {
       const allowWagerIncoming = !G.combat.wagerDice;
       const variedAoe = combatResult.aoeDamageByChar && Object.keys(combatResult.aoeDamageByChar).length > 0;
       if (!Array.isArray(combatResult.incomingDamageEvents)) combatResult.incomingDamageEvents = [];
-      this._log(variedAoe
-        ? `${enemy.name} 反擊全隊，基礎 ${combatResult.aoeCounter} 傷害。`
-        : `${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`, 'danger');
+      this._log(combatResult.counterDmg > 0 && combatResult.counterTargetName
+        ? `${enemy.name} 反擊主目標 ${combatResult.counterTargetName}，其餘隊友濺射 ${combatResult.aoeCounter} 傷害。`
+        : (variedAoe
+          ? `${enemy.name} 反擊全隊，基礎 ${combatResult.aoeCounter} 傷害。`
+          : `${enemy.name} 反擊全隊，造成 ${combatResult.aoeCounter} 傷害。`), 'danger');
       for (const c of alive) {
         let incomingAoe = Math.max(0, combatResult.aoeDamageByChar?.[c.id] ?? combatResult.aoeCounter);
         incomingAoe = CombatStatus.applyWoundTakenBonus(c, incomingAoe, combatResult.logs);
@@ -312,12 +316,13 @@ const GameCombatFlow = {
     this._endWagerDiceAttackFlow();
     G.combat = null;
     this._log('測試戰鬥失敗：測試模式不會結束遊戲，隊伍已恢復至 1 HP。', 'dim');
+    const diceLabel = attacker ? `${attacker.name} 的攻擊骰` : '守勢骰';
     this._openModal({
       title: '測試戰鬥失敗',
       desc: `${enemy.name} 擊倒了測試隊伍。\n\n測試戰鬥失敗不會結束遊戲，隊伍已恢復至 1 HP。`,
       combatLog: combatResult.logs,
       combat: this._buildCombatScene(enemy, attacker, '測試戰鬥失敗'),
-      dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: displayRoll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
+      dice: { type: 'combat', label: diceLabel, value: displayRoll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
       choices: [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
     return true;
@@ -431,7 +436,7 @@ const GameCombatFlow = {
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: displayRoll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
       choices: [
         {
-          label: `追加攻擊（剩餘 ${max - used} 次）`,
+          label: `追擊 剩${max - used}`,
           action: () => {
             if (attacker.hp <= 0 || attacker.dead) {
               this._closeModal();
@@ -980,7 +985,9 @@ const GameCombatFlow = {
         }
         if (combatResult.stunned) {
           summaryLines.push(`${enemy.name} 失衡，本回合無法行動。`);
-      } else if (combatResult.aoeCounter > 0) {
+        } else if (combatResult.counterDmg > 0 && combatResult.aoeCounter > 0) {
+          summaryLines.push(`${enemy.name} 攻擊主目標 ${combatResult.counterTargetName || attacker.name}，造成 ${combatResult.counterDmg} 傷害；其餘隊友濺射 ${combatResult.aoeCounter} 傷害。`);
+        } else if (combatResult.aoeCounter > 0) {
           const variedAoe = combatResult.aoeDamageByChar && Object.keys(combatResult.aoeDamageByChar).length > 0;
           summaryLines.push(variedAoe
             ? `${enemy.name} 反擊全隊，基礎 ${combatResult.aoeCounter} 傷害，凝視命中者加倍。`
@@ -1005,6 +1012,8 @@ const GameCombatFlow = {
             showBag: false,
             inventory: this._combatInventoryView(),
             canUseBag: this._canUseCombatBag(),
+            canGuard: this._canUseCombatGuard(),
+            guardCooldown: this._combatGuardCooldown(),
             rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
           },
           combatAnims: this._combatResultAnims(attacker, combatResult, 400),
@@ -1033,7 +1042,12 @@ const GameCombatFlow = {
       playerFollowHits: combatResult.rapierFollowHits || 0,
       playerDamageEvents: Array.isArray(combatResult.rapierDamageEvents) ? combatResult.rapierDamageEvents : [],
       incomingDamageEvents: Array.isArray(combatResult.incomingDamageEvents) ? combatResult.incomingDamageEvents : [],
-      counterTarget: combatResult.counterDmg > 0 ? (combatResult.counterTargetId || attacker?.id || null) : null,
+      guardBlock: combatResult.guardBlock || 0,
+      guardTargetId: combatResult.guardTargetId || null,
+      guardRemainingBlockByChar: combatResult.guardRemainingBlockByChar || null,
+      counterTarget: combatResult.enemyAttackFlow && combatResult.counterTargetId
+        ? combatResult.counterTargetId
+        : (combatResult.counterDmg > 0 ? (attacker?.id || null) : null),
       aoe: combatResult.aoeCounter > 0,
       enemyBlock: combatResult.enemyBlockGain > 0,
       delay,
@@ -1080,7 +1094,7 @@ const GameCombatFlow = {
   },
 
   selectCombatAttacker(charId) {
-    if (this._combatItemTargeting() || G.combat?.actionInProgress) return;
+    if (this._combatItemTargeting() || this._combatGuardTargeting() || G.combat?.actionInProgress) return;
     if (G.combat) G.combat.bagOpen = false;
     const char = G.squad.find(c => c.id === charId);
     if (!char || char.dead || char.hp <= 0) return;
@@ -1089,6 +1103,187 @@ const GameCombatFlow = {
     document.querySelector(`.combat-unit.ally[data-char-id="${char.id}"]`)?.classList.add('active');
     G.combat.actionInProgress = true;
     this._doCombatRound(char);
+  },
+
+  selectCombatGuard() {
+    if (!G.combat || this._combatItemTargeting() || G.combat.actionInProgress) return;
+    if (!this._canUseCombatGuard()) return;
+    G.combat.guardTargeting = true;
+    G.combat.bagOpen = false;
+    G.combat.pendingInventoryItemIndex = null;
+    this._showCombatModal();
+  },
+
+  selectCombatGuardTarget(charId) {
+    if (!G.combat || !this._combatGuardTargeting() || G.combat.actionInProgress) return;
+    const enemy = G.combat.enemy;
+    if (!enemy || enemy.hp <= 0) return;
+    const target = G.squad.find(c => c.id === charId);
+    if (!target || target.dead || target.hp <= 0) return;
+
+    G.combat.actionInProgress = true;
+    G.combat.guardTargeting = false;
+    G.combat.bagOpen = false;
+    G.combat.attackerId = null;
+    document.querySelectorAll('.combat-unit.ally.active').forEach(el => el.classList.remove('active'));
+
+    const roll = Dice.rollRaw();
+    this._showCombatGuardDicePreview(roll, () => this._resolveCombatGuard(roll, target.id));
+  },
+
+  cancelCombatGuardTargeting() {
+    if (!G.combat || G.combat.actionInProgress) return;
+    G.combat.guardTargeting = false;
+    this._showCombatModal();
+  },
+
+  _resolveCombatGuard(roll, targetId) {
+    if (!G.combat) return;
+    const enemy = G.combat.enemy;
+    if (!enemy || enemy.hp <= 0) return;
+    const target = G.squad.find(c => c.id === targetId && c.hp > 0 && !c.dead);
+    if (!target) {
+      G.combat.actionInProgress = false;
+      this._showCombatModal();
+      return;
+    }
+    const block = Math.max(1, roll || 0);
+    const logs = [`守勢骰 ${Dice.face(roll)}（${roll}）：${target.name} 獲得格檔 ${block}。`];
+    const guardBlockByChar = {};
+    CombatStatus.raiseBlock(target, block);
+    guardBlockByChar[target.id] = CombatStatus.getBlock(target);
+    logs.push(`${target.name} 格檔 +${block}`);
+
+    const combatResult = {
+      damage: 0,
+      weaknessHit: false,
+      logs,
+      incomingDamageEvents: [],
+      enemyBlockGain: 0,
+      counterDmg: 0,
+      counterTargetId: null,
+      counterTargetName: null,
+      aoeCounter: 0,
+      aoeDamageByChar: null,
+      enemyDiceRoll: null,
+      enemyAttackFlow: false,
+      guardBlock: block,
+      guardTargetId: target.id,
+      guardRemainingBlockByChar: {},
+    };
+
+    G.combat.deferredEnemyAction = {
+      intent: G.combat.intent,
+      round: G.combat.round,
+      combatMods: G.combatMods || [],
+      wagerDice: null,
+    };
+    const appliedEnemyAction = this._applyDeferredEnemyAction(null, combatResult);
+
+    if (appliedEnemyAction) {
+      if (combatResult.counterTargetId) this._halveCombatThreat(combatResult.counterTargetId);
+      if (this._handleDevTestDefeat(combatResult, null, enemy, roll, { value: roll })) return;
+      if (this._checkLose()) return;
+    }
+
+    const guardRemainingBlockByChar = {};
+    for (const char of this._aliveSquad()) {
+      guardRemainingBlockByChar[char.id] = CombatStatus.getBlock(char);
+    }
+    combatResult.guardRemainingBlockByChar = guardRemainingBlockByChar;
+
+    this._clearExpiredWeaknessEffects(enemy);
+    for (const banner of this._activeCombatBanners()) banner.usedThisRound = false;
+    for (const char of G.squad) {
+      CombatStatus.clearBlock(char);
+      char._grapplingHookUsedRound = false;
+      char._corrosiveOilUsedRound = false;
+      char._serratedOilUsedRound = false;
+      char._rapierGuaranteedFollowUpsUsed = 0;
+    }
+
+    G.combat.guardReadyRound = (G.combat.round || 1) + 4;
+    G.combat.round++;
+    this._ensureRoundStartNativeWeakness(enemy, combatResult.logs);
+    EnemyAbilities.onRoundStart(enemy, { ...G.combat, squad: G.squad }, combatResult.logs);
+    G.combat.bowFollowUps = 0;
+    G.combat.itemUsedRound = 0;
+    G.combat.rollItemUsedRound = 0;
+    G.combat.bagOpen = false;
+    G.combat.pendingInventoryItemIndex = null;
+    G.combat.guardTargeting = false;
+    G.combat.intent = this._resolveCombatIntent(enemy);
+    G.combat.actionInProgress = false;
+
+    const summaryLines = [`${target.name} 採取守勢，擲出 ${Dice.face(roll)}（${roll}），獲得 ${block} 格檔。`];
+    if (combatResult.counterDmg > 0 && combatResult.aoeCounter > 0) {
+      summaryLines.push(`${enemy.name} 攻擊主目標 ${combatResult.counterTargetName || '小隊'}，造成 ${combatResult.counterDmg} 傷害；其餘隊友濺射 ${combatResult.aoeCounter} 傷害。`);
+    } else if (combatResult.aoeCounter > 0) {
+      summaryLines.push(`${enemy.name} 攻擊全隊，基礎 ${combatResult.aoeCounter} 傷害。`);
+    } else if (combatResult.counterDmg > 0) {
+      summaryLines.push(`${enemy.name} 攻擊 ${combatResult.counterTargetName || '小隊'}，造成 ${combatResult.counterDmg} 傷害。`);
+    } else {
+      summaryLines.push(`${enemy.name} 本回合沒有造成傷害。`);
+    }
+    if (combatResult.gazeSummary) summaryLines.push(combatResult.gazeSummary);
+    if (combatResult.fateSummary) summaryLines.push(combatResult.fateSummary);
+    if (combatResult.bannerSummary) summaryLines.push(combatResult.bannerSummary);
+
+    const combatScene = this._buildCombatScene(enemy, null, this._combatStatusText());
+    combatScene.squad = combatScene.squad.map(char => ({
+      ...char,
+      block: Math.max(char.block || 0, guardBlockByChar[char.id] || 0),
+    }));
+
+    this._openModal({
+      title: `戰鬥：第 ${G.combat.round - 1} 回合結果`,
+      desc: summaryLines.join('\n'),
+      combatLog: combatResult.logs,
+      combat: {
+        ...combatScene,
+        selectable: true,
+        itemTargeting: false,
+        guardTargeting: false,
+        showBag: false,
+        inventory: this._combatInventoryView(),
+        canUseBag: this._canUseCombatBag(),
+        canGuard: this._canUseCombatGuard(),
+        guardCooldown: this._combatGuardCooldown(),
+        rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
+      },
+      combatAnims: this._combatResultAnims(null, combatResult, 300),
+      dice: { type: 'combat', label: '守勢骰', value: roll, raw: roll, floored: false, charCls: 'neutral', sides: 6 },
+      enemyDice: combatResult.gazeRoll
+        ? { type: 'danger', label: '裂隙凝視骰', value: combatResult.gazeRoll, sides: 6 }
+        : (combatResult.fateRoll
+          ? {
+            type: 'danger',
+            label: combatResult.fateLuckyFace
+              ? `命運骰（幸運 ${combatResult.fateLuckyFace} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
+              : '命運骰',
+            value: combatResult.fateRoll,
+            sides: 6,
+          }
+          : (combatResult.enemyDiceRoll
+            ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: 6 }
+            : null)),
+      choices: this._combatActionChoices(),
+    });
+  },
+
+  _canUseCombatGuard() {
+    if (!G.combat || G.combat.actionInProgress || this._combatItemTargeting() || this._combatGuardTargeting()) return false;
+    if (!this._aliveSquad().length) return false;
+    return (G.combat.round || 1) >= (G.combat.guardReadyRound || 1);
+  },
+
+  _combatGuardTargeting() {
+    return !!G.combat?.guardTargeting;
+  },
+
+  _combatGuardCooldown() {
+    if (!G.combat) return 0;
+    return Math.max(0, (G.combat.guardReadyRound || 1) - (G.combat.round || 1));
   },
 
   _combatActionChoices() {
@@ -1213,6 +1408,9 @@ const GameCombatFlow = {
       const item = this._inventoryItem(G.inventory[G.combat.pendingInventoryItemIndex]);
       return item ? `選擇 ${item.icon} ${item.name} 的目標。` : '選擇道具目標。';
     }
+    if (this._combatGuardTargeting()) {
+      return '選擇一名角色獲得本次守勢格檔。';
+    }
     const drum = G.combat?.battleDrum;
     const drumText = drum && drum.remaining > 0
       ? `戰鼓：接下來 ${drum.remaining} 次主戰攻擊 +${drum.value || 1} 攻擊。`
@@ -1220,7 +1418,7 @@ const GameCombatFlow = {
     const bannerText = this._activeCombatBanners()
       .map(banner => `${banner.name}・${banner.faceName}：${banner.level} 階。`)
       .join(' ');
-    return ['點擊角色卡選擇主戰者，或打開背包使用道具。', drumText, bannerText].filter(Boolean).join(' ');
+    return ['點擊角色卡選擇主戰者，或使用格檔／背包。', drumText, bannerText].filter(Boolean).join(' ');
   },
 
   _combatInventoryView() {
@@ -1450,6 +1648,58 @@ const GameCombatFlow = {
       clearInterval(timer);
       callback();
     }, MS * STEPS + 320);
+  },
+
+  _showCombatGuardDicePreview(roll, callback) {
+    const guardButton = document.querySelector('.combat-guard-button');
+    if (!guardButton) { callback(); return; }
+
+    const pipHtml = v => {
+      const P = { 1:[5], 2:[1,9], 3:[1,5,9], 4:[1,3,7,9], 5:[1,3,5,7,9], 6:[1,3,4,6,7,9] };
+      const on = new Set(P[Math.max(1, Math.min(6, v))] || [5]);
+      return Array.from({ length: 9 }, (_, i) =>
+        `<span class="${on.has(i + 1) ? 'on' : ''}"></span>`).join('');
+    };
+    const setDiceFaceClass = (el, value) => {
+      el.classList.remove('dice-face-1', 'dice-face-2', 'dice-face-3', 'dice-face-4', 'dice-face-5', 'dice-face-6');
+      if (value >= 1 && value <= 6) el.classList.add(`dice-face-${value}`);
+    };
+    const randomFace = () => Math.ceil(Math.random() * 6);
+
+    document.querySelectorAll('.combat-tools button').forEach(btn => { btn.disabled = true; });
+    document.querySelector('.combat-guard-dice')?.remove();
+
+    const diceEl = document.createElement('div');
+    const initialFace = randomFace();
+    diceEl.className = 'combat-card-dice player combat-guard-dice dice-theme-neutral';
+    diceEl.dataset.sides = '6';
+    setDiceFaceClass(diceEl, initialFace);
+    diceEl.innerHTML = pipHtml(initialFace);
+    diceEl.classList.add('dice-rolling');
+    guardButton.before(diceEl);
+
+    let count = 0;
+    const STEPS = 10;
+    const MS = 75;
+    const timer = setInterval(() => {
+      count++;
+      if (count < STEPS) {
+        const face = randomFace();
+        setDiceFaceClass(diceEl, face);
+        diceEl.innerHTML = pipHtml(face);
+      } else {
+        clearInterval(timer);
+        setDiceFaceClass(diceEl, roll);
+        diceEl.innerHTML = pipHtml(roll);
+        diceEl.classList.remove('dice-rolling');
+        diceEl.classList.add('dice-pip-settled');
+      }
+    }, MS);
+
+    setTimeout(() => {
+      clearInterval(timer);
+      callback();
+    }, MS * STEPS + 360);
   },
 
   _showModalDicePreview(rollResult, label, callback) {

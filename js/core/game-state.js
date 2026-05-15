@@ -433,7 +433,7 @@ const GameStateHelpers = {
   _recordTerrain(type)     { if (type === 'empty') return; if (!G.visitedTerrains.includes(type)) { G.visitedTerrains.push(type); this._saveVisitedTerrains(); } },
   _loadLibrary()         { try { return this._filterLibraryRelics(JSON.parse(localStorage.getItem('bbn_library') || '[]')); } catch { return []; } },
   _saveLibrary()         { localStorage.setItem('bbn_library', JSON.stringify(this._filterLibraryRelics(G.library))); },
-  _loadLibraryUnlocked() { return localStorage.getItem('bbn_library_unlocked') === 'true'; },
+  _loadLibraryUnlocked() { return localStorage.getItem('bbn_library_unlocked') !== 'false'; },
   _saveLibraryUnlocked() { localStorage.setItem('bbn_library_unlocked', 'true'); },
 
   _applyStartingLibraryRelic(relicId, carrierCls = null) {

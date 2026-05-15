@@ -371,7 +371,7 @@ const Render = {
     if (cell.type === 'altar' && cell.visited)  return '神壇';
     if (cell.type === 'rest')  return G.phase === 'night' ? '殘火' : '休息';
     if (cell.content?.reward === 'rescue') return '頭目';
-    if (cell.content?.reward === 'echo_site') return cell.content?.echoSystemName || '共鳴';
+    if (cell.content?.reward === 'echo_site') return this._cellEchoLabel(cell);
     if (cell.type === 'enemy') return '';
     if (cell.type === 'relic') return '';
     return '';
@@ -403,6 +403,12 @@ const Render = {
     if (cell.type === 'altar' && cell.visited) return '神壇，血祭 / 融合';
     if (cell.visited) return '已探索，無事';
     return '未知';
+  },
+
+  _cellEchoLabel(cell) {
+    const name = cell?.content?.echoSystemName || '';
+    const shortName = name.replace(/體系$/, '系').trim();
+    return shortName || '共鳴';
   },
 
   // Section.
@@ -517,13 +523,13 @@ const Render = {
       const relicHtml = (() => {
         if (!char.relic && !char.fusedRelic) return `<span class="card-val dim">無</span>`;
         const parts = [];
-        if (char.relic) {
-          parts.push(`<span class="card-relic-name">${char.relic.icon} ${char.relic.name}</span>
-            <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','relic')">查看</button>`);
-        }
         if (char.fusedRelic) {
           parts.push(`<span class="card-relic-name fused">🔮 ${char.fusedRelic.icon} ${char.fusedRelic.name}</span>
             <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','fusedRelic')">查看</button>`);
+        }
+        if (char.relic) {
+          parts.push(`<span class="card-relic-name">${char.relic.icon} ${char.relic.name}</span>
+            <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','relic')">查看</button>`);
         }
         return parts.join('<br>');
       })();
@@ -536,7 +542,7 @@ const Render = {
         : `<span class="dim">無裝備</span>`;
 
       const card = document.createElement('div');
-      card.className = `char-card${char.dead ? ' dead' : ''}`;
+      card.className = `char-card cls-${char.cls}${char.dead ? ' dead' : ''}`;
       card.innerHTML = `
         <div class="card-title-row">
           ${this._charPortraitHtml(char, cls)}

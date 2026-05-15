@@ -14,6 +14,7 @@ const GameDevTool = {
         { label: '替換角色裝備', action: () => this._devChooseGear() },
         { label: '指定怪物戰鬥', action: () => this._devChooseEnemyCombat() },
         { label: '指定觸發事件', action: () => this._devChooseEventTerrain() },
+        { label: '直接開始神壇', action: () => this._devStartAltar() },
         { label: '調整隊伍狀態', action: () => this._devOpenSquadStateTool() },
         { label: '關閉', action: () => this._closeModal() },
       ],
@@ -381,7 +382,7 @@ const GameDevTool = {
     if (enemy.nightOnly) tags.push('夜晚限定');
     const tagText = tags.length ? `｜${tags.join('、')}` : '';
     const weaknessText = Number.isFinite(enemy.weakness) ? enemy.weakness : (enemy.finalBoss ? '開眼顯現' : '無');
-    return `HP ${enemy.hp}／攻擊 ${enemy.attack}／格檔 ${enemy.block || 0}／原生弱點 ${weaknessText}${tagText}`;
+    return `HP ${enemy.hp}／攻擊 ${enemy.attack}／原生弱點 ${weaknessText}${tagText}`;
   },
 
   _devStartEnemyCombat(enemy, opts = {}) {
@@ -395,6 +396,17 @@ const GameDevTool = {
     if (reward) cell.content.reward = reward;
     this._log(`測試工具：開始與「${enemy.name}」戰鬥。`, 'info');
     this._triggerCombat(cell, { source: opts.source || 'devTest', darkMonsterId: opts.darkMonsterId || null });
+  },
+
+  _devStartAltar() {
+    const cell = {
+      type: 'altar',
+      cleared: false,
+      content: null,
+      altarUsedDay: null,
+    };
+    this._log('測試工具：開啟神壇。', 'info');
+    this._triggerAltar(cell);
   },
 
   _devChooseEventTerrain() {

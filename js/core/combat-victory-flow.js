@@ -229,6 +229,10 @@ const GameCombatVictoryFlow = {
     }
 
     const isEventDrop = droppedRelic?.eventOnly;
+    if (droppedRelic && !isEventDrop) {
+      this._triggerRelic(cell);
+      return;
+    }
     const dropDesc = droppedRelic
       ? isEventDrop
         ? ''
@@ -242,10 +246,10 @@ const GameCombatVictoryFlow = {
       combatAnims: this._combatResultAnims(attacker, combatResult, 250),
       dice: this._combatVictoryDice(attacker, roll, rollResult),
       choices: [{
-        label: (!isEventDrop && droppedRelic) ? `拾取「${droppedRelic.name}」` : '繼續',
+        label: '繼續',
         action: () => {
-          if (!isEventDrop && droppedRelic) this._triggerRelic(cell);
-          else { this._closeModal(); Render.fullRender(); }
+          this._closeModal();
+          Render.fullRender();
         },
       }],
     });

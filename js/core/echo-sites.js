@@ -164,24 +164,7 @@ const GameEchoSites = {
     cell.content = { relic: { ...relic } };
     cell.cleared = false;
     this._log(`${siteName} 的守護者倒下，留下聖物「${relic.name}」。`, 'reward');
-    const system = getEchoRelicSystemById(cell.content?.echoSystemId || site?.systemId);
-    this._openModal({
-      title: '共鳴遺址已清除',
-      desc: [
-        `${enemy.name} 被擊敗。`,
-        finalHitDesc,
-        system?.victoryText || `${siteName} 的封印裂開，露出「${relic.name}」。`,
-        `獲得機會：「${relic.name}」\n${relic.desc}`,
-      ].join('\n\n'),
-      combatLog: logs,
-      combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
-      combatAnims,
-      dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
-      choices: [{
-        label: `拾取「${relic.name}」`,
-        action: () => this._triggerRelic(cell),
-      }],
-    });
+    this._triggerRelic(cell);
   },
 };
 

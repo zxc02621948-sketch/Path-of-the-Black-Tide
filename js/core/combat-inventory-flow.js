@@ -9,6 +9,7 @@ const GameCombatInventoryFlow = {
     }
     G.combat.bagOpen = !G.combat.bagOpen;
     G.combat.pendingInventoryItemIndex = null;
+    G.combat.guardTargeting = false;
     this._showCombatModal();
   },
 
@@ -29,6 +30,7 @@ const GameCombatInventoryFlow = {
       return;
     }
     G.combat.pendingInventoryItemIndex = idx;
+    G.combat.guardTargeting = false;
     G.combat.bagOpen = false;
     this._showCombatModal();
   },

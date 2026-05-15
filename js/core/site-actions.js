@@ -8,15 +8,17 @@ const GameSiteActions = {
 
     if (!usedToday) {
       choices.push({
-        label: '血祭：全隊最大 HP -1，探索骰 4-5 黑暗 -1，6 黑暗 -2',
-        danger: true,
-        action: () => this._doAltarBloodSacrifice(cell),
+        label: '融合聖物',
+        hint: G.actionsLeft > 0
+          ? '消耗 1 行動，角色最大 HP -1。'
+          : '行動不足，無法融合。',
+        action: () => this._chooseAltarFusionTarget(cell),
       });
       choices.push({
-        label: G.actionsLeft > 0
-          ? '融合聖物：消耗 1 行動，角色最大 HP -1'
-          : '融合聖物：行動不足',
-        action: () => this._chooseAltarFusionTarget(cell),
+        label: '血祭',
+        hint: '全隊最大 HP -1；探索骰 4-5 黑暗 -1，6 黑暗 -2。',
+        danger: true,
+        action: () => this._doAltarBloodSacrifice(cell),
       });
     }
 

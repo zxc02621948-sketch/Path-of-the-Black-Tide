@@ -97,6 +97,7 @@ const ENEMIES = [
     icon: '💀',
     iconImage: 'assets/enemies/rot-knight.png',
     iconFlipX: true,
+    iconScale: 'large',
     tier: 'medium',
     tierUpDays: 6,
     weakness: 4,

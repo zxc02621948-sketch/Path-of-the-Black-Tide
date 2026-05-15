@@ -74,9 +74,6 @@ const Game = {
     this._revealAround(cx, cy);
 
     this._log('你們踏入黑夜邊境。', 'important');
-    if (G.libraryUnlocked && G.library.length > 0) {
-      this._log(`聖物庫中有 ${G.library.length} 件聖物可用。`, 'reward');
-    }
     this._syncKnownRelicNotes();
 
     this._updateResonances();
