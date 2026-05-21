@@ -4,6 +4,8 @@ const RenderModal = {
     this._hideCombatTip();
     this._hideCombatBannerPopover();
     this._hideCombatStatusPopover();
+    this._ensureCombatLogDelegation();
+    if (cfg?.combat || cfg?.combatAnims) this._preloadCombatDamageDigits();
     if (this._modalTypeTimer) {
       clearInterval(this._modalTypeTimer);
       this._modalTypeTimer = null;
@@ -13,12 +15,17 @@ const RenderModal = {
     const titleEl = document.getElementById('modal-title');
     const descEl = document.getElementById('modal-desc');
     delete descEl.dataset.combatResultDeferred;
-    contentEl.querySelectorAll(':scope > .combat-tools, :scope > .combat-bag-panel').forEach(el => el.remove());
+    contentEl.querySelectorAll(':scope > .combat-tools, :scope > .combat-bag-panel, :scope > .combat-log-open').forEach(el => el.remove());
     contentEl.classList.toggle('combat-modal', !!cfg.combat);
     contentEl.classList.toggle('narrative-modal', !cfg.combat && (cfg.desc || '').length > 900);
     contentEl.classList.toggle('character-detail-content', !!cfg.characterDetail);
     contentEl.classList.toggle('wager-modal-content', !!cfg.wagerModal);
-    titleEl.textContent = cfg.title || '';
+    contentEl.classList.toggle('tutorial-modal', !!cfg.tutorialModal);
+    if (cfg.titleHtml) {
+      titleEl.innerHTML = cfg.titleHtml;
+    } else {
+      titleEl.textContent = cfg.title || '';
+    }
     const shouldAnimateDice = !cfg.combat && (
       (cfg.dice && cfg.dice.animate !== false) ||
       (cfg.enemyDice && cfg.enemyDice.animate !== false)
@@ -91,7 +98,7 @@ const RenderModal = {
       const combatScene = { ...cfg.combat, playerDice: cfg.dice || null, enemyDice: cfg.enemyDice || null };
       sceneEl.innerHTML = this._combatSceneHtml(combatScene);
       descEl.before(sceneEl);
-      if (cfg.enemyDice && cfg.enemyDice.animate !== false) {
+      if (cfg.enemyDice && cfg.enemyDice.animate !== false && !cfg.combatAnims) {
         requestAnimationFrame(() => this._animateCombatEnemyDice(sceneEl, cfg.enemyDice));
       }
       const combatBagPanel = sceneEl.querySelector('.combat-bag-panel');
@@ -206,11 +213,16 @@ const RenderModal = {
     const actionHost = combatActionsEl || choicesEl;
     for (const choice of (cfg.choices || [])) {
       const btn = document.createElement('button');
-      btn.className = `choice-btn${choice.danger ? ' danger-choice' : ''}${choice.hint ? ' has-choice-hint' : ''}`;
+      const extraClass = choice.className ? ` ${choice.className}` : '';
+      btn.className = `choice-btn${choice.danger ? ' danger-choice' : ''}${choice.hint ? ' has-choice-hint' : ''}${extraClass}`;
       btn.title = choice.hint ? `${choice.label || ''}\n${choice.hint}` : (choice.label || '');
       const label = document.createElement('span');
       label.className = 'choice-label';
-      label.textContent = choice.label;
+      if (choice.labelHtml) {
+        label.innerHTML = choice.labelHtml;
+      } else {
+        label.textContent = choice.label;
+      }
       btn.appendChild(label);
       if (choice.hint) {
         const hint = document.createElement('span');
@@ -232,12 +244,19 @@ const RenderModal = {
     // Section.
     descEl.classList.toggle('has-combat-log-open', !!(cfg.combat && cfg.combatLog && cfg.combatLog.length > 0));
     if (cfg.combat && cfg.combatLog && cfg.combatLog.length > 0) {
+      this._combatLogParentCfg = cfg;
       const detailBtn = document.createElement('button');
       detailBtn.type = 'button';
       detailBtn.className = 'combat-log-open';
       detailBtn.textContent = '詳細紀錄';
-      detailBtn.addEventListener('click', () => this._openCombatLogModal(cfg));
-      descEl.appendChild(detailBtn);
+      detailBtn.addEventListener('click', event => {
+        event.preventDefault();
+        event.stopPropagation();
+        this._openCombatLogModal(cfg);
+      });
+      contentEl.appendChild(detailBtn);
+    } else {
+      this._combatLogParentCfg = null;
     }
 
     modal.classList.remove('hidden');
@@ -281,8 +300,21 @@ const RenderModal = {
       }
       this._preparePlayerDamageSequence(playerDamageEvents);
       this._prepareIncomingDamageSequence(incomingDamageEvents);
-      setTimeout(() => this._triggerCounterAnims({ ...cfg.combatAnims, playerFollowStepMs }), delay);
+      setTimeout(() => this._triggerCounterAnims({ ...cfg.combatAnims, enemyDice: cfg.enemyDice || null, playerFollowStepMs }), delay);
     }
+  },
+
+  _ensureCombatLogDelegation() {
+    if (this._combatLogDelegationReady) return;
+    this._combatLogDelegationReady = true;
+    document.addEventListener('click', event => {
+      const btn = event.target?.closest?.('.combat-log-open');
+      if (!btn) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const cfg = this._combatLogParentCfg || (typeof G !== 'undefined' ? G.modal : null);
+      if (cfg?.combatLog?.length) this._openCombatLogModal(cfg);
+    }, true);
   },
 
   _deferCombatResultText(descEl, revealMs = 0) {
@@ -290,7 +322,7 @@ const RenderModal = {
     const originalHtml = descEl.innerHTML;
     const token = `${Date.now()}-${Math.random()}`;
     descEl.dataset.combatResultDeferred = token;
-    descEl.innerHTML = '<div class="combat-result-pending">連刺中...</div>';
+      descEl.innerHTML = '<div class="combat-result-pending">攻擊中...</div>';
     setTimeout(() => {
       if (descEl.dataset.combatResultDeferred !== token) return;
       descEl.innerHTML = originalHtml;
@@ -323,36 +355,64 @@ const RenderModal = {
   },
 
   _openCombatLogModal(parentCfg) {
-    const grouped = this._groupCombatLog(parentCfg.combatLog || [], parentCfg.combat || null);
-    const returnCfg = { ...parentCfg, combatAnims: null };
-    const sectionHtml = [
-      ['我方', grouped.player],
-      ['敵方', grouped.enemy],
-      ['其他', grouped.other],
-    ]
-      .filter(([, lines]) => lines.length > 0)
-      .map(([title, lines]) => `
-        <section class="combat-log-section">
-          <h3>${this._escapeHtml(title)}</h3>
-          <div class="combat-log-lines">${lines.map(line => `<div>${this._escapeHtml(line)}</div>`).join('')}</div>
-        </section>
-      `).join('');
-    const detailCfg = {
-      title: '戰鬥詳細紀錄',
-      descHtml: `<div class="combat-log-modal">${sectionHtml || '<div class="combat-log-empty">沒有詳細紀錄。</div>'}</div>`,
-      typeText: false,
-      choices: [
-        {
-          label: '返回戰鬥',
-          action: () => {
-            if (typeof G !== 'undefined') G.modal = returnCfg;
-            this.showModal(returnCfg);
-          },
-        },
-      ],
-    };
-    if (typeof G !== 'undefined') G.modal = detailCfg;
-    this.showModal(detailCfg);
+    try {
+      const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, ch => ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      }[ch]));
+      const grouped = this._groupCombatLog(parentCfg.combatLog || [], parentCfg.combat || null);
+      const sectionHtml = [
+        ['我方', grouped.player],
+        ['敵方', grouped.enemy],
+        ['其他', grouped.other],
+      ]
+        .filter(([, lines]) => lines.length > 0)
+        .map(([title, lines]) => `
+          <section class="combat-log-section">
+            <h3>${escapeHtml(title)}</h3>
+            <div class="combat-log-lines">${lines.map(line => `<div>${escapeHtml(line)}</div>`).join('')}</div>
+          </section>
+        `).join('');
+      this._closeCombatLogOverlay();
+      const overlay = document.createElement('div');
+      overlay.className = 'combat-log-overlay';
+      overlay.innerHTML = `
+        <div class="combat-log-panel" role="dialog" aria-modal="true" aria-label="戰鬥詳細紀錄">
+          <div class="combat-log-panel-head">
+            <h2>戰鬥詳細紀錄</h2>
+            <button type="button" class="combat-log-panel-close" aria-label="關閉">返回戰鬥</button>
+          </div>
+          <div class="combat-log-modal">${sectionHtml || '<div class="combat-log-empty">沒有詳細紀錄。</div>'}</div>
+        </div>
+      `;
+      overlay.addEventListener('click', event => {
+        if (event.target === overlay) this._closeCombatLogOverlay();
+      });
+      overlay.querySelector('.combat-log-panel-close')?.addEventListener('click', () => this._closeCombatLogOverlay());
+      document.body.appendChild(overlay);
+      requestAnimationFrame(() => overlay.classList.add('visible'));
+    } catch (err) {
+      console.error('Failed to open combat log modal', err);
+      const logs = Array.isArray(parentCfg?.combatLog) ? parentCfg.combatLog.map(line => String(line || '')).filter(Boolean) : [];
+      this.showModal({
+        title: '戰鬥詳細紀錄',
+        desc: logs.length ? logs.join('\n') : '沒有詳細紀錄。',
+        typeText: false,
+        choices: [{ label: '返回', action: () => this.showModal({ ...parentCfg, combatAnims: null }) }],
+      });
+    }
+  },
+
+  _closeCombatLogOverlay() {
+    document.querySelectorAll('.combat-log-overlay').forEach(el => el.remove());
+  },
+
+  triggerCombatFollowUp(charId) {
+    const action = this._combatFollowUpActions?.[charId];
+    if (typeof action === 'function') action();
   },
 
   _groupCombatLog(lines = [], combat = null) {
@@ -640,8 +700,117 @@ const RenderModal = {
     badge.title = `格檔 ${block}：會先吸收受到的傷害`;
   },
 
-  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, counterTarget, aoe, enemyBlock }) {
+  _showCombatDamageNumber(targetEl, damage, opts = {}) {
+    if (!targetEl || !Number.isFinite(damage) || damage <= 0) return;
+    const sceneEl = opts.scene || targetEl.closest('.combat-scene');
+    if (!sceneEl) return;
+    const targetRect = targetEl.getBoundingClientRect();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const pop = document.createElement('div');
+    pop.className = `combat-damage-pop ${opts.side === 'ally' ? 'ally' : 'enemy'}`;
+    pop.setAttribute('aria-hidden', 'true');
+    const digits = String(Math.round(damage)).split('');
+    for (const char of digits) {
+      const digit = Number(char);
+      if (!Number.isFinite(digit)) continue;
+      const img = document.createElement('img');
+      img.className = 'combat-damage-digit';
+      img.src = `assets/effects/damage-digits/${digit}.png`;
+      img.alt = '';
+      pop.appendChild(img);
+    }
+    if (!pop.children.length) return;
+    const x = targetRect.left - sceneRect.left + targetRect.width / 2;
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 138);
+    pop.style.left = `${Math.round(x)}px`;
+    pop.style.top = `${Math.round(y)}px`;
+    sceneEl.appendChild(pop);
+    setTimeout(() => pop.remove(), 1220);
+  },
+
+  _showCombatHitEffect(targetEl, effect = '', opts = {}) {
+    if (!targetEl || !effect) return;
+    const sceneEl = opts.scene || targetEl.closest('.combat-scene');
+    if (!sceneEl) return;
+    const targetRect = targetEl.getBoundingClientRect();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
+    const fx = document.createElement('div');
+    fx.className = `combat-hit-effect hit-${effect}`;
+    fx.setAttribute('aria-hidden', 'true');
+    const x = targetRect.left - sceneRect.left + targetRect.width / 2;
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 54 : 128);
+    fx.style.left = `${Math.round(x)}px`;
+    fx.style.top = `${Math.round(y)}px`;
+    if (sourceRect) {
+      const sourceX = sourceRect.left + sourceRect.width / 2;
+      const sourceY = sourceRect.top + sourceRect.height / 2;
+      const targetX = targetRect.left + targetRect.width / 2;
+      const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 128);
+      const angle = Math.atan2(targetY - sourceY, targetX - sourceX) * 180 / Math.PI;
+      fx.style.setProperty('--hit-angle', `${angle}deg`);
+    }
+    sceneEl.appendChild(fx);
+    setTimeout(() => fx.remove(), 760);
+  },
+
+  _showCombatAttackTrail(targetEl, trail = '', opts = {}) {
+    if (!targetEl || !trail || !['pierce', 'slash', 'strike'].includes(trail)) return;
+    const sceneEl = opts.scene || targetEl.closest('.combat-scene');
+    const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
+    if (!sceneEl || !sourceRect) return;
+    const targetRect = targetEl.getBoundingClientRect();
+    const sceneRect = sceneEl.getBoundingClientRect();
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
+    const targetX = targetRect.left + targetRect.width / 2;
+    const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 128);
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const distance = Math.max(120, Math.hypot(dx, dy));
+    const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const fx = document.createElement('div');
+    fx.className = `combat-attack-trail trail-${trail}`;
+    fx.setAttribute('aria-hidden', 'true');
+    if (trail === 'pierce') {
+      fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
+      fx.style.top = `${Math.round(sourceY - sceneRect.top)}px`;
+      fx.style.width = `${Math.round(distance)}px`;
+      fx.style.setProperty('--trail-angle', `${angle}deg`);
+    } else {
+      fx.style.left = `${Math.round(targetX - sceneRect.left)}px`;
+      fx.style.top = `${Math.round(targetY - sceneRect.top)}px`;
+      fx.style.setProperty('--trail-angle', `${sourceX <= targetX ? -32 : 32}deg`);
+    }
+    sceneEl.appendChild(fx);
+    setTimeout(() => fx.remove(), 620);
+  },
+
+  _pulseCombatImpact(sceneEl, damage = 0) {
+    if (!sceneEl) return;
+    const cls = damage >= 8 ? 'combat-impact-heavy' : 'combat-impact-light';
+    sceneEl.classList.remove('combat-impact-light', 'combat-impact-heavy');
+    // Force animation restart when multiple hits land in a row.
+    void sceneEl.offsetWidth;
+    sceneEl.classList.add(cls);
+    setTimeout(() => sceneEl.classList.remove(cls), damage >= 8 ? 280 : 210);
+  },
+
+  _preloadCombatDamageDigits() {
+    if (this._combatDamageDigitsPreloaded) return;
+    this._combatDamageDigitsPreloaded = true;
+    this._combatDamageDigitsImages = Array.from({ length: 10 }, (_, digit) => {
+      const img = new Image();
+      img.src = `assets/effects/damage-digits/${digit}.png`;
+      return img;
+    });
+  },
+
+  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, counterTarget, aoe, enemyBlock, enemyDice = null }) {
+    this._preloadCombatDamageDigits();
     const enemyCard = document.querySelector('.combat-enemy-card');
+    const combatScene = enemyCard?.closest('.combat-scene') || document.querySelector('.combat-scene');
+    const findAllyUnit = charId => combatScene?.querySelector(`.combat-unit.ally[data-char-id="${charId}"]`) || null;
     const damageEvents = Array.isArray(playerDamageEvents) ? playerDamageEvents : [];
     const incomingEvents = Array.isArray(incomingDamageEvents) ? incomingDamageEvents : [];
     const remainingBlocks = guardRemainingBlockByChar && typeof guardRemainingBlockByChar === 'object' ? guardRemainingBlockByChar : null;
@@ -667,9 +836,7 @@ const RenderModal = {
 
     for (let i = 0; i < followHits; i++) {
       setTimeout(() => {
-        const attackerEl = playerAttacker
-          ? document.querySelector(`.combat-unit[data-char-id="${playerAttacker}"]`)
-          : null;
+        const attackerEl = playerAttacker ? findAllyUnit(playerAttacker) : null;
         if (attackerEl) {
           attackerEl.classList.add('anim-lunge');
           setTimeout(() => attackerEl.classList.remove('anim-lunge'), 340);
@@ -677,6 +844,19 @@ const RenderModal = {
         if (enemyCard) {
           setTimeout(() => {
             enemyCard.classList.add('anim-hit');
+            const damageEvent = damageEvents[i];
+            if (damageEvent) {
+              this._pulseCombatImpact(combatScene, damageEvent.damage);
+              const attackTrail = damageEvent.attackTrail || damageEvent.hitEffect;
+              const hitEffect = damageEvent.hitEffect || '';
+              const layeredWeaponHit = ['slash', 'strike', 'pierce'].includes(attackTrail);
+              const visualHitEffect = hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect;
+              this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
+              if (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail) {
+                this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
+              }
+              this._showCombatDamageNumber(enemyCard, damageEvent.damage, { side: 'enemy', scene: combatScene });
+            }
             setTimeout(() => enemyCard.classList.remove('anim-hit'), 300);
           }, 120);
         }
@@ -697,27 +877,42 @@ const RenderModal = {
     }
 
     const attackDelay = followDelay + (enemyBlock ? 220 : 0);
-    if ((counterTarget || aoe) && enemyCard) {
+    const hasEnemyAttack = !!(counterTarget || aoe);
+    const enemyDiceWindup = hasEnemyAttack && enemyDice && enemyDice.animate !== false ? 760 : 0;
+    if (enemyDiceWindup && enemyCard) {
+      setTimeout(() => {
+        this._animateCombatEnemyDice(enemyCard.closest('.combat-scene'), enemyDice);
+      }, attackDelay);
+    }
+    const enemyHitDelay = attackDelay + enemyDiceWindup;
+    if (hasEnemyAttack && enemyCard) {
       setTimeout(() => {
         enemyCard.classList.add('anim-pulse-left');
         setTimeout(() => enemyCard.classList.remove('anim-pulse-left'), 400);
-      }, attackDelay);
+      }, enemyHitDelay);
     }
 
     // Section.
     setTimeout(() => {
       if (aoe) {
-        document.querySelectorAll('.combat-unit.ally').forEach(el => {
+        combatScene?.querySelectorAll('.combat-unit.ally').forEach(el => {
           el.classList.add('anim-hit');
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         });
         for (const event of incomingEvents) {
-          if (event?.targetId && Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
+          if (!event?.targetId) continue;
+          const targetEl = findAllyUnit(event.targetId);
+          if (targetEl) this._pulseCombatImpact(combatScene, event.damage);
+          if (targetEl) this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene });
+          if (Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
         }
       } else if (counterTarget) {
-        const el = document.querySelector(`.combat-unit[data-char-id="${counterTarget}"]`);
+        const el = findAllyUnit(counterTarget);
         if (el) {
           el.classList.add('anim-hit');
+          const event = incomingEvents.find(item => item?.targetId === counterTarget);
+          if (event) this._pulseCombatImpact(combatScene, event.damage);
+          if (event) this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene });
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         }
         const event = incomingEvents.find(item => item?.targetId === counterTarget);
@@ -728,7 +923,7 @@ const RenderModal = {
           Object.entries(remainingBlocks).forEach(([charId, block]) => this._setDisplayedAllyBlock(charId, block));
         }, 120);
       }
-    }, attackDelay + 270);
+    }, enemyHitDelay + 270);
   },
 
   _combatSceneHtml(combat) {
@@ -749,6 +944,10 @@ const RenderModal = {
     const selectable = !!combat.selectable;
     const itemTargeting = !!combat.itemTargeting;
     const guardTargeting = !!combat.guardTargeting;
+    if (combat.onFollowUpTarget && combat.followUpTargetId) {
+      if (!this._combatFollowUpActions) this._combatFollowUpActions = {};
+      this._combatFollowUpActions[combat.followUpTargetId] = combat.onFollowUpTarget;
+    }
 
     let squadHtml = combat.squad.map(char => {
       const cls = CHARACTER_CLASSES[char.cls];
@@ -756,8 +955,9 @@ const RenderModal = {
       const hpClass = hpPct <= 25 ? 'critical' : hpPct <= 50 ? 'low' : '';
       const isActive = combat.attackerId === char.id;
       const isDown = char.hp <= 0;
+      const isFollowUpTarget = combat.followUpTargetId === char.id && !isDown;
       const showPlayerDice = combat.playerDice && combat.attackerId === char.id;
-      const canClick = (selectable || itemTargeting || guardTargeting) && !isDown;
+      const canClick = (selectable || itemTargeting || guardTargeting || isFollowUpTarget) && !isDown;
       const isIntentTarget = this._combatShouldShowIntentArrow(combat) && combat.intent?.targetId === char.id;
       const threat = char.threat || 0;
       const wagerFaces = Array.isArray(char.wagerDiceFaces) ? char.wagerDiceFaces : [];
@@ -827,11 +1027,14 @@ const RenderModal = {
         ? `onclick="Game.selectCombatGuardTarget('${char.id}')"`
         : itemTargeting && !isDown
         ? `onclick="Game.useCombatInventoryItemOnTarget('${char.id}')"`
+        : isFollowUpTarget
+        ? `onclick="Render.triggerCombatFollowUp('${char.id}')"`
         : (selectable && !isDown ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
       const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
       return `
-        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
+        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${isFollowUpTarget ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
           data-char-id="${char.id}" ${clickAttr}>
+          ${isFollowUpTarget ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           <div class="combat-unit-main">
             <span class="combat-sprite">${cls.icon}</span>
@@ -881,7 +1084,7 @@ const RenderModal = {
           const blocked = item.useType === 'roll_mod' && combat.rollItemBlocked;
           const countText = entry.count > 1 ? ` x${entry.count}` : '';
           return `<button class="combat-bag-item" ${blocked ? 'disabled' : ''} onclick="Game.selectCombatBagItem(${entry.index})">
-            <span>${item.icon} ${item.name}${countText}</span>
+            <span>${EquipmentIcon.label(item, 'equipment-inline-icon item-combat-icon')}${countText}</span>
             <small>${blocked ? '本次攻擊已使用擲骰道具' : item.desc}</small>
           </button>`;
         }).join('') : '<div class="combat-bag-empty">背包沒有可在戰鬥中使用的道具</div>'}
@@ -1232,10 +1435,10 @@ const RenderModal = {
     const rows = [];
     rows.push(`<div class="cct-name">${cls.icon} ${char.name}（${cls.name}）</div>`);
     rows.push(`<div class="cct-row"><span class="cct-label">被動</span>${cls.passiveDesc}</div>`);
-    if (char.weapon) rows.push(`<div class="cct-row"><span class="cct-label">武器</span>${char.weapon.icon} ${char.weapon.name}：${char.weapon.desc}</div>`);
-    if (char.gear)   rows.push(`<div class="cct-row"><span class="cct-label">裝備</span>${char.gear.icon} ${char.gear.name}：${char.gear.desc}</div>`);
-    if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${char.relic.icon} ${char.relic.name}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.relic, false) : char.relic.desc}</div>`);
-    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>✨ ${char.fusedRelic.icon} ${char.fusedRelic.name}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.fusedRelic, true) : char.fusedRelic.desc}</div>`);
+    if (char.weapon) rows.push(`<div class="cct-row"><span class="cct-label">武器</span>${EquipmentIcon.label(char.weapon, 'equipment-inline-icon weapon-tooltip-icon')}：${char.weapon.desc}</div>`);
+    if (char.gear)   rows.push(`<div class="cct-row"><span class="cct-label">裝備</span>${EquipmentIcon.label(char.gear, 'equipment-inline-icon gear-tooltip-icon')}：${char.gear.desc}</div>`);
+    if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.relic, false) : char.relic.desc}</div>`);
+    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>✨ ${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.fusedRelic, true) : char.fusedRelic.desc}</div>`);
     const resonances = (G.activeResonances || []).filter(res => res.isBody && res.bodyChar?.id === char.id);
     for (const res of resonances) {
       rows.push(`<div class="cct-row"><span class="cct-label">共鳴</span>${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}</div>`);

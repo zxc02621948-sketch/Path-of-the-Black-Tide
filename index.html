@@ -15,7 +15,17 @@
   <meta name="twitter:image" content="assets/site-thumbnail.png">
   <link rel="icon" type="image/png" href="assets/site-thumbnail.png">
   <link rel="apple-touch-icon" href="assets/site-thumbnail.png">
-<link rel="stylesheet" href="style.css?v=squad-card-support-emblem1">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/0.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/1.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/2.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/3.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/4.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/5.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/6.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
+  <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
+<link rel="stylesheet" href="style.css?v=relic-assign-hover1">
 </head>
 <body>
 <div id="app">
@@ -30,7 +40,7 @@
           <img src="assets/title-logo.svg" alt="黑夜邊境">
         </h1>
         <p class="game-subtitle">
-          帶領小隊穿越黑霧邊界，在白日探索、救援、蒐集聖物；當第 10 天黑夜降臨，每一次移動都會付出代價。
+          帶領小隊穿越黑霧邊界，在白日探索、救援、蒐集聖物；當第 10 天黑夜降臨，黑暗化身會開始追獵。
         </p>
         <div class="start-actions">
           <button id="btn-new-game" class="btn-primary">開始探索</button>
@@ -45,7 +55,7 @@
         </div>
         <div class="brief-item">
           <span class="brief-num">10</span>
-          <span><b>黑夜降臨</b>黑暗化身開始追獵，每一步都可能流血。</span>
+          <span><b>黑夜降臨</b>黑暗化身開始追獵，倒數歸零或追上小隊就會開戰。</span>
         </div>
         <div class="brief-item">
           <span class="brief-num">20</span>
@@ -182,46 +192,48 @@
 </div><!-- /#app -->
 
 <!-- Scripts（順序不可改） -->
-<script src="js/config.js?v=supply-gear1"></script>
-<script src="js/data/equipment.js?v=dagger-weakness-flaw1"></script>
+<script src="js/config.js?v=map-opening-balance1"></script>
+<script src="js/data/equipment.js?v=item-icons1"></script>
 <script src="js/data/characters.js?v=scholar-odd-flaw2"></script>
-<script src="js/data/relics.js?v=banner-support-text1"></script>
-<script src="js/data/enemies.js?v=rot-knight-large1"></script>
-<script src="js/data/events.js?v=shadow-note-once1"></script>
+<script src="js/data/relics.js?v=eagle-feather-icon2"></script>
+<script src="js/data/enemies.js?v=dark-gift1"></script>
+<script src="js/data/events.js?v=trap-tiers2"></script>
 <script src="js/data/resonances.js?v=banner-warcry-round1"></script>
 <script src="js/core/dice.js?v=rulesnotes2"></script>
-<script src="js/core/map.js?v=one-visible-altar1"></script>
+<script src="js/core/map.js?v=map-opening-balance1"></script>
 <script src="js/core/combat-status.js?v=banner-warcry-round1"></script>
 <script src="js/core/enemy-abilities.js?v=cage-execution1"></script>
 <script src="js/core/weakness-effects.js?v=dark-avatar-weaken1"></script>
-<script src="js/core/combat.js?v=banner-warcry-round1"></script>
+<script src="js/core/combat.js?v=attack-trails1"></script>
 <script src="js/core/relic-rules.js?v=pain-mask-desc1"></script>
 <script src="js/core/equipment-rules.js?v=rulesnotes2"></script>
 <script src="js/core/terrain-rules.js?v=rulesnotes2"></script>
-<script src="js/core/game.js?v=initial-log-trim1"></script>
+<script src="js/core/game.js?v=relic-info-before-assign1"></script>
 <script src="js/core/inventory.js?v=relic-replace-drop1"></script>
-<script src="js/core/character-details.js?v=rapier-resonance1"></script>
-<script src="js/core/dice-flow.js?v=dice-corruptor1"></script>
+<script src="js/ui/icon-render.js?v=weapon-icons1"></script>
+<script src="js/core/character-details.js?v=relic-title-icons1"></script>
+<script src="js/core/dice-flow.js?v=dark-gift1"></script>
 <script src="js/core/relic-resonance.js?v=banner-warcry-round1"></script>
-<script src="js/core/game-state.js?v=night-relic-pool-fallback1"></script>
-  <script src="js/core/combat-flow.js?v=banner-support-text1"></script>
-  <script src="js/core/combat-victory-flow.js?v=night-relic-pool-fallback1"></script>
+<script src="js/core/game-state.js?v=library-relic-icons1"></script>
+  <script src="js/core/combat-flow.js?v=bow-followup-card2"></script>
+  <script src="js/core/combat-victory-flow.js?v=victory-anim-wait1"></script>
   <script src="js/core/combat-tooltips.js?v=enemy-info-no-block1"></script>
   <script src="js/core/combat-inventory-flow.js?v=combat-single-guard1"></script>
   <script src="js/core/combat-threat.js?v=dice-corruptor1"></script>
-  <script src="js/core/combat-retreat.js?v=remove-old-boss1"></script>
+  <script src="js/core/combat-retreat.js?v=dark-gift1"></script>
 <script src="js/core/site-actions.js?v=altar-choice-hints1"></script>
-<script src="js/core/echo-sites.js?v=echo-reserve-on-trigger1"></script>
-<script src="js/core/event-handlers.js?v=echo-reserve-on-trigger1"></script>
-  <script src="js/core/event-treasure.js?v=relic-replace-drop1"></script>
+<script src="js/core/echo-sites.js?v=victory-anim-wait1"></script>
+<script src="js/core/event-handlers.js?v=relic-assign-lean1"></script>
+  <script src="js/core/event-treasure.js?v=dark-gift1"></script>
 <script src="js/core/event-encounters.js?v=supply-heal-detail1"></script>
-<script src="js/core/event-traps.js?v=split-events1"></script>
+<script src="js/core/event-traps.js?v=trap-tiers1"></script>
 <script src="js/core/event-notes.js?v=altar-clue-fallback1"></script>
 <script src="js/core/dark-monsters.js?v=dark-avatar-no-stack1"></script>
-<script src="js/core/dev-tool.js?v=dev-altar-start1"></script>
-<script src="js/ui/render.js?v=scholar-odd-flaw2"></script>
-<script src="js/ui/modal-render.js?v=enemy-dice-card-corner1"></script>
-<script src="js/ui/notes-render.js?v=banner-support-text1"></script>
-<script src="js/main.js?v=library-default-unlocked1"></script>
+<script src="js/core/dev-tool.js?v=relic-choice-icons1"></script>
+<script src="js/ui/render.js?v=relic-icons1"></script>
+<script src="js/ui/modal-render.js?v=bow-followup-card1"></script>
+<script src="js/ui/notes-render.js?v=notes-scroll-top1"></script>
+<script src="js/ui/tutorial-render.js?v=tutorial-skip2"></script>
+<script src="js/main.js?v=library-relic-icons1"></script>
 </body>
 </html>

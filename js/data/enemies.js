@@ -232,6 +232,27 @@ const ENEMIES = [
   },
 
   {
+    id: 'dark_gift_mimic',
+    name: '黑匣擬態',
+    icon: '◈',
+    desc: '黑暗贈禮寶箱裡蜷伏的怪物。它的鎖孔每次遭遇都會換一個原生弱點，若以天然骰面命中原生弱點，箱體會直接開啟。',
+    hp: 42,
+    block: 6,
+    attack: 4,
+    weakness: 1,
+    weaknessEffect: { type: 'fear', desc: '鎖孔鬆動，此擊無視格檔' },
+    nightOnly: false,
+    boss: true,
+    darkGiftMimic: true,
+    lore: '它不是寶箱被怪物占據，而是黑暗學會了偽裝成獎賞。',
+    intents: [
+      { type: 'block',        weight: 2 },
+      { type: 'block_attack', weight: 2 },
+      { type: 'attack',       weight: 3 },
+    ],
+  },
+
+  {
     id: 'echo_guardian_wound',
     name: '痛痕守護者',
     icon: '🩸',
@@ -488,6 +509,13 @@ function getRescueBossEnemy() {
 function getTreasureMimicEnemy() {
   const mimic = ENEMIES.find(e => e.treasureMimic);
   return mimic ? { ...mimic } : randomEnemy(false);
+}
+
+function getDarkGiftMimicEnemy() {
+  const mimic = ENEMIES.find(e => e.darkGiftMimic);
+  const enemy = mimic ? { ...mimic } : getTreasureMimicEnemy();
+  enemy.weakness = Dice.rollRaw();
+  return enemy;
 }
 
 function getEchoGuardianEnemy(systemId) {

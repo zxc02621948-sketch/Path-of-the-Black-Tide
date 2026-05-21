@@ -6,7 +6,7 @@ const GameCombatRetreat = {
     if (!combat || !enemy) return false;
     if (enemy.darkMonster || enemy.boss || enemy.rescueBoss || enemy.noRetreat || enemy.tier === 'strong') return false;
     if (combat.source === 'darkMonsterPassive' || combat.source === 'darkMonsterActive') return false;
-    if (['rescue', 'treasure_mimic'].includes(combat.reward)) return false;
+    if (['rescue', 'treasure_mimic', 'dark_gift_mimic'].includes(combat.reward)) return false;
     return true;
   },
 

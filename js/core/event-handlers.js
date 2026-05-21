@@ -114,6 +114,7 @@ const GameEventHandlers = {
   _dispatchTerrainEvent(cell, ev) {
     cell.cleared = true;
     if (ev.id === 'empty_darkness_seep') { this._triggerDarknessSeep(cell, ev); return; }
+    if (ev.id === 'empty_dark_whisper') { this._triggerDarkWhisper(cell, ev); return; }
     if (ev.id === 'empty_old_camp') { this._triggerOldCamp(cell, ev); return; }
     if (ev.id === 'cave_starlight_shard') { this._triggerCaveStarlightShard(ev); return; }
     if (ev.choiceTrap) { this._triggerChoiceTrap(cell, ev); return; }
@@ -143,7 +144,48 @@ const GameEventHandlers = {
       ...G,
       squadHasRelic: relicId => this._squadHasRelic(relicId),
       relicIdInRun: relicId => this._getRelicIdsInRun().has(relicId),
+      canRevealAltarClue: () => this._canRevealAltarClue(),
+      canRevealRescueBoss: () => this._canRevealRescueBoss(),
+      canFindEventRelic: () => this._canFindEventRelic(),
+      canPlaceTreasureChest: () => this._canPlaceTreasureChest(),
     });
+  },
+
+  _canRevealAltarClue() {
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (cell?.hiddenSite?.type === 'altar') return true;
+        if (cell?.type === 'altar' && cell.altarHidden) return true;
+      }
+    }
+    return false;
+  },
+
+  _canRevealRescueBoss() {
+    if (!this._needsRescue()) return false;
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (cell?.hiddenSite?.type === 'rescue') return true;
+        if (cell?.content?.reward === 'rescue' && !cell.cleared && !cell.rescueRevealed) return true;
+      }
+    }
+    return false;
+  },
+
+  _canFindEventRelic() {
+    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase());
+    return pool.length > 0;
+  },
+
+  _canPlaceTreasureChest() {
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared || cell.reserved) continue;
+        if (cell.x === G.playerX && cell.y === G.playerY) continue;
+        return true;
+      }
+    }
+    return false;
   },
 
   _isEchoSiteClueStillValid(ev) {
@@ -220,20 +262,73 @@ const GameEventHandlers = {
   },
 
   _openEventRelicChoiceModal(cell, ev, relicChoices) {
+    G.eventRelicChoiceContext = { cell, ev, relicChoices };
     this._openModal({
       title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n你們找到兩件殘留聖物，只能帶走其中一件。`,
-      choices: relicChoices.map(relic => ({
-        label: `查看「${relic.name}」`,
-        action: () => this._previewEventRelicChoice(cell, ev, relicChoices, relic),
-      })).concat([{ label: '全部放棄', action: () => { this._completeProgressEvent(ev); this._closeModal(); Render.fullRender(); } }]),
+      descHtml: `
+        <div class="event-relic-choice-intro">
+          <p>${this._escapeEventHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}</p>
+          <p>你們找到兩件殘留聖物，只能帶走其中一件。</p>
+        </div>
+        <div class="event-relic-choice-grid">
+          ${relicChoices.map((relic, index) => this._eventRelicChoiceCardHtml(relic, index)).join('')}
+        </div>
+      `,
+      typeText: false,
+      choices: [{ label: '全部放棄', action: () => { G.eventRelicChoiceContext = null; this._completeProgressEvent(ev); this._closeModal(); Render.fullRender(); } }],
     });
+  },
+
+  _eventRelicChoiceCardHtml(relic, index) {
+    const lore = this._getFirstLore(relic.id);
+    const shortDesc = this._shortEventRelicDesc(relic.desc || '');
+    const visual = relic.iconImage
+      ? `<img class="event-relic-choice-img" src="${this._escapeEventAttr(relic.iconImage)}" alt="">`
+      : `<span class="event-relic-choice-emoji">${this._escapeEventHtml(relic.icon || '◆')}</span>`;
+    return `
+      <button type="button" class="event-relic-choice" onclick="Game.chooseEventRelicChoice(${index})">
+        <span class="event-relic-choice-visual">${visual}</span>
+        <span class="event-relic-choice-body">
+          <span class="event-relic-choice-kicker">帶走這件聖物</span>
+          <span class="event-relic-choice-name">${this._escapeEventHtml(relic.name || '未知聖物')}</span>
+          <span class="event-relic-choice-desc">${this._escapeEventHtml(shortDesc)}</span>
+          ${lore ? `<span class="event-relic-choice-lore">「${this._escapeEventHtml(this._shortEventRelicDesc(lore, 32))}」</span>` : ''}
+        </span>
+      </button>
+    `;
+  },
+
+  chooseEventRelicChoice(index) {
+    const ctx = G.eventRelicChoiceContext;
+    const relic = ctx?.relicChoices?.[index];
+    if (!ctx || !relic) return;
+    this._claimEventRelicChoice(ctx.cell, ctx.ev, relic);
+  },
+
+  _shortEventRelicDesc(text, limit = 48) {
+    const clean = String(text || '').replace(/\s+/g, ' ').trim();
+    return clean.length > limit ? `${clean.slice(0, limit)}…` : clean;
+  },
+
+  _escapeEventHtml(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  },
+
+  _escapeEventAttr(value) {
+    return this._escapeEventHtml(value).replace(/`/g, '&#96;');
   },
 
   _previewEventRelicChoice(cell, ev, relicChoices, relic) {
     const lore = this._getFirstLore(relic.id);
     this._openModal({
-      title: `${relic.icon} ${relic.name}`,
+      title: relic.name,
+      titleHtml: EquipmentIcon.label(relic, 'equipment-inline-icon relic-detail-icon'),
       desc: `效果：${relic.desc}${lore ? `\n\n「${lore}」` : ''}`,
       choices: [
         { label: `拿取「${relic.name}」`, action: () => this._claimEventRelicChoice(cell, ev, relic) },

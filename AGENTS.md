@@ -23,6 +23,14 @@ This project contains a lot of Traditional Chinese player-facing text. Treat tex
 - Internal identifiers may remain English, for example `tempWeakness`, if changing them would risk logic regressions.
 - Avoid duplicate fields such as two `name` or `desc` properties in one object.
 
+## Judgment Before Execution
+
+- Do not follow user requests mechanically when the requested asset, implementation, wording, or direction appears questionable.
+- Before using a provided image or asset, consider whether it fits the current purpose, including small-icon readability, visual style consistency, background-removal risk, color mood, and connection to the item or mechanic.
+- If something seems unsuitable, risky, inconsistent, or likely to create poor results, explain the concern before applying it.
+- If something is usable but has tradeoffs, state the tradeoffs clearly and recommend the best path.
+- The user remains the final decision maker, but the assistant should act as a thoughtful production partner rather than only an execution tool.
+
 ## Work Modes And Search Scope
 
 Choose the lightest workflow that fits the user's request. Do not treat every task like a fresh codebase audit.

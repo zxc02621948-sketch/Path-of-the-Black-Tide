@@ -16,11 +16,12 @@ const RenderNotes = {
     const tabs = document.createElement('div');
     tabs.className = 'notes-tabs';
 
-    const relicTab = this._createNotesTab('聖物筆記', true);
+    const guideTab = this._createNotesTab('遊玩指南', true);
+    const relicTab = this._createNotesTab('聖物筆記');
     const terrainTab = this._createNotesTab('地形情報');
     const equipmentTab = this._createNotesTab('武器裝備');
     const rulesTab = this._createNotesTab('規則索引');
-    tabs.append(relicTab, terrainTab, equipmentTab, rulesTab);
+    tabs.append(guideTab, relicTab, terrainTab, equipmentTab, rulesTab);
     content.appendChild(tabs);
 
     const area = document.createElement('div');
@@ -28,18 +29,20 @@ const RenderNotes = {
     content.appendChild(area);
 
     const showTab = (activeTab, render) => {
-      for (const tab of [relicTab, terrainTab, equipmentTab, rulesTab]) {
+      for (const tab of [guideTab, relicTab, terrainTab, equipmentTab, rulesTab]) {
         tab.classList.toggle('active', tab === activeTab);
       }
       area.innerHTML = '';
       render.call(this, area);
+      this._resetNotesScroll(modal, content, area);
     };
 
+    guideTab.addEventListener('click', () => showTab(guideTab, this.renderGuideNotes));
     relicTab.addEventListener('click', () => showTab(relicTab, this._renderRelicNotesGrid));
     terrainTab.addEventListener('click', () => showTab(terrainTab, this._renderTerrainNotes));
     equipmentTab.addEventListener('click', () => showTab(equipmentTab, this._renderEquipmentNotes));
     rulesTab.addEventListener('click', () => showTab(rulesTab, this._renderRulesNotes));
-    showTab(relicTab, this._renderRelicNotesGrid);
+    showTab(guideTab, this.renderGuideNotes);
 
     const libraryRelics = (G.library || []).filter(relic => relic?.effect?.type !== 'unlock_library');
     if (G.libraryUnlocked && libraryRelics.length > 0) {
@@ -50,13 +53,22 @@ const RenderNotes = {
         const display = this._relicDisplay(relic);
         const item = document.createElement('div');
         item.className = 'library-relic';
-        item.innerHTML = `${display.icon} <span class="relic-name">${display.name}</span> <span class="relic-holder">${display.desc}</span>`;
+        item.innerHTML = `${display.iconHtml || display.icon} <span class="relic-name">${display.name}</span> <span class="relic-holder">${display.desc}</span>`;
         libSection.appendChild(item);
       }
       content.appendChild(libSection);
     }
 
     modal.classList.remove('hidden');
+    this._resetNotesScroll(modal, content, area);
+  },
+
+  _resetNotesScroll(...elements) {
+    requestAnimationFrame(() => {
+      for (const el of elements) {
+        if (el) el.scrollTop = 0;
+      }
+    });
   },
 
   _createNotesTab(label, active = false) {
@@ -98,7 +110,7 @@ const RenderNotes = {
         entry.className = 'equipment-note-entry';
         entry.innerHTML = `
           <div class="equipment-note-head">
-            <span class="equipment-note-icon">${display.icon}</span>
+            <span class="equipment-note-icon">${display.iconHtml || display.icon}</span>
             <span class="equipment-note-name">${display.name}</span>
             ${tags.map(tag => `<span class="equipment-note-tag">${tag}</span>`).join('')}
           </div>
@@ -247,7 +259,7 @@ const RenderNotes = {
       const item = document.createElement('div');
       item.className = `relic-note-icon${isUnlocked ? '' : ' locked'}`;
       item.innerHTML = `
-        <span class="relic-note-emoji">${isUnlocked ? display.icon : '?'}</span>
+        <span class="relic-note-emoji">${isUnlocked ? (display.iconHtml || display.icon) : '?'}</span>
         <span class="relic-note-name">${isUnlocked ? display.name : '未知聖物'}</span>
         <span class="relic-note-count">${isUnlocked ? `${unlocked.length}/${total}` : '0/?'}</span>
       `;
@@ -279,7 +291,7 @@ const RenderNotes = {
       item.type = 'button';
       item.className = 'relic-note-icon resonance-note-icon';
       item.innerHTML = `
-        <span class="relic-note-emoji">${relicDisplays.map(display => display.icon).join('')}</span>
+        <span class="relic-note-emoji">${relicDisplays.map(display => display.iconHtml || display.icon).join('')}</span>
         <span class="relic-note-name">${res.name}</span>
       `;
       item.addEventListener('click', () => {
@@ -333,7 +345,7 @@ const RenderNotes = {
       item.className = 'resonance-relic-card';
       item.innerHTML = `
         <div class="resonance-relic-head">
-          <span class="equipment-note-icon">${display.icon}</span>
+          <span class="equipment-note-icon">${display.iconHtml || display.icon}</span>
           <span class="equipment-note-name">${display.name}</span>
           <span class="equipment-note-tag">${entry.slot}</span>
         </div>
@@ -434,7 +446,7 @@ const RenderNotes = {
 
     const title = document.createElement('div');
     title.className = 'relic-lore-title';
-    title.textContent = isUnlocked ? `${display.icon} ${display.name}` : '? 未知聖物';
+    title.innerHTML = isUnlocked ? `${display.iconHtml || display.icon} ${display.name}` : '? 未知聖物';
     container.appendChild(title);
 
     if (isUnlocked) {
@@ -650,6 +662,7 @@ const RenderNotes = {
     return {
       name: data.name || relic.name || relic.id || '未知聖物',
       icon: data.icon || relic.icon || '◆',
+      iconHtml: EquipmentIcon.html({ ...relic, icon: data.icon || relic.icon || '◆' }, 'equipment-inline-icon relic-inline-icon'),
       desc: relic.desc || data.desc || '尚無說明。',
       fusedDesc: (typeof relicFusionDesc === 'function' ? relicFusionDesc(relic) : '') || data.fusedDesc || (relic.fusedEffect ? '融合後效果已套用。' : ''),
       lore: relic.lore || data.lore || [],
@@ -668,14 +681,15 @@ const RenderNotes = {
       sword_plus: ['裁衡劍', '⚔️', '主戰時，最終骰面 1-3 傷害 +2；4 以上傷害 +4。'],
       bow_plus: ['逐星弓', '🏹', '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。'],
       dagger_plus: ['影牙匕首', '🗡️', '主戰時，命中弱點與破綻時額外 +2 傷害；未命中任何弱點或破綻時，額外造成等同最終骰面的傷害。'],
-      battle_drum_plus: ['進階戰鼓', '🥁', '主戰攻擊後，接下來 3 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
-      healing_staff_plus: ['進階祈癒杖', '+', '主戰時，本次攻擊無視敵人格檔。命中原生弱點時，全隊恢復 2 HP。'],
+      battle_drum_plus: ['星盤戰鼓', '🥁', '主戰攻擊後，接下來 3 次我方主戰攻擊 +1 攻擊。持鼓者主戰時，骰面附加傷害減半。'],
+      healing_staff_plus: ['晨星祈杖', '+', '主戰時，本次攻擊無視敵人格檔。命中原生弱點時，全隊恢復 2 HP。'],
       soul_cutter_katana: ['斷魂太刀', '⚔️', '主戰造成傷害時施加 1 層傷口；命中 8 層以上傷口敵人時本次傷害 +3；若本次攻擊觸發傷口引爆，額外造成 10 點固定傷害。'],
     };
     const data = overrides[weapon.id] || [];
     return {
       name: data[0] || weapon.name || weapon.id || '未知武器',
       icon: data[1] || weapon.icon || '◆',
+      iconHtml: EquipmentIcon.html({ ...weapon, icon: data[1] || weapon.icon || '◆' }, 'equipment-note-img weapon-note-icon'),
       desc: data[2] || weapon.desc || '尚無說明。',
     };
   },
@@ -700,6 +714,7 @@ const RenderNotes = {
     return {
       name: data[0] || gear.name || gear.id || '未知裝備',
       icon: data[1] || gear.icon || '◆',
+      iconHtml: EquipmentIcon.html({ ...gear, icon: data[1] || gear.icon || '◆' }, 'equipment-note-img gear-note-icon'),
       desc: data[2] || gear.desc || '尚無說明。',
     };
   },
@@ -707,6 +722,7 @@ const RenderNotes = {
   _itemDisplay(item = {}) {
     const overrides = {
       herb_pack: ['草藥包', '🌿', '立即使用，恢復目標 30% 最大生命；輔助使用時恢復 40%。'],
+      wish_chest: ['祈願寶箱', '🎁', '使用後可選擇休整、聖物、裝備、武器升級或黎明祈願。'],
       whetstone: ['磨刀石', '🪨', '本場戰鬥主戰攻擊 +1。'],
       leather_patch: ['皮革補片', '🧩', '本場戰鬥受到的傷害 -1。'],
       bone_dice: ['骨骰', '🎲', '下一次骰子判定重骰，保留較高結果。'],
@@ -716,6 +732,7 @@ const RenderNotes = {
     return {
       name: data[0] || item.name || item.id || '未知道具',
       icon: data[1] || item.icon || '◆',
+      iconHtml: EquipmentIcon.html({ ...item, icon: data[1] || item.icon || '◆' }, 'equipment-note-img item-note-icon'),
       desc: data[2] || item.desc || '尚無說明。',
     };
   },

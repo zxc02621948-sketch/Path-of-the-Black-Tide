@@ -112,6 +112,8 @@ const MapGen = {
       }
     }
 
+    this._ensureOpeningArea(grid, cx, cy);
+
     // Initial reveal is handled by game.js.
     return grid;
   },
@@ -164,6 +166,65 @@ const MapGen = {
       }
     }
     return candidates.slice(0, count);
+  },
+
+  _ensureOpeningArea(grid, cx, cy) {
+    const opening = [];
+    for (let y = 0; y < grid.length; y++) {
+      for (let x = 0; x < grid[y].length; x++) {
+        if (x === cx && y === cy) continue;
+        const dist = this.distance(x, y, cx, cy);
+        if (dist >= 1 && dist <= 2) opening.push(grid[y][x]);
+      }
+    }
+    const isInteractive = cell => ['forest', 'ruins', 'cave', 'enemy', 'rest'].includes(cell.type) || !!cell.content?.eventPending;
+    const terrainTypes = new Set(opening.filter(cell => ['forest', 'ruins', 'cave'].includes(cell.type)).map(cell => cell.type));
+    const interactiveCount = opening.filter(isInteractive).length;
+    if (interactiveCount >= 3 && terrainTypes.size >= 2) return;
+
+    const desiredTerrains = ['forest', 'ruins', 'cave'].filter(type => !terrainTypes.has(type));
+    const targetEmpty = opening.filter(cell => cell.type === 'empty' && !cell.content && !cell.hiddenSite);
+    let targetIndex = 0;
+
+    const swapIntoOpening = sourceCell => {
+      const target = targetEmpty[targetIndex++];
+      if (!target || !sourceCell) return false;
+      const sourceType = sourceCell.type;
+      const sourceContent = sourceCell.content || null;
+      const sourceHiddenSite = sourceCell.hiddenSite || null;
+      sourceCell.type = target.type;
+      sourceCell.content = target.content || null;
+      sourceCell.hiddenSite = target.hiddenSite || null;
+      target.type = sourceType;
+      target.content = sourceContent;
+      target.hiddenSite = sourceHiddenSite;
+      return true;
+    };
+
+    for (const type of desiredTerrains) {
+      const source = this._findOpeningSwapSource(grid, opening, cell => cell.type === type);
+      swapIntoOpening(source);
+    }
+
+    while (opening.filter(isInteractive).length < 3) {
+      const source = this._findOpeningSwapSource(grid, opening, isInteractive);
+      if (!swapIntoOpening(source)) break;
+    }
+  },
+
+  _findOpeningSwapSource(grid, opening, predicate) {
+    const openingSet = new Set(opening);
+    const candidates = [];
+    for (const row of grid) {
+      for (const cell of row) {
+        if (openingSet.has(cell)) continue;
+        if (cell.revealed || cell.reserved) continue;
+        if (cell.hiddenSite) continue;
+        if (predicate(cell)) candidates.push(cell);
+      }
+    }
+    this._shuffle(candidates);
+    return candidates[0] || null;
   },
 
   distance(x1, y1, x2, y2) {

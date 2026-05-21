@@ -351,7 +351,7 @@ const Render = {
     if (cell.content?.reward === 'rescue') return '🗝️';
     if (cell.content?.reward === 'echo_site') return '◆';
     if (cell.type === 'enemy')  return '⚔️';
-    if (cell.type === 'chest')  return '🧰';
+    if (cell.type === 'chest')  return cell.content?.chestKind === 'dark_gift' ? '◈' : '🧰';
     if (cell.type === 'relic')  return '💎';
     if (cell.type === 'rest')   return G.phase === 'night' ? '🔥' : '';
     if (cell.type === 'altar')  return '';
@@ -397,7 +397,7 @@ const Render = {
     if (cell.content?.reward === 'rescue') return '救援頭目，擊敗後可解救角色';
     if (cell.content?.reward === 'echo_site') return `${cell.content?.echoSiteName || '共鳴遺址'}，擊敗守護者可獲得${cell.content?.echoSystemName || '共鳴'}聖物`;
     if (cell.type === 'enemy') return '敵人';
-    if (cell.type === 'chest') return '寶箱';
+    if (cell.type === 'chest') return cell.content?.chestKind === 'dark_gift' ? '黑暗贈禮' : '寶箱';
     if (cell.type === 'relic') return '聖物';
     if (cell.type === 'rest')  return G.phase === 'night' ? '殘火點，可治療或點燃火把' : '休息點，回血';
     if (cell.type === 'altar' && cell.visited) return '神壇，血祭 / 融合';
@@ -524,21 +524,21 @@ const Render = {
         if (!char.relic && !char.fusedRelic) return `<span class="card-val dim">無</span>`;
         const parts = [];
         if (char.fusedRelic) {
-          parts.push(`<span class="card-relic-name fused">🔮 ${char.fusedRelic.icon} ${char.fusedRelic.name}</span>
+          parts.push(`<span class="card-relic-name fused">🔮 ${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-card-icon')}</span>
             <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','fusedRelic')">查看</button>`);
         }
         if (char.relic) {
-          parts.push(`<span class="card-relic-name">${char.relic.icon} ${char.relic.name}</span>
+          parts.push(`<span class="card-relic-name">${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-card-icon')}</span>
             <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','relic')">查看</button>`);
         }
         return parts.join('<br>');
       })();
 
       const weaponHtml = char.weapon
-        ? `<div class="card-item-name" title="${char.weapon.desc}">${char.weapon.icon} ${char.weapon.name}</div>`
+        ? `<div class="card-item-name" title="${char.weapon.desc}">${EquipmentIcon.label(char.weapon, 'equipment-inline-icon weapon-card-icon')}</div>`
         : `<span class="dim">無武器</span>`;
       const gearHtml = char.gear
-        ? `<div class="card-item-name" title="${char.gear.desc}">${char.gear.icon} ${char.gear.name}</div>`
+        ? `<div class="card-item-name" title="${char.gear.desc}">${EquipmentIcon.label(char.gear, 'equipment-inline-icon gear-card-icon')}</div>`
         : `<span class="dim">無裝備</span>`;
 
       const card = document.createElement('div');
@@ -607,7 +607,7 @@ const Render = {
       const countText = count > 1 ? ` x${count}` : '';
       slots.push(item
         ? `<div class="inventory-slot filled">
-            <div class="inventory-item-main">${item.icon} ${item.name}${countText}</div>
+            <div class="inventory-item-main">${EquipmentIcon.label(item, 'equipment-inline-icon item-inventory-icon')}${countText}</div>
             <div class="inventory-item-desc">${item.desc}</div>
             <button class="btn-tiny" onclick="Game.useInventoryItem(${i})">${item.useType === 'instant' ? '使用' : '激活'}</button>
           </div>`
@@ -640,7 +640,7 @@ const Render = {
         const item = document.createElement('div');
         item.className = `relic-item${resonanceIds.has(relic.id) ? ' resonating' : ''}`;
         item.innerHTML = `
-          <span class="relic-icon">${relic.icon}</span>
+          <span class="relic-icon">${EquipmentIcon.html(relic, 'equipment-inline-icon relic-list-icon')}</span>
           <span class="relic-name">${relic.name}</span>
           <span class="relic-effect">${typeof relicEffectDesc === 'function' ? relicEffectDesc(relic, slot === 'fusedRelic') : relic.desc}</span>
           <span class="relic-holder">${char.name}${slot === 'fusedRelic' ? '（已融合）' : ''}</span>
@@ -867,7 +867,7 @@ const Render = {
         <div class="char-detail-section">
           <div class="char-detail-section-title">武器欄</div>
           <div class="char-detail-item">
-            <div class="char-detail-item-name">${weapon.icon} ${weapon.name}</div>
+            <div class="char-detail-item-name">${EquipmentIcon.label(weapon, 'equipment-inline-icon weapon-detail-icon')}</div>
             <div class="char-detail-item-desc">${weapon.desc}</div>
           </div>
         </div>` : ''}
@@ -876,7 +876,7 @@ const Render = {
         <div class="char-detail-section">
           <div class="char-detail-section-title">裝備欄</div>
           <div class="char-detail-item">
-            <div class="char-detail-item-name">${gear.icon} ${gear.name}</div>
+            <div class="char-detail-item-name">${EquipmentIcon.label(gear, 'equipment-inline-icon gear-detail-icon')}</div>
             <div class="char-detail-item-desc">${gear.desc}</div>
           </div>
         </div>` : ''}
@@ -938,7 +938,7 @@ const Render = {
         item.type = 'button';
         item.className = `library-pick-card${selectedLibraryRelicId === relic.id ? ' selected' : ''}`;
         item.innerHTML = `
-          <span>${relic.icon} ${relic.name}</span>
+          <span>${EquipmentIcon.label(relic, 'equipment-inline-icon relic-library-icon')}</span>
           <small>${relic.desc}</small>
         `;
         item.addEventListener('click', () => onLibraryToggle(relic.id));

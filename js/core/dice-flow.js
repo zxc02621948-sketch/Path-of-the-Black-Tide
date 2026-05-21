@@ -4,6 +4,7 @@ const GameDiceFlow = {
     const base = (this._hasDodecaFateDice(char, diceType) || this._hasDodecaLuckyDice(char, diceType))
       ? this._rollDodecaCombat(char)
       : Dice.roll(diceType, char);
+    base.naturalRaw = base.raw;
     let value = base.value;
     const pollutedFace = diceType === 'combat' && typeof EnemyAbilities !== 'undefined'
       ? EnemyAbilities.pollutedRollFace?.(char, base.raw, base.value, base.sides || 6)
@@ -78,6 +79,7 @@ const GameDiceFlow = {
     const value = Math.max(raw, floor);
     return {
       raw,
+      naturalRaw: raw,
       value,
       floored: value > raw,
       sides: 12,

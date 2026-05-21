@@ -228,6 +228,16 @@ const GameCombatFlow = {
       rollResult,
       opts,
     });
+    const damageEvents = Array.isArray(combatResult.playerDamageEvents) ? combatResult.playerDamageEvents : [];
+    combatResult.latestPlayerDamageEvents = [...damageEvents];
+    if (opts.bowFollowUp) {
+      const previousEvents = Array.isArray(G.combat.playerDamageEventsThisAttack)
+        ? G.combat.playerDamageEventsThisAttack
+        : [];
+      G.combat.playerDamageEventsThisAttack = [...previousEvents, ...damageEvents];
+    } else {
+      G.combat.playerDamageEventsThisAttack = [...damageEvents];
+    }
     if (!opts.bowFollowUp) {
       this._spendBattleDrumCharge(combatResult.logs);
       this._refreshBattleDrum(attacker, combatResult.logs);
@@ -433,6 +443,46 @@ const GameCombatFlow = {
     const damageLine = combatResult.damage > 0
       ? `本次攻擊造成 ${combatResult.damage} 點傷害。`
       : '本次攻擊造成 0 點傷害。';
+    const followUpAction = () => {
+      if (attacker.hp <= 0 || attacker.dead) {
+        this._closeModal();
+        this._finishCombatRound(attacker, combatResult, roll, rollResult);
+        return;
+      }
+      const nextFollowUpCount = (G.combat.bowFollowUps || 0) + 1;
+      G.combat.bowFollowUps = nextFollowUpCount;
+      const followUpOpts = { bowFollowUp: true };
+      const followUpDamageStep = attacker.weapon?.effect?.followUpDamageStep || 0;
+      if (followUpDamageStep > 0) followUpOpts.bowFollowUpDamageBonus = followUpDamageStep * nextFollowUpCount;
+      if (this._hasStarHunterEye(attacker)) {
+        followUpOpts.starHunterEyeDamageBonus = 2;
+        if (nextFollowUpCount >= (attacker.weapon?.effect?.maxPerRound || 2)) followUpOpts.starHunterForceSix = true;
+      }
+      if (eagleRelic?.effect?.firstFollowUpDamageBonus && !G.combat.eagleFeatherDamageUsed) {
+        G.combat.eagleFeatherDamageUsed = true;
+        followUpOpts.eagleFeatherDamageBonus = eagleRelic.effect.firstFollowUpDamageBonus;
+      }
+      this._doCombatRound(attacker, null, followUpOpts);
+    };
+    const latestPlayerDamageEvents = Array.isArray(combatResult.latestPlayerDamageEvents)
+      ? combatResult.latestPlayerDamageEvents
+      : (Array.isArray(combatResult.playerDamageEvents) ? combatResult.playerDamageEvents : []);
+    const promptAnimResult = {
+      ...combatResult,
+      playerDamageEvents: latestPlayerDamageEvents,
+      rapierDamageEvents: [],
+      rapierFollowHits: 0,
+      incomingDamageEvents: [],
+      guardBlock: 0,
+      guardTargetId: null,
+      guardRemainingBlockByChar: null,
+      counterDmg: 0,
+      counterTargetId: null,
+      aoeCounter: 0,
+      enemyBlockGain: 0,
+      enemyAttackFlow: false,
+    };
+    combatResult.skipPlayerDamageAnims = true;
     this._openModal({
       title: '弓追擊',
       desc: eagleTriggered
@@ -447,33 +497,14 @@ const GameCombatFlow = {
         inventory: this._combatInventoryView(),
         canUseBag: false,
         rollItemBlocked: true,
+        followUpTargetId: attacker.id,
+        followUpLabel: `追擊 剩${max - used}`,
+        followUpHint: '點擊角色卡繼續追擊',
+        onFollowUpTarget: followUpAction,
       },
+      combatAnims: this._combatResultAnims(attacker, promptAnimResult, 120),
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: displayRoll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
       choices: [
-        {
-          label: `追擊 剩${max - used}`,
-          action: () => {
-            if (attacker.hp <= 0 || attacker.dead) {
-              this._closeModal();
-              this._finishCombatRound(attacker, combatResult, roll, rollResult);
-              return;
-            }
-            const nextFollowUpCount = (G.combat.bowFollowUps || 0) + 1;
-            G.combat.bowFollowUps = nextFollowUpCount;
-            const followUpOpts = { bowFollowUp: true };
-            const followUpDamageStep = attacker.weapon?.effect?.followUpDamageStep || 0;
-            if (followUpDamageStep > 0) followUpOpts.bowFollowUpDamageBonus = followUpDamageStep * nextFollowUpCount;
-            if (this._hasStarHunterEye(attacker)) {
-              followUpOpts.starHunterEyeDamageBonus = 2;
-              if (nextFollowUpCount >= (attacker.weapon?.effect?.maxPerRound || 2)) followUpOpts.starHunterForceSix = true;
-            }
-            if (eagleRelic?.effect?.firstFollowUpDamageBonus && !G.combat.eagleFeatherDamageUsed) {
-              G.combat.eagleFeatherDamageUsed = true;
-              followUpOpts.eagleFeatherDamageBonus = eagleRelic.effect.firstFollowUpDamageBonus;
-            }
-            this._doCombatRound(attacker, null, followUpOpts);
-          },
-        },
         {
           label: '結束攻擊',
           action: () => {
@@ -744,7 +775,7 @@ const GameCombatFlow = {
     const before = enemy.hp;
     enemy.hp = Math.max(0, enemy.hp - damage);
     if (logs) logs.push(`${warcry.name}・${warcry.faceName}：回合開始造成 ${damage} 點固定傷害（${before} → ${enemy.hp}）。`);
-    return { banner: warcry, owner, damage, enemyDead: enemy.hp <= 0 };
+    return { banner: warcry, owner, damage, from: before, to: enemy.hp, enemyDead: enemy.hp <= 0 };
   },
 
   _applyRoundStartBannerDamageIfNeeded(actor = null) {
@@ -764,6 +795,12 @@ const GameCombatFlow = {
       damage: result.damage,
       weaknessHit: false,
       logs,
+      playerDamageEvents: [{
+        type: 'fixed',
+        damage: result.damage,
+        from: result.from,
+        to: result.to,
+      }],
       incomingDamageEvents: [],
       enemyBlockGain: 0,
       counterDmg: 0,
@@ -1059,6 +1096,7 @@ const GameCombatFlow = {
         this._ensureRoundStartNativeWeakness(enemy, combatResult.logs);
         EnemyAbilities.onRoundStart(enemy, { ...G.combat, squad: G.squad }, combatResult.logs);
         G.combat.bowFollowUps = 0;
+        G.combat.playerDamageEventsThisAttack = [];
         G.combat.itemUsedRound = 0;
         G.combat.rollItemUsedRound = 0;
         G.combat.bagOpen = false;
@@ -1106,7 +1144,7 @@ const GameCombatFlow = {
             guardCooldown: this._combatGuardCooldown(),
             rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
           },
-          combatAnims: this._combatResultAnims(attacker, combatResult, 400),
+          combatAnims: this._combatResultAnims(attacker, combatResult, 120),
           dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: displayRoll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
           enemyDice: combatResult.gazeRoll
             ? { type: 'danger', label: '裂隙凝視骰', value: combatResult.gazeRoll, sides: 6 }
@@ -1127,10 +1165,15 @@ const GameCombatFlow = {
     },
 
   _combatResultAnims(attacker, combatResult = {}, delay = 400) {
+    const playerDamageEvents = combatResult.skipPlayerDamageAnims
+      ? []
+      : (Array.isArray(combatResult.playerDamageEvents)
+        ? combatResult.playerDamageEvents
+        : (Array.isArray(combatResult.rapierDamageEvents) ? combatResult.rapierDamageEvents : []));
     return {
       playerAttacker: attacker?.id || null,
-      playerFollowHits: combatResult.rapierFollowHits || 0,
-      playerDamageEvents: Array.isArray(combatResult.rapierDamageEvents) ? combatResult.rapierDamageEvents : [],
+      playerFollowHits: Math.max(combatResult.rapierFollowHits || 0, playerDamageEvents.length),
+      playerDamageEvents,
       incomingDamageEvents: Array.isArray(combatResult.incomingDamageEvents) ? combatResult.incomingDamageEvents : [],
       guardBlock: combatResult.guardBlock || 0,
       guardTargetId: combatResult.guardTargetId || null,
@@ -1869,26 +1912,7 @@ const GameCombatFlow = {
 
   // Section.
   _combatAttackAnim(attacker, callback) {
-    const attackerEl = document.querySelector(`.combat-unit[data-char-id="${attacker.id}"]`);
-    const enemyCard  = document.querySelector('.combat-enemy-card');
-    const hasBlock   = CombatStatus.getBlock(G.combat?.enemy) > 0;
-
-    if (hasBlock && enemyCard) {
-      enemyCard.classList.add('anim-block-up');
-      setTimeout(() => enemyCard.classList.remove('anim-block-up'), 430);
-    }
-    if (attackerEl) {
-      attackerEl.classList.add('anim-lunge');
-      setTimeout(() => attackerEl.classList.remove('anim-lunge'), 450);
-    }
-    setTimeout(() => {
-      if (enemyCard) {
-        const hitClass = hasBlock ? 'anim-hit-blocked' : 'anim-hit';
-        enemyCard.classList.add(hitClass);
-        setTimeout(() => enemyCard.classList.remove(hitClass), 420);
-      }
-    }, 190);
-    setTimeout(callback, 500);
+    if (callback) callback();
   },
 
   _buildCombatScene(enemy, attacker, status) {
@@ -1948,8 +1972,8 @@ const GameCombatFlow = {
         id: c.id, name: c.name, cls: c.cls, hp: c.hp, maxHp: c.maxHp, attack: (c.attack || 0) + Math.max(0, c._greatswordMomentum || 0),
         weapon: c.weapon || null,
         gear: c.gear || null,
-        relic: c.relic ? { name: c.relic.name, icon: c.relic.icon, desc: c.relic.desc } : null,
-        fusedRelic: c.fusedRelic ? { name: c.fusedRelic.name, icon: c.fusedRelic.icon, desc: c.fusedRelic.desc } : null,
+        relic: c.relic ? { name: c.relic.name, icon: c.relic.icon, iconImage: c.relic.iconImage, desc: c.relic.desc } : null,
+        fusedRelic: c.fusedRelic ? { name: c.fusedRelic.name, icon: c.fusedRelic.icon, iconImage: c.fusedRelic.iconImage, desc: c.fusedRelic.desc } : null,
         wagerDiceMissStacks: c._wagerDiceMissStacks || 0,
         gamblerBacklashStacks: c._gamblerBacklashStacks || 0,
         canWagerDice: !!this._wagerDiceEffect(c),

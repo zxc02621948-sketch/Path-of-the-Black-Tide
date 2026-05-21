@@ -388,9 +388,7 @@ const GameStateHelpers = {
   _relicRewardPoolForPhase(phase = G.phase) {
     const day = getDayRelics();
     if (phase !== 'night') return day;
-    const night = getNightRelics();
-    const nightAvailable = this._getAvailableRelics(night);
-    return nightAvailable.length > 0 ? night : [...night, ...day];
+    return [...day, ...getNightRelics()];
   },
 
   _dedupeMapRelics() {
@@ -447,7 +445,8 @@ const GameStateHelpers = {
   _closeModal() {
     G.modal = null;
     Render.hideModal();
-    this._flushSystemModal();
+    if (this._flushSystemModal()) return;
+    this._triggerPendingDarkMonsterChase?.();
   },
 
   // Section.
@@ -476,7 +475,12 @@ const GameStateHelpers = {
   },
 
   _filterLibraryRelics(relics) {
-    return (relics || []).filter(r => r?.effect?.type !== 'unlock_library' && !!getRelicById(r.id));
+    return (relics || [])
+      .map(r => {
+        const latest = getRelicById(r?.id);
+        return latest ? { ...latest } : null;
+      })
+      .filter(r => r?.effect?.type !== 'unlock_library');
   },
 };
 

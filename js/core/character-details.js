@@ -9,7 +9,8 @@ const GameCharacterDetails = {
     const desc = typeof relicEffectDesc === 'function' ? relicEffectDesc(relic, isFused) : relic.desc;
     const fusionNote = !isFused && typeof relicFusionDesc === 'function' ? relicFusionDesc(relic) : '';
     this._openModal({
-      title: `${relic.icon} ${relic.name}`,
+      title: relic.name,
+      titleHtml: EquipmentIcon.label(relic, 'equipment-inline-icon relic-detail-icon'),
       desc: [
         desc,
         fusionNote ? `融合後：${fusionNote}` : '',
@@ -27,9 +28,9 @@ const GameCharacterDetails = {
     const portrait = char.portrait
       ? '<div class="character-detail-portrait"><img src="' + char.portrait + '" alt="' + char.name + '"></div>'
       : '<div class="character-detail-portrait fallback">' + cls.icon + '</div>';
-    const weapon = char.weapon ? char.weapon.icon + ' ' + char.weapon.name + '：' + char.weapon.desc : '無';
-    const gear = char.gear ? char.gear.icon + ' ' + char.gear.name + '：' + char.gear.desc : '無';
-    const relic = char.relic ? char.relic.icon + ' ' + char.relic.name + '：' + this._relicDescText(char.relic, false) : '無';
+    const weapon = char.weapon ? EquipmentIcon.label(char.weapon, 'equipment-inline-icon weapon-detail-icon') + '：' + char.weapon.desc : '無';
+    const gear = char.gear ? EquipmentIcon.label(char.gear, 'equipment-inline-icon gear-detail-icon') + '：' + char.gear.desc : '無';
+    const relic = char.relic ? EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-detail-icon') + '：' + this._relicDescText(char.relic, false) : '無';
     const fused = char.fusedRelic ? this._characterFusedRelicText(char.fusedRelic) : '無';
     const sideInfo = this._characterDetailSideInfo(char, cls);
     const resonanceInfo = this._characterResonanceDetailHtml(char);
@@ -43,7 +44,7 @@ const GameCharacterDetails = {
 
   _characterFusedRelicText(relic) {
     if (!relic) return '無';
-    return relic.icon + ' ' + relic.name + '：' + this._relicDescText(relic, true);
+    return EquipmentIcon.label(relic, 'equipment-inline-icon relic-detail-icon') + '：' + this._relicDescText(relic, true);
   },
 
   _relicDescText(relic, fused = false) {

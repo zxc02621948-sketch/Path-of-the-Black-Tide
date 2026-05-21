@@ -72,7 +72,28 @@ const GameEventTreasure = {
     return cell;
   },
 
+  _triggerDarkWhisper(cell, ev) {
+    this._applyDarkness(1, ev.name || '黑暗低語');
+    const chestCell = this._placeTreasureChestRandom('dark_gift');
+    const foundText = chestCell
+      ? `低語在遠處凝成一個黑暗贈禮寶箱。\n\n寶箱位置：(${chestCell.x},${chestCell.y})。`
+      : '低語尋不到合適的落點，只在空地裡散成冷霧。';
+    this._log(chestCell
+      ? `黑暗低語標記黑暗贈禮寶箱 (${chestCell.x},${chestCell.y})。`
+      : '黑暗低語未能標記黑暗贈禮寶箱。',
+      chestCell ? 'reward' : 'dim');
+    this._openModal({
+      title: ev.name,
+      desc: `${ev.desc || ''}\n\n「黑暗記得每個進來的人的名字。」\n\n黑暗 +1。\n${foundText}`,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
   _triggerWeaponChest(cell) {
+    if (cell.content?.chestKind === 'dark_gift') {
+      this._triggerDarkGiftChest(cell);
+      return;
+    }
     if (cell.content?.chestKind === 'broken') {
       this._triggerBrokenTreasureChest(cell);
       return;
@@ -150,6 +171,36 @@ const GameEventTreasure = {
     });
   },
 
+  _triggerDarkGiftChest(cell) {
+    if (Math.random() < 0.45) {
+      const enemy = typeof getDarkGiftMimicEnemy === 'function' ? getDarkGiftMimicEnemy() : getTreasureMimicEnemy();
+      cell.type = 'enemy';
+      cell.content = { enemy, reward: 'dark_gift_mimic' };
+      cell.cleared = false;
+      this._log(`黑暗贈禮寶箱變成黑匣擬態，原生弱點為 ${enemy.weakness}。`, 'danger');
+      this._triggerCombat(cell);
+      return;
+    }
+
+    const item = randomEquipment(G.day);
+    const addResult = this._addInventoryItem(item);
+    this._clearWeaponChest(cell);
+    if (!addResult.added) {
+      this._openInventoryFullModal({
+        name: '黑暗贈禮寶箱',
+        desc: '黑暗贈禮吐出一件道具，但背包已滿。',
+      }, item, '');
+      return;
+    }
+    const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
+    this._log(`黑暗贈禮寶箱中獲得道具「${item.name}」。`, 'reward');
+    this._openModal({
+      title: '黑暗贈禮寶箱',
+      desc: `黑匣沒有張開牙齒，只吐出一件能用的東西。\n\n你們找到 ${item.icon} ${item.name}${countText}。\n${item.desc}`,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
   _settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
     const baseChance = CONFIG.TREASURE_MIMIC_GEAR_DROP_CHANCE ?? 0.5;
     const boostedChance = CONFIG.TREASURE_MIMIC_WEAKNESS_GEAR_DROP_CHANCE ?? 0.8;
@@ -184,6 +235,184 @@ const GameEventTreasure = {
         action: () => this._openTreasureMimicGearModal(cell, enemy, gear, combatLog),
       }],
     });
+  },
+
+  _settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
+    this._applyDarkness(-1, '黑匣擬態');
+    const reward = this._rollDarkGiftMimicReward();
+    const openedText = enemy?.darkGiftOpened
+      ? '\n\n天然骰面命中原生弱點，黑匣直接開啟。'
+      : '';
+    this._log(`黑匣擬態掉落${reward.label}「${reward.name}」。`, 'reward');
+    this._openModal({
+      title: '黑匣開啟',
+      desc: `${enemy.name} 被擊敗。${finalHitDesc ? `\n${finalHitDesc}` : ''}${openedText}\n\n黑暗 -1。\n\n黑匣留下 ${reward.icon} ${reward.name}。\n${reward.desc}`,
+      combatLog,
+      combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 開啟 ${enemy.name}`),
+      combatAnims,
+      dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
+      choices: this._darkGiftRewardAssignChoices(cell, reward),
+    });
+  },
+
+  _rollDarkGiftMimicReward() {
+    const roll = Math.random();
+    if (roll < 0.45) {
+      const gear = randomGear(G.day);
+      return { type: 'gear', label: '角色裝備', ...gear };
+    }
+    if (roll < 0.80) {
+      const weapon = randomWeaponForSquad(G.squad);
+      if (weapon) return { type: 'weapon', label: '武器', ...weapon };
+    }
+    const pool = this._getAvailableRelics([...getDayRelics(), ...getNightRelics()]);
+    if (pool.length > 0) {
+      const relic = weightedRelicPick(pool);
+      return { type: 'relic', label: '聖物', ...relic };
+    }
+    const gear = randomGear(G.day);
+    return { type: 'gear', label: '角色裝備', ...gear };
+  },
+
+  _darkGiftRewardAssignChoices(cell, reward) {
+    if (reward.type === 'weapon') {
+      const choices = this._aliveSquad().map(char => {
+        const current = char.weapon;
+        const upgraded = current?.id === reward.id && reward.upgradeTo ? getWeaponById(reward.upgradeTo) : null;
+        const label = upgraded
+          ? `${char.name}：升級為 ${upgraded.name}`
+          : `${char.name}：裝備 ${reward.name}${current ? `（替換 ${current.name}）` : ''}`;
+        return { label, action: () => this._giveWeaponFromChest(cell, char, reward) };
+      });
+      choices.push({
+        label: `放棄「${reward.name}」`,
+        action: () => {
+          this._clearWeaponChest(cell);
+          this._log(`放棄黑匣擬態掉落的武器「${reward.name}」。`, 'dim');
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+      return choices;
+    }
+
+    if (reward.type === 'relic') {
+      const carriers = reward.scholarOnly
+        ? this._aliveSquad().filter(c => c.cls === 'scholar')
+        : this._aliveSquad();
+      const choices = carriers.map(char => ({
+        label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
+        detail: char.relic ? `目前效果：${char.relic.desc}` : '',
+        action: () => {
+          const result = this._grantFateTableRelic(char, reward);
+          this._clearWeaponChest(cell);
+          this._openModal({
+            title: `獲得聖物：${reward.name}`,
+            desc: [
+              `${char.name} 獲得聖物「${reward.name}」。`,
+              result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+              this._resonanceActivatedText(result?.newly || []),
+            ].filter(Boolean).join('\n'),
+            choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+          });
+        },
+      }));
+      choices.push({
+        label: `放棄「${reward.name}」`,
+        action: () => {
+          this._clearWeaponChest(cell);
+          this._log(`放棄黑匣擬態掉落的聖物「${reward.name}」。`, 'dim');
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+      return choices;
+    }
+
+    const choices = this._aliveSquad().map(char => ({
+      label: `${char.name}：裝備 ${reward.name}${char.gear ? `（替換 ${char.gear.name}）` : ''}`,
+      action: () => this._giveGearFromTreasureMimic(cell, char, reward),
+    }));
+    choices.push({
+      label: `放棄「${reward.name}」`,
+      action: () => {
+        this._clearWeaponChest(cell);
+        this._log(`放棄黑匣擬態掉落的裝備「${reward.name}」。`, 'dim');
+        this._closeModal();
+        Render.fullRender();
+      },
+    });
+    return choices;
+  },
+
+  _openDarkGiftRewardAssignModal(cell, reward, combatLog = []) {
+    if (reward.type === 'weapon') {
+      const choices = this._aliveSquad().map(char => {
+        const current = char.weapon;
+        const upgraded = current?.id === reward.id && reward.upgradeTo ? getWeaponById(reward.upgradeTo) : null;
+        const label = upgraded
+          ? `${char.name}：升級為 ${upgraded.name}`
+          : `${char.name}：裝備 ${reward.name}${current ? `（替換 ${current.name}）` : ''}`;
+        return { label, action: () => this._giveWeaponFromChest(cell, char, reward) };
+      });
+      choices.push({
+        label: `放棄「${reward.name}」`,
+        action: () => {
+          this._clearWeaponChest(cell);
+          this._log(`放棄黑匣擬態掉落的武器「${reward.name}」。`, 'dim');
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+      this._openModal({
+        title: `獲得武器：${reward.name}`,
+        desc: `${reward.icon} ${reward.name}\n${reward.desc}\n\n選擇要交給哪位角色。若角色已持有同型武器，會改為升級。`,
+        combatLog,
+        choices,
+      });
+      return;
+    }
+
+    if (reward.type === 'relic') {
+      const carriers = reward.scholarOnly
+        ? this._aliveSquad().filter(c => c.cls === 'scholar')
+        : this._aliveSquad();
+      const choices = carriers.map(char => ({
+        label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
+        detail: char.relic ? `目前效果：${char.relic.desc}` : '',
+        action: () => {
+          const result = this._grantFateTableRelic(char, reward);
+          this._clearWeaponChest(cell);
+          this._openModal({
+            title: `獲得聖物：${reward.name}`,
+            desc: [
+              `${char.name} 獲得聖物「${reward.name}」。`,
+              result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+              this._resonanceActivatedText(result?.newly || []),
+            ].filter(Boolean).join('\n'),
+            choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+          });
+        },
+      }));
+      choices.push({
+        label: `放棄「${reward.name}」`,
+        action: () => {
+          this._clearWeaponChest(cell);
+          this._log(`放棄黑匣擬態掉落的聖物「${reward.name}」。`, 'dim');
+          this._closeModal();
+          Render.fullRender();
+        },
+      });
+      this._openModal({
+        title: `獲得聖物：${reward.name}`,
+        desc: `${reward.icon} ${reward.name}\n${reward.desc}\n\n選擇要交給哪位角色。`,
+        combatLog,
+        choices,
+      });
+      return;
+    }
+
+    this._openTreasureMimicGearModal(cell, null, reward, combatLog);
   },
 
   _openTreasureMimicGearModal(cell, enemy, gear, combatLog = []) {

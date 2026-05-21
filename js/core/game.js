@@ -78,6 +78,9 @@ const Game = {
 
     this._updateResonances();
     Render.fullRender();
+    if (Render.shouldShowOpeningTutorial?.()) {
+      Render.showTutorial?.(0);
+    }
   },
 
   // Section.
@@ -345,16 +348,45 @@ const Game = {
       }
     }
 
+    if (G.eventRelicChoiceContext?.relicChoices?.length > 0) {
+      this._openRelicAssignTargetModal(relic, clearRelic);
+      return;
+    }
+
+    const lore = this._getFirstLore(relic.id);
+    this._openModal({
+      title: `發現聖物：${relic.name}`,
+      descHtml: this._relicRewardCardHtml(relic, lore),
+      typeText: false,
+      choices: [
+        { label: '分配聖物', action: () => this._openRelicAssignTargetModal(relic, clearRelic) },
+        {
+          label: '放棄聖物',
+          className: 'relic-abandon-choice',
+          action: () => {
+            this._relicAssignContext = null;
+            clearRelic();
+            this._log(`放棄聖物「${relic.name}」。`);
+            this._closeModal();
+          },
+        },
+      ],
+    });
+
+  },
+
+  _openRelicAssignTargetModal(relic, clearRelic) {
     const carriers = relic.scholarOnly
       ? G.squad.filter(c => !c.dead && c.hp > 0 && c.cls === 'scholar')
       : G.squad.filter(c => !c.dead);
     const emptySlots = carriers.filter(c => !c.relic);
     const withRelic = carriers.filter(c => c.relic && c.relic.id !== relic.id);
-    const choices = [];
+    const assignOptions = [];
 
     for (const char of emptySlots) {
-      choices.push({
-        label: `交給 ${char.name}`,
+      assignOptions.push({
+        char,
+        actionLabel: '收下',
         action: () => {
           char.relic = { ...relic };
           this._applyRelicEquip(char, relic);
@@ -368,25 +400,118 @@ const Game = {
     }
 
     for (const char of withRelic) {
-      choices.push({
-        label: `替換 ${char.name} 的「${char.relic.name}」`,
-        detail: `目前效果：${char.relic.desc}`,
+      assignOptions.push({
+        char,
+        actionLabel: '替換',
+        currentRelic: char.relic,
         action: () => this._replaceRelicWithLinkWarning(char, relic, clearRelic),
       });
     }
 
+    this._relicAssignContext = { relic, options: assignOptions };
+
+    const choices = [];
+    if (G.eventRelicChoiceContext?.relicChoices?.length > 0) {
+      choices.push({
+        label: '返回選擇',
+        action: () => {
+          this._relicAssignContext = null;
+          this._openEventRelicChoiceModal(G.eventRelicChoiceContext.cell, G.eventRelicChoiceContext.ev, G.eventRelicChoiceContext.relicChoices);
+        },
+      });
+    }
     choices.push({
       label: '放棄聖物',
-      action: () => { clearRelic(); this._log(`放棄聖物「${relic.name}」。`); this._closeModal(); },
+      className: 'relic-abandon-choice',
+      action: () => {
+        this._relicAssignContext = null;
+        G.eventRelicChoiceContext = null;
+        clearRelic();
+        this._log(`放棄聖物「${relic.name}」。`);
+        this._closeModal();
+      },
     });
 
-    const lore = this._getFirstLore(relic.id);
     this._openModal({
       title: `發現聖物：${relic.name}`,
-      desc: `效果：${relic.desc}${lore ? `\n\n「${lore}」` : ''}`,
+      descHtml: this._relicAssignPanelHtml(assignOptions),
+      typeText: false,
       choices,
     });
+  },
 
+  chooseRelicAssignTarget(index) {
+    const option = this._relicAssignContext?.options?.[index];
+    if (option?.action) option.action();
+  },
+
+  _relicAssignPanelHtml(assignOptions = []) {
+    const assignCards = assignOptions.length
+      ? assignOptions.map((option, index) => this._relicAssignTargetCardHtml(option, index)).join('')
+      : '<div class="relic-assign-empty">沒有可持有這件聖物的角色。</div>';
+    return `
+      <div class="relic-assign-panel">
+        <div class="relic-assign-instruction">選擇要交給哪位角色。</div>
+        <div class="relic-assign-target-grid">${assignCards}</div>
+      </div>
+    `;
+  },
+
+  _relicRewardCardHtml(relic, lore = '', compact = false) {
+    const name = this._escapeHtmlLocal(relic.name || '未知聖物');
+    const desc = this._escapeHtmlLocal(relic.desc || '');
+    const loreHtml = !compact && lore ? `<div class="relic-reward-lore">「${this._escapeHtmlLocal(lore)}」</div>` : '';
+    const visual = relic.iconImage
+      ? `<img class="relic-reward-img" src="${this._escapeAttrLocal(relic.iconImage)}" alt="">`
+      : `<span class="relic-reward-emoji">${this._escapeHtmlLocal(relic.icon || '◆')}</span>`;
+    return `
+      <div class="relic-reward-panel${compact ? ' compact' : ''}">
+        <div class="relic-reward-visual">${visual}</div>
+        <div class="relic-reward-copy">
+          <div class="relic-reward-kicker">選擇持有者</div>
+          <div class="relic-reward-name">${name}</div>
+          ${compact ? '' : `<div class="relic-reward-desc">${desc}</div>`}
+          ${loreHtml}
+        </div>
+      </div>
+    `;
+  },
+
+  _relicAssignTargetCardHtml(option, index) {
+    const char = option.char;
+    const cls = CHARACTER_CLASSES[char.cls] || {};
+    const hpText = `${Math.max(0, char.hp || 0)}/${char.maxHp || 0}`;
+    const current = option.currentRelic
+      ? `<span class="relic-assign-current">替換：${this._escapeHtmlLocal(option.currentRelic.name || '既有聖物')}</span>`
+      : '<span class="relic-assign-current empty">空欄位</span>';
+    const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
+    const art = battleArt ? `<span class="relic-assign-art"><img src="${this._escapeAttrLocal(battleArt)}" alt=""></span>` : '';
+    return `
+      <button type="button" class="relic-assign-target-card${option.currentRelic ? ' replace' : ''}" onclick="Game.chooseRelicAssignTarget(${index})">
+        ${art}
+        <span class="relic-assign-head">
+          <span class="relic-assign-class">${this._escapeHtmlLocal(cls.icon || '◆')}</span>
+          <span class="relic-assign-name">${this._escapeHtmlLocal(char.name || '')}</span>
+          <span class="relic-assign-action">${this._escapeHtmlLocal(option.actionLabel || '選擇')}</span>
+        </span>
+        <span class="relic-assign-meta">HP ${this._escapeHtmlLocal(hpText)}</span>
+        ${current}
+      </button>
+    `;
+  },
+
+  _escapeHtmlLocal(value) {
+    return String(value ?? '').replace(/[&<>"']/g, ch => ({
+      '&': '&amp;',
+      '<': '&lt;',
+      '>': '&gt;',
+      '"': '&quot;',
+      "'": '&#39;',
+    }[ch]));
+  },
+
+  _escapeAttrLocal(value) {
+    return this._escapeHtmlLocal(value).replace(/`/g, '&#96;');
   },
 
   _openDroppedRelicReturnModal(cell, droppedRelic, relic, owner, clearRelic) {

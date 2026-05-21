@@ -92,6 +92,11 @@ const GameCombatVictoryFlow = {
       this._settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
       return true;
     }
+    if (combatReward === 'dark_gift_mimic') {
+      enemy.darkGiftOpened = !!combatResult.darkGiftNativeOpen;
+      this._settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
+      return true;
+    }
     if (combatReward === 'echo_site') {
       this._settleEchoSiteVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
       return true;
@@ -216,6 +221,7 @@ const GameCombatVictoryFlow = {
 
   _settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatReward, combatResult = null) {
     let droppedRelic = null;
+    const combatAnims = this._combatResultAnims(attacker, combatResult, 250);
     const canDropRelic = this._canCombatDropRelic(enemy, combatReward);
     const pool = canDropRelic
       ? this._getAvailableRelics(this._relicRewardPoolForPhase())
@@ -230,7 +236,16 @@ const GameCombatVictoryFlow = {
 
     const isEventDrop = droppedRelic?.eventOnly;
     if (droppedRelic && !isEventDrop) {
-      this._triggerRelic(cell);
+      this._openModal({
+        title: '戰鬥勝利',
+        desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n掉落聖物「${droppedRelic.name}」，可選擇拾取。`,
+        combatLog: logs,
+        combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+        combatAnims,
+        dice: this._combatVictoryDice(attacker, roll, rollResult),
+        choices: [],
+      });
+      setTimeout(() => this._triggerRelic(cell), this._combatAnimWaitMs(combatAnims));
       return;
     }
     const dropDesc = droppedRelic
@@ -243,7 +258,7 @@ const GameCombatVictoryFlow = {
       desc: `${enemy.name} 被擊敗。\n${finalHitDesc}${dropDesc}`,
       combatLog: logs,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
-      combatAnims: this._combatResultAnims(attacker, combatResult, 250),
+      combatAnims,
       dice: this._combatVictoryDice(attacker, roll, rollResult),
       choices: [{
         label: '繼續',
@@ -257,8 +272,20 @@ const GameCombatVictoryFlow = {
 
   _canCombatDropRelic(enemy, combatReward = null) {
     if (!enemy) return false;
-    if (enemy.boss || enemy.rescueBoss || enemy.echoGuardian || enemy.treasureMimic) return false;
-    return !['rescue', 'corrupted', 'treasure_mimic', 'echo_site', 'dev_test'].includes(combatReward);
+    if (enemy.boss || enemy.rescueBoss || enemy.echoGuardian || enemy.treasureMimic || enemy.darkGiftMimic) return false;
+    return !['rescue', 'corrupted', 'treasure_mimic', 'dark_gift_mimic', 'echo_site', 'dev_test'].includes(combatReward);
+  },
+
+  _combatAnimWaitMs(combatAnims = null) {
+    if (!combatAnims) return 0;
+    const delay = Number.isFinite(combatAnims.delay) ? combatAnims.delay : 120;
+    const playerDamageEvents = Array.isArray(combatAnims.playerDamageEvents) ? combatAnims.playerDamageEvents : [];
+    const playerFollowHits = Math.max(0, combatAnims.playerFollowHits || 0, playerDamageEvents.length);
+    const guardBlock = Math.max(0, combatAnims.guardBlock || 0);
+    const enemyBlock = combatAnims.enemyBlock ? 220 : 0;
+    const hasCombatAnim = playerFollowHits > 0 || guardBlock > 0 || !!(combatAnims.counterTarget || combatAnims.aoe || combatAnims.enemyBlock);
+    if (!hasCombatAnim) return delay;
+    return delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * 380 + enemyBlock + 760;
   },
 };
 

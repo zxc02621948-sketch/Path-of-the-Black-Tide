@@ -161,7 +161,16 @@ const GameEchoSites = {
     cell.content = { relic: { ...relic } };
     cell.cleared = false;
     this._log(`${siteName} 的守護者倒下，留下聖物「${relic.name}」。`, 'reward');
-    this._triggerRelic(cell);
+    this._openModal({
+      title: '共鳴遺址戰利品',
+      desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n${siteName} 的守護者倒下，留下聖物「${relic.name}」。`,
+      combatLog: logs,
+      combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
+      dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
+      choices: [],
+    });
+    setTimeout(() => this._triggerRelic(cell), this._combatAnimWaitMs(combatAnims));
   },
 };
 

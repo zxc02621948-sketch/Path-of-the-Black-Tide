@@ -1,6 +1,11 @@
 // event-traps methods extracted from js/core/event-handlers.js.
 const GameEventTraps = {
   _triggerTrap(ev, forcedRollResult = null) {
+    if (ev.fixedTrap) {
+      this._triggerFixedTrap(ev);
+      return;
+    }
+
     const attacker = G.squad.find(c => !c.dead && c.cls === 'explorer') || this._aliveSquad()[0];
     if (!attacker) { Render.fullRender(); return; }
 
@@ -132,13 +137,20 @@ const GameEventTraps = {
   },
 
   _triggerChoiceTrap(cell, ev) {
+    const choices = [
+      { label: `${ev.choiceTrapLabel || '小心解除'}（探索骰門檻 ${ev.successMin || 3}，失敗隨機隊員 -${ev.failDamage || 2} HP）`, action: () => this._rollChoiceTrapWithAnimation(cell, ev) },
+      { label: `${ev.forceTrapLabel || '硬闖'}（全隊 -${ev.forceDamage || 1} HP，直接通過）`, danger: true, action: () => this._forceChoiceTrap(cell, ev) },
+    ];
+    if (ev.detourActionCost > 0) {
+      choices.push({
+        label: `${ev.detourTrapLabel || '繞路'}（行動 -${ev.detourActionCost}，不受傷）`,
+        action: () => this._detourChoiceTrap(cell, ev),
+      });
+    }
     this._openModal({
       title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇解除方式。小心處理需要探索骰；硬闖會讓全隊受傷但直接通過。`,
-      choices: [
-        { label: `${ev.choiceTrapLabel || '小心解除'}（探索骰門檻 ${ev.successMin || 3}，失敗隨機隊員 -${ev.failDamage || 2} HP）`, action: () => this._rollChoiceTrapWithAnimation(cell, ev) },
-        { label: `${ev.forceTrapLabel || '硬闖'}（全隊 -${ev.forceDamage || 1} HP，直接通過）`, danger: true, action: () => this._forceChoiceTrap(cell, ev) },
-      ],
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇解除方式。小心處理需要探索骰；硬闖會讓全隊受傷但直接通過${ev.detourActionCost > 0 ? '；繞路會消耗剩餘行動但避免傷害' : ''}。`,
+      choices,
     });
   },
 
@@ -215,6 +227,66 @@ const GameEventTraps = {
       desc: `${this._eventDiceText(ev)}${ev.forceDesc || ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
     });
+  },
+
+  _detourChoiceTrap(cell, ev) {
+    const cost = ev.detourActionCost || 1;
+    const spent = this._spendTrapAction(cost, ev.name);
+    this._completeProgressEvent(ev);
+    const text = spent > 0
+      ? `你們選擇繞路，避開危險區域。\n\n行動 -${spent}。`
+      : '你們選擇繞路，避開危險區域。\n\n今天已沒有剩餘行動可扣。';
+    this._openModal({
+      title: ev.name,
+      desc: `${this._eventDiceText(ev)}${ev.detourDesc || ev.desc || ''}\n\n${text}`,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _triggerFixedTrap(ev) {
+    const effects = [];
+    if (ev.actionCost > 0) {
+      const spent = this._spendTrapAction(ev.actionCost, ev.name);
+      effects.push(spent > 0 ? `行動 -${spent}` : '今天已沒有剩餘行動可扣');
+    }
+    if (ev.partyDamage > 0) {
+      const damaged = this._damageAliveSquad(ev.partyDamage);
+      effects.push(`全隊受傷：${damaged.join('、')}`);
+    }
+    if (ev.targetDamage > 0) {
+      const target = this._aliveSquad().sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
+      if (target) {
+        const damage = this._reduceIncomingDamage(target, ev.targetDamage);
+        target.hp = Math.max(0, target.hp - damage);
+        effects.push(`${target.name} -${damage} HP`);
+        this._log(`${ev.name}：${target.name} 受到 ${damage} 傷害。`, 'danger');
+      }
+    }
+    this._completeProgressEvent(ev);
+    this._openModal({
+      title: ev.name,
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.fixedResultText || '陷阱立刻生效，沒有時間閃避。'}\n${effects.join('\n')}`,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
+    });
+  },
+
+  _spendTrapAction(amount = 1, reason = '陷阱') {
+    const before = Math.max(0, G.actionsLeft || 0);
+    const spent = Math.min(before, Math.max(0, amount));
+    G.actionsLeft = Math.max(0, before - spent);
+    if (spent > 0) this._log(`${reason}：行動 -${spent}。`, 'danger');
+    return spent;
+  },
+
+  _damageAliveSquad(amount = 1) {
+    const damaged = [];
+    for (const char of this._aliveSquad()) {
+      const damage = this._reduceIncomingDamage(char, amount);
+      char.hp = Math.max(0, char.hp - damage);
+      damaged.push(`${char.name} -${damage}`);
+    }
+    this._log(`固定陷阱傷害：${damaged.join('、')} HP。`, 'danger');
+    return damaged;
   },
 
 

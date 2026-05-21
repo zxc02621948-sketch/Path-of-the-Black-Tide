@@ -3,6 +3,7 @@ const CombatRules = {
   resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, deferEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
     const rawRoll = rollResult.value;
     const diceRaw = rollResult.raw ?? rollResult.value;
+    const naturalRaw = rollResult.naturalRaw ?? diceRaw;
     const logs = [];
     const banners = Array.isArray(banner) ? banner.filter(Boolean) : (banner ? [banner] : []);
 
@@ -142,6 +143,11 @@ const CombatRules = {
     );
     let grapplingHookAssisted = false;
     const tempWeaknesses = CombatStatus.tempWeaknesses(enemy);
+    const darkGiftNativeOpen = !!enemy.darkGiftMimic &&
+      allowFinalNativeWeakness &&
+      naturalRaw >= 1 &&
+      naturalRaw <= 6 &&
+      activeNativeWeaknesses.includes(naturalRaw);
     let luckyTempMultipleHits = rollResult.dodecaLuckyDice
       ? tempWeaknesses.filter(w => w > 0 && roll % w === 0)
       : [];
@@ -619,8 +625,28 @@ const CombatRules = {
       logs.push(`探索者：${attacker.name} 標記 1 個可疑弱點。`);
     }
 
+    const playerDamageEvents = [];
+    const primaryAttackTrail = weapon?.family === 'bow'
+      ? 'pierce'
+      : (['sword', 'dagger', 'katana'].includes(weapon?.family) ? 'slash' : 'strike');
+    const primaryHitEffect = weapon?.effect?.type === 'bow_followup'
+      ? 'pierce'
+      : (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit)
+        ? 'eagle-mark'
+        : (weapon?.family === 'sword' ? 'slash' : 'strike');
     logs.push(`最終傷害：${damage}`);
+    const primaryHpBefore = enemy.hp;
     enemy.hp = Math.max(0, enemy.hp - damage);
+    if (damage > 0) {
+      playerDamageEvents.push({
+        type: 'primary',
+        damage,
+        from: primaryHpBefore,
+        to: enemy.hp,
+        hitEffect: primaryHitEffect,
+        attackTrail: primaryAttackTrail,
+      });
+    }
     let rapierFollowHits = 0;
     const rapierDamageEvents = [];
     if (greatswordStrike) {
@@ -678,6 +704,16 @@ const CombatRules = {
           damage: currentFollowDamage,
           from: followHpBefore,
           to: enemy.hp,
+          hitEffect: 'pierce',
+          attackTrail: 'pierce',
+        });
+        playerDamageEvents.push({
+          type: 'rapier',
+          damage: currentFollowDamage,
+          from: followHpBefore,
+          to: enemy.hp,
+          hitEffect: 'pierce',
+          attackTrail: 'pierce',
         });
         damage += currentFollowDamage;
         rapierFollowHits++;
@@ -687,7 +723,15 @@ const CombatRules = {
       }
     }
     if (corrosiveOilDamage > 0) {
+      const corrosiveHpBefore = enemy.hp;
       enemy.hp = Math.max(0, enemy.hp - corrosiveOilDamage);
+      playerDamageEvents.push({
+        type: 'fixed',
+        damage: corrosiveOilDamage,
+        from: corrosiveHpBefore,
+        to: enemy.hp,
+        hitEffect: 'wound-burst',
+      });
       logs.push(`腐蝕傷害：${corrosiveOilDamage}`);
     }
     if (damage > 0) {
@@ -740,18 +784,46 @@ const CombatRules = {
           const consumedWounds = enemy.wounds;
           const damagePerWound = painMask?.effect?.explodeDamagePerWound || 2;
           const explodeDamage = consumedWounds * damagePerWound;
+          const explodeHpBefore = enemy.hp;
           enemy.hp = Math.max(0, enemy.hp - explodeDamage);
           damage += explodeDamage;
+          playerDamageEvents.push({
+            type: 'fixed',
+            damage: explodeDamage,
+            from: explodeHpBefore,
+            to: enemy.hp,
+            hitEffect: 'wound-burst',
+          });
           enemy.wounds = 0;
           logs.push(`${painResonanceActive ? '痛痕共鳴・爆發' : '痛苦面具融合'}：引爆並消耗 ${consumedWounds} 層傷口，每層 ${damagePerWound} 點，造成 ${explodeDamage} 點固定傷害`);
           if (weapon?.effect?.explodeDamage) {
             const weaponExplodeBonus = weapon.effect.explodeDamage;
+            const weaponExplodeHpBefore = enemy.hp;
             enemy.hp = Math.max(0, enemy.hp - weaponExplodeBonus);
             damage += weaponExplodeBonus;
+            playerDamageEvents.push({
+              type: 'fixed',
+              damage: weaponExplodeBonus,
+              from: weaponExplodeHpBefore,
+              to: enemy.hp,
+              hitEffect: 'wound-burst',
+            });
             logs.push(`斷魂太刀：本次傷口引爆，額外造成 ${weaponExplodeBonus} 點固定傷害`);
           }
         }
       }
+    }
+    if (darkGiftNativeOpen && enemy.hp > 0) {
+      const darkGiftHpBefore = enemy.hp;
+      enemy.hp = 0;
+      playerDamageEvents.push({
+        type: 'fixed',
+        damage: darkGiftHpBefore,
+        from: darkGiftHpBefore,
+        to: 0,
+        hitEffect: 'shadow-break',
+      });
+      logs.push(`黑匣鎖孔回應原生弱點 ${naturalRaw}，箱體直接打開。`);
     }
     const enemyDead = enemy.hp <= 0;
     let enemyBlockGain = 0;
@@ -901,6 +973,7 @@ const CombatRules = {
     return {
       roll,
       rawRoll: rollResult.raw,
+      naturalRaw,
       floored: rollResult.floored,
       damage,
       counterDmg,
@@ -927,8 +1000,10 @@ const CombatRules = {
       grapplingHookAssisted,
       rapierFollowHits,
       rapierDamageEvents,
+      playerDamageEvents,
       stunned,
       enemyDead,
+      darkGiftNativeOpen,
       logs,
     };
   },

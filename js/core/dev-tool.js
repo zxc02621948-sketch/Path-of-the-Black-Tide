@@ -28,7 +28,8 @@ const GameDevTool = {
       title,
       desc: '選擇要新增的聖物。',
       choices: relics.map(relic => ({
-        label: `${relic.icon} ${relic.name}`,
+        label: relic.name,
+        labelHtml: EquipmentIcon.label(relic, 'equipment-inline-icon relic-detail-icon'),
         detail: relic.desc,
         action: () => this._devChooseRelicTarget(relic, slot),
       })).concat([{ label: '返回', action: () => this.openDevTool() }]),
@@ -241,6 +242,7 @@ const GameDevTool = {
         { label: '頭目怪物', action: () => this._devChooseEnemyCombatCategory('boss') },
         { label: '尾王測試', action: () => this._devChooseFinalBossCombat() },
         { label: '聖物守護者', action: () => this._devChooseEnemyCombatCategory('echo') },
+        { label: '黑匣擬態', action: () => this._devChooseEnemyCombatCategory('dark_gift') },
         { label: '黑暗化身', action: () => this._devChooseEnemyCombatCategory('dark') },
         { label: '返回', action: () => this.openDevTool() },
       ],
@@ -259,6 +261,7 @@ const GameDevTool = {
       strong: '強型怪物',
       boss: '頭目怪物',
       echo: '聖物守護者',
+      dark_gift: '黑匣擬態',
     };
     if (enemies.length === 0) {
       this._openModal({
@@ -288,10 +291,12 @@ const GameDevTool = {
     if (category === 'medium') return enemies.filter(enemy => enemy.tier === 'medium' && !enemy.boss);
     if (category === 'strong') return enemies.filter(enemy => enemy.tier === 'strong' && !enemy.boss);
     if (category === 'echo') return enemies.filter(enemy => enemy.echoGuardian);
+    if (category === 'dark_gift') return enemies.filter(enemy => enemy.darkGiftMimic);
     if (category === 'boss') {
       return enemies.filter(enemy =>
         (enemy.boss || enemy.rescueBoss || enemy.treasureMimic) &&
         !enemy.echoGuardian &&
+        !enemy.darkGiftMimic &&
         !enemy.devOnly
       );
     }
@@ -366,6 +371,7 @@ const GameDevTool = {
   },
 
   _devResolveEnemyForCombat(enemy, tierIndex = null) {
+    if (enemy?.darkGiftMimic && typeof getDarkGiftMimicEnemy === 'function') return getDarkGiftMimicEnemy();
     if (enemy?.tiers) {
       const index = Number.isInteger(tierIndex)
         ? Math.max(0, Math.min(enemy.tiers.length - 1, tierIndex))
@@ -378,7 +384,7 @@ const GameDevTool = {
   _devEnemyCombatDetail(enemy) {
     const tags = [];
     if (enemy.darkMonster) tags.push('黑暗化身');
-    if (enemy.boss || enemy.rescueBoss || enemy.treasureMimic) tags.push('特殊怪');
+    if (enemy.boss || enemy.rescueBoss || enemy.treasureMimic || enemy.darkGiftMimic) tags.push('特殊怪');
     if (enemy.nightOnly) tags.push('夜晚限定');
     const tagText = tags.length ? `｜${tags.join('、')}` : '';
     const weaknessText = Number.isFinite(enemy.weakness) ? enemy.weakness : (enemy.finalBoss ? '開眼顯現' : '無');
@@ -387,7 +393,7 @@ const GameDevTool = {
 
   _devStartEnemyCombat(enemy, opts = {}) {
     if (!enemy) return;
-    const reward = enemy.treasureMimic ? 'treasure_mimic' : null;
+    const reward = enemy.darkGiftMimic ? 'dark_gift_mimic' : (enemy.treasureMimic ? 'treasure_mimic' : null);
     const cell = {
       type: 'enemy',
       cleared: false,

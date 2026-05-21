@@ -82,7 +82,9 @@ document.addEventListener('DOMContentLoaded', () => {
   function getLibraryRelics() {
     const unlocked = localStorage.getItem('bbn_library_unlocked') !== 'false';
     if (!unlocked) return [];
-    return safeParseStorage('bbn_library', []).filter(r => r?.effect?.type !== 'unlock_library' && !!getRelicById(r.id));
+    return safeParseStorage('bbn_library', [])
+      .map(r => getRelicById(r?.id))
+      .filter(r => r?.effect?.type !== 'unlock_library');
   }
 
   function safeParseStorage(key, fallback) {
@@ -149,7 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // 起始畫面的筆記按鈕（只有存有筆記才顯示）
   const btnNotesStart = document.getElementById('btn-notes-start');
   if (btnNotesStart) {
-    btnNotesStart.style.display = hasNotes ? 'block' : 'none';
+    btnNotesStart.style.display = 'block';
     btnNotesStart.addEventListener('click', () => {
       // 開一個簡單 modal 來顯示筆記（遊戲未開始時）
       const tempNotes = safeParseStorage('bbn_notes', {});
