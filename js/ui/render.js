@@ -232,6 +232,11 @@ const Render = {
     let pinchStart = null;
 
     viewport.addEventListener('click', event => {
+      if (!this._isMobileMapView()) return;
+      if (!this._isTouchMapEvent(event)) {
+        if (G.mapView) G.mapView.suppressClick = false;
+        return;
+      }
       if (!G.mapView?.suppressClick) return;
       event.preventDefault();
       event.stopPropagation();
@@ -239,6 +244,8 @@ const Render = {
     }, true);
 
     viewport.addEventListener('pointerdown', event => {
+      if (!this._isMobileMapView()) return;
+      if (!this._isTouchMapEvent(event)) return;
       if (event.button !== undefined && event.button !== 0) return;
       viewport.setPointerCapture?.(event.pointerId);
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -267,6 +274,8 @@ const Render = {
     });
 
     viewport.addEventListener('pointermove', event => {
+      if (!this._isMobileMapView()) return;
+      if (!this._isTouchMapEvent(event)) return;
       if (!pointers.has(event.pointerId)) return;
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.size === 2 && pinchStart) {
@@ -311,14 +320,23 @@ const Render = {
     viewport.addEventListener('pointercancel', endPointer);
 
     viewport.addEventListener('wheel', event => {
+      if (!this._isMobileMapView()) return;
       event.preventDefault();
       this._zoomMapAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
     }, { passive: false });
 
   },
 
+  _isMobileMapView() {
+    return !!window.matchMedia?.('(pointer: coarse)').matches;
+  },
+
+  _isTouchMapEvent(event) {
+    return event?.pointerType ? event.pointerType !== 'mouse' : window.matchMedia?.('(pointer: coarse)').matches;
+  },
+
   _mapZoomBounds() {
-    return { min: window.matchMedia?.('(max-width: 760px)').matches ? 0.9 : 0.75, max: 2.4 };
+    return { min: 0.9, max: 2.4 };
   },
 
   _clampMapZoom(value) {
@@ -346,7 +364,7 @@ const Render = {
     const viewport = document.getElementById('map-viewport');
     const playerCell = document.querySelector('#map-grid .map-cell.has-player');
     if (!viewport || !playerCell || !G.mapView) return;
-    const zoom = this._clampMapZoom(G.mapView.zoom || (window.matchMedia?.('(max-width: 760px)').matches ? 1.35 : 1));
+    const zoom = this._clampMapZoom(G.mapView.zoom || 1.35);
     const targetX = playerCell.offsetLeft + playerCell.offsetWidth / 2;
     const targetY = playerCell.offsetTop + playerCell.offsetHeight / 2;
     G.mapView.zoom = zoom;
@@ -384,6 +402,14 @@ const Render = {
     const grid = document.getElementById('map-grid');
     if (!grid) return;
     if (!G.mapView) G.mapView = { zoom: 1, panX: 0, panY: 0, lastPlayerKey: null, suppressClick: false };
+    if (!this._isMobileMapView()) {
+      G.mapView.zoom = 1;
+      G.mapView.panX = 0;
+      G.mapView.panY = 0;
+      G.mapView.suppressClick = false;
+      grid.style.transform = '';
+      return;
+    }
     const playerKey = `${G.playerX},${G.playerY}`;
     if (opts.centerIfPlayerMoved && G.mapView.lastPlayerKey !== playerKey) {
       requestAnimationFrame(() => this._centerMapOnPlayer());
