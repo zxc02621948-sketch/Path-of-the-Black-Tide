@@ -246,11 +246,21 @@ const Render = {
         dragStart = { x: event.clientX, y: event.clientY, panX: G.mapView.panX || 0, panY: G.mapView.panY || 0, moved: false };
       } else if (pointers.size === 2) {
         const pts = [...pointers.values()];
+        const rect = viewport.getBoundingClientRect();
+        const centerX = (pts[0].x + pts[1].x) / 2;
+        const centerY = (pts[0].y + pts[1].y) / 2;
+        const localX = centerX - rect.left;
+        const localY = centerY - rect.top;
+        const startZoom = G.mapView.zoom || 1;
+        const startPanX = G.mapView.panX || 0;
+        const startPanY = G.mapView.panY || 0;
         pinchStart = {
           distance: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
-          zoom: G.mapView.zoom || 1,
-          centerX: (pts[0].x + pts[1].x) / 2,
-          centerY: (pts[0].y + pts[1].y) / 2,
+          zoom: startZoom,
+          panX: startPanX,
+          panY: startPanY,
+          mapX: (localX - startPanX) / startZoom,
+          mapY: (localY - startPanY) / startZoom,
         };
       }
     });
@@ -262,7 +272,14 @@ const Render = {
         event.preventDefault();
         const pts = [...pointers.values()];
         const distance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        this._zoomMapAt(pinchStart.centerX, pinchStart.centerY, distance / Math.max(1, pinchStart.distance), pinchStart.zoom);
+        const rect = viewport.getBoundingClientRect();
+        const centerX = (pts[0].x + pts[1].x) / 2 - rect.left;
+        const centerY = (pts[0].y + pts[1].y) / 2 - rect.top;
+        const nextZoom = this._clampMapZoom(pinchStart.zoom * (distance / Math.max(1, pinchStart.distance)));
+        G.mapView.zoom = nextZoom;
+        G.mapView.panX = centerX - pinchStart.mapX * nextZoom;
+        G.mapView.panY = centerY - pinchStart.mapY * nextZoom;
+        this._applyMapView();
         G.mapView.suppressClick = true;
         return;
       }
