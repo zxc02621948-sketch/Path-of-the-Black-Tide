@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
-<link rel="stylesheet" href="style.css?v=mobile-tutorial-fix1">
+<link rel="stylesheet" href="style.css?v=map-zoom-pan1">
 </head>
 <body>
 <div id="app">
@@ -114,7 +114,14 @@
         <button id="turn-end-float" class="turn-end-float" type="button" aria-live="polite">
           行動力已用完，請結束今天
         </button>
-        <div id="map-grid"></div>
+        <div id="map-viewport">
+          <div id="map-grid"></div>
+        </div>
+        <div id="map-controls" aria-label="地圖縮放控制">
+          <button type="button" class="map-control-btn" data-map-control="zoom-out" aria-label="縮小地圖">-</button>
+          <button type="button" class="map-control-btn" data-map-control="center" aria-label="置中到小隊">◎</button>
+          <button type="button" class="map-control-btn" data-map-control="zoom-in" aria-label="放大地圖">+</button>
+        </div>
         <div id="map-hint">點擊相鄰格子移動探索</div>
       </div>
 
@@ -234,7 +241,7 @@
 <script src="js/core/event-notes.js?v=altar-clue-fallback1"></script>
 <script src="js/core/dark-monsters.js?v=dark-avatar-no-stack1"></script>
 <script src="js/core/dev-tool.js?v=dev-event-modal4"></script>
-<script src="js/ui/render.js?v=relic-icons1"></script>
+<script src="js/ui/render.js?v=map-zoom-pan1"></script>
 <script src="js/ui/modal-render.js?v=event-image-slot1"></script>
 <script src="js/ui/notes-render.js?v=notes-scroll-top1"></script>
 <script src="js/ui/tutorial-render.js?v=tutorial-skip2"></script>

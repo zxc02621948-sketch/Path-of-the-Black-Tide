@@ -432,6 +432,51 @@ html, body {
   grid-template-rows:    repeat(12, 46px);
   gap: 2px;
   border: 1px solid var(--border);
+  transform-origin: 0 0;
+  will-change: transform;
+  touch-action: none;
+}
+
+#map-viewport {
+  position: relative;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+#map-viewport:active {
+  cursor: grabbing;
+}
+
+#map-controls {
+  position: absolute;
+  right: 12px;
+  bottom: 42px;
+  z-index: 6;
+  display: flex;
+  gap: 6px;
+  padding: 5px;
+  border: 1px solid rgba(201, 145, 47, .32);
+  border-radius: 999px;
+  background: rgba(8, 7, 6, .78);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, .38);
+}
+
+.map-control-btn {
+  width: 32px;
+  height: 32px;
+  display: grid;
+  place-items: center;
+  color: #f0d28f;
+  border: 1px solid rgba(201, 145, 47, .42);
+  border-radius: 999px;
+  background: rgba(38, 28, 14, .86);
+  font: inherit;
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .map-cell {
@@ -6794,11 +6839,15 @@ body::before {
 
   #map-panel {
     padding: 12px 8px 14px;
-    overflow-x: auto;
-    overflow-y: auto;
+    min-height: min(72vh, 520px);
+    overflow: hidden;
     align-items: flex-start;
     justify-content: flex-start;
     -webkit-overflow-scrolling: touch;
+  }
+
+  #map-viewport {
+    min-height: min(64vh, 460px);
   }
 
   #map-grid {
@@ -7357,6 +7406,16 @@ body::before {
   #map-panel {
     padding-left: 6px;
     padding-right: 6px;
+    min-height: 68vh;
+  }
+
+  #map-viewport {
+    min-height: 60vh;
+  }
+
+  #map-controls {
+    right: 10px;
+    bottom: 40px;
   }
 
   .modal-content.tutorial-modal #modal-choices {

@@ -214,6 +214,145 @@ const Render = {
         grid.appendChild(el);
       }
     }
+    this._ensureMapView();
+    this._applyMapView({ centerIfPlayerMoved: true });
+  },
+
+  _ensureMapView() {
+    const viewport = document.getElementById('map-viewport');
+    const grid = document.getElementById('map-grid');
+    if (!viewport || !grid || viewport.dataset.mapViewReady) return;
+    viewport.dataset.mapViewReady = 'true';
+    if (!G.mapView) {
+      G.mapView = { zoom: 1, panX: 0, panY: 0, lastPlayerKey: null, suppressClick: false };
+    }
+
+    const pointers = new Map();
+    let dragStart = null;
+    let pinchStart = null;
+
+    viewport.addEventListener('click', event => {
+      if (!G.mapView?.suppressClick) return;
+      event.preventDefault();
+      event.stopPropagation();
+      G.mapView.suppressClick = false;
+    }, true);
+
+    viewport.addEventListener('pointerdown', event => {
+      if (event.button !== undefined && event.button !== 0) return;
+      viewport.setPointerCapture?.(event.pointerId);
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 1) {
+        dragStart = { x: event.clientX, y: event.clientY, panX: G.mapView.panX || 0, panY: G.mapView.panY || 0, moved: false };
+      } else if (pointers.size === 2) {
+        const pts = [...pointers.values()];
+        pinchStart = {
+          distance: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y),
+          zoom: G.mapView.zoom || 1,
+          centerX: (pts[0].x + pts[1].x) / 2,
+          centerY: (pts[0].y + pts[1].y) / 2,
+        };
+      }
+    });
+
+    viewport.addEventListener('pointermove', event => {
+      if (!pointers.has(event.pointerId)) return;
+      pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+      if (pointers.size === 2 && pinchStart) {
+        event.preventDefault();
+        const pts = [...pointers.values()];
+        const distance = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+        this._zoomMapAt(pinchStart.centerX, pinchStart.centerY, distance / Math.max(1, pinchStart.distance), pinchStart.zoom);
+        G.mapView.suppressClick = true;
+        return;
+      }
+      if (!dragStart || pointers.size !== 1) return;
+      const dx = event.clientX - dragStart.x;
+      const dy = event.clientY - dragStart.y;
+      if (Math.hypot(dx, dy) > 4) dragStart.moved = true;
+      if (!dragStart.moved) return;
+      event.preventDefault();
+      G.mapView.panX = dragStart.panX + dx;
+      G.mapView.panY = dragStart.panY + dy;
+      G.mapView.suppressClick = true;
+      this._applyMapView();
+    });
+
+    const endPointer = event => {
+      pointers.delete(event.pointerId);
+      if (pointers.size < 2) pinchStart = null;
+      if (pointers.size === 0) dragStart = null;
+    };
+    viewport.addEventListener('pointerup', endPointer);
+    viewport.addEventListener('pointercancel', endPointer);
+
+    viewport.addEventListener('wheel', event => {
+      event.preventDefault();
+      this._zoomMapAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
+    }, { passive: false });
+
+    document.getElementById('map-controls')?.addEventListener('click', event => {
+      const action = event.target?.closest?.('[data-map-control]')?.dataset.mapControl;
+      if (!action) return;
+      if (action === 'center') {
+        this._centerMapOnPlayer();
+      } else {
+        const rect = viewport.getBoundingClientRect();
+        this._zoomMapAt(rect.left + rect.width / 2, rect.top + rect.height / 2, action === 'zoom-in' ? 1.18 : 1 / 1.18);
+      }
+    });
+  },
+
+  _mapZoomBounds() {
+    return { min: window.matchMedia?.('(max-width: 760px)').matches ? 0.9 : 0.75, max: 2.4 };
+  },
+
+  _clampMapZoom(value) {
+    const bounds = this._mapZoomBounds();
+    return Math.max(bounds.min, Math.min(bounds.max, value || 1));
+  },
+
+  _zoomMapAt(clientX, clientY, factor, baseZoom = null) {
+    const viewport = document.getElementById('map-viewport');
+    if (!viewport || !G.mapView) return;
+    const rect = viewport.getBoundingClientRect();
+    const oldZoom = G.mapView.zoom || 1;
+    const nextZoom = this._clampMapZoom((baseZoom || oldZoom) * factor);
+    const localX = clientX - rect.left;
+    const localY = clientY - rect.top;
+    const mapX = (localX - (G.mapView.panX || 0)) / oldZoom;
+    const mapY = (localY - (G.mapView.panY || 0)) / oldZoom;
+    G.mapView.zoom = nextZoom;
+    G.mapView.panX = localX - mapX * nextZoom;
+    G.mapView.panY = localY - mapY * nextZoom;
+    this._applyMapView();
+  },
+
+  _centerMapOnPlayer() {
+    const viewport = document.getElementById('map-viewport');
+    const playerCell = document.querySelector('#map-grid .map-cell.has-player');
+    if (!viewport || !playerCell || !G.mapView) return;
+    const zoom = this._clampMapZoom(G.mapView.zoom || (window.matchMedia?.('(max-width: 760px)').matches ? 1.35 : 1));
+    const targetX = playerCell.offsetLeft + playerCell.offsetWidth / 2;
+    const targetY = playerCell.offsetTop + playerCell.offsetHeight / 2;
+    G.mapView.zoom = zoom;
+    G.mapView.panX = viewport.clientWidth / 2 - targetX * zoom;
+    G.mapView.panY = viewport.clientHeight / 2 - targetY * zoom;
+    G.mapView.lastPlayerKey = `${G.playerX},${G.playerY}`;
+    this._applyMapView();
+  },
+
+  _applyMapView(opts = {}) {
+    const grid = document.getElementById('map-grid');
+    if (!grid) return;
+    if (!G.mapView) G.mapView = { zoom: 1, panX: 0, panY: 0, lastPlayerKey: null, suppressClick: false };
+    const playerKey = `${G.playerX},${G.playerY}`;
+    if (opts.centerIfPlayerMoved && G.mapView.lastPlayerKey !== playerKey) {
+      requestAnimationFrame(() => this._centerMapOnPlayer());
+      return;
+    }
+    G.mapView.zoom = this._clampMapZoom(G.mapView.zoom || 1);
+    grid.style.transform = `translate(${Math.round(G.mapView.panX || 0)}px, ${Math.round(G.mapView.panY || 0)}px) scale(${G.mapView.zoom})`;
   },
 
   animatePlayerMove(fromX, fromY, toX, toY, onDone = null) {
