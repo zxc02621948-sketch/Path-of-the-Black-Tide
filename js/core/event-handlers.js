@@ -282,11 +282,12 @@ const GameEventHandlers = {
   _eventRelicChoiceCardHtml(relic, index) {
     const lore = this._getFirstLore(relic.id);
     const shortDesc = this._shortEventRelicDesc(relic.desc || '');
+    const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
     const visual = relic.iconImage
       ? `<img class="event-relic-choice-img" src="${this._escapeEventAttr(relic.iconImage)}" alt="">`
       : `<span class="event-relic-choice-emoji">${this._escapeEventHtml(relic.icon || '◆')}</span>`;
     return `
-      <button type="button" class="event-relic-choice" onclick="Game.chooseEventRelicChoice(${index})">
+      <button type="button" class="event-relic-choice relic-${relicClass}" onclick="Game.chooseEventRelicChoice(${index})">
         <span class="event-relic-choice-visual">${visual}</span>
         <span class="event-relic-choice-body">
           <span class="event-relic-choice-kicker">帶走這件聖物</span>

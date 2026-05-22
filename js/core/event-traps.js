@@ -150,6 +150,8 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇解除方式。小心處理需要探索骰；硬闖會讓全隊受傷但直接通過${ev.detourActionCost > 0 ? '；繞路會消耗剩餘行動但避免傷害' : ''}。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices,
     });
   },
@@ -171,6 +173,8 @@ const GameEventTraps = {
         preDesc,
         resultDesc: `${preDesc}\n\n${resultText}`,
         resultAppend: resultText,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -190,6 +194,8 @@ const GameEventTraps = {
       preDesc,
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
       choices: [
         {
@@ -225,6 +231,8 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.forceDesc || ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
     });
   },
@@ -239,6 +247,8 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.detourDesc || ev.desc || ''}\n\n${text}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
@@ -263,10 +273,15 @@ const GameEventTraps = {
       }
     }
     this._completeProgressEvent(ev);
+    const descText = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.fixedResultText || '陷阱立刻生效，沒有時間閃避。'}\n${effects.join('\n')}`;
+    const choices = [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }];
     this._openModal({
       title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.fixedResultText || '陷阱立刻生效，沒有時間閃避。'}\n${effects.join('\n')}`,
-      choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
+      desc: descText,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
+      typeText: !ev.eventImage,
+      choices,
     });
   },
 

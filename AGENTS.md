@@ -31,6 +31,14 @@ This project contains a lot of Traditional Chinese player-facing text. Treat tex
 - If something is usable but has tradeoffs, state the tradeoffs clearly and recommend the best path.
 - The user remains the final decision maker, but the assistant should act as a thoughtful production partner rather than only an execution tool.
 
+## Collaboration Before Editing
+
+- Before changing code, first understand the relevant runtime path. For example, distinguish formal gameplay flow from dev-tool shortcuts before patching event, combat, or modal behavior.
+- If a request may conflict with existing logic, create side effects, or make a feature feel redundant, explain the concern and recommended options before editing.
+- Before starting implementation, briefly state which files or systems will be touched, why, and what behavior should change.
+- Do not automatically run checks after every small edit. If the user asks to defer checks, skip them unless the edit is high risk; in that case, explain the risk first.
+- Keep small visual or asset iterations lightweight. Make the focused change, update cache when needed, and wait for feedback before broad cleanup or verification.
+
 ## Work Modes And Search Scope
 
 Choose the lightest workflow that fits the user's request. Do not treat every task like a fresh codebase audit.

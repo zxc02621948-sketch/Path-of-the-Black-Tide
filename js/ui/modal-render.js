@@ -207,6 +207,14 @@ const RenderModal = {
       }
     }
 
+    if (cfg.eventImage) {
+      const image = document.createElement('img');
+      image.className = 'modal-extra event-illustration-img';
+      image.src = cfg.eventImage;
+      image.alt = cfg.eventImageAlt || '';
+      contentEl.appendChild(image);
+    }
+
     choicesEl.innerHTML = '';
     const combatActionsEl = cfg.combat ? contentEl.querySelector('.combat-actions') : null;
     if (combatActionsEl) combatActionsEl.innerHTML = '';
@@ -264,8 +272,11 @@ const RenderModal = {
     descEl.scrollTop = 0;
     choicesEl.scrollTop = 0;
     if (cfg.combat) {
+      this._bindCombatIntentArrowResize();
       requestAnimationFrame(() => this._positionCombatIntentArrow());
       setTimeout(() => this._positionCombatIntentArrow(), 160);
+    } else {
+      this._unbindCombatIntentArrowResize();
     }
 
     // Section.
@@ -448,7 +459,7 @@ const RenderModal = {
     const arrow = scene?.querySelector('.combat-intent-arrow');
     if (!scene || !arrow) return;
     const targetId = arrow.dataset.targetId || '';
-    const source = scene.querySelector('.combat-enemy-sprite');
+    const source = scene.querySelector('.combat-enemy-card');
     const target = [...scene.querySelectorAll('.combat-unit[data-char-id]')]
       .find(unit => unit.dataset.charId === targetId);
     if (!source || !target) {
@@ -458,10 +469,17 @@ const RenderModal = {
     arrow.hidden = false;
     const sourceRect = source.getBoundingClientRect();
     const targetRect = target.getBoundingClientRect();
-    const horizontal = targetRect.left > sourceRect.right;
-    const x1 = horizontal ? sourceRect.right + 2 : sourceRect.left + sourceRect.width / 2;
+    const gapRight = targetRect.left - sourceRect.right;
+    const gapLeft = sourceRect.left - targetRect.right;
+    const horizontal = gapRight > -12 || gapLeft > -12;
+    const targetOnRight = targetRect.left >= sourceRect.left;
+    const x1 = horizontal
+      ? (targetOnRight ? sourceRect.right - 4 : sourceRect.left + 4)
+      : sourceRect.left + sourceRect.width / 2;
     const y1 = sourceRect.top + sourceRect.height / 2;
-    const x2 = horizontal ? targetRect.left - 8 : targetRect.left + targetRect.width / 2;
+    const x2 = horizontal
+      ? (targetOnRight ? targetRect.left + 6 : targetRect.right - 6)
+      : targetRect.left + targetRect.width / 2;
     const y2 = horizontal ? targetRect.top + targetRect.height / 2 : targetRect.top - 8;
     arrow.setAttribute('viewBox', `0 0 ${Math.max(1, window.innerWidth)} ${Math.max(1, window.innerHeight)}`);
     arrow.querySelector('line')?.setAttribute('x1', x1);
@@ -470,6 +488,30 @@ const RenderModal = {
     arrow.querySelector('line')?.setAttribute('y2', y2);
     arrow.querySelector('circle')?.setAttribute('cx', x1);
     arrow.querySelector('circle')?.setAttribute('cy', y1);
+  },
+
+  _bindCombatIntentArrowResize() {
+    if (this._combatIntentArrowResizeHandler) return;
+    this._combatIntentArrowResizeHandler = () => {
+      if (this._combatIntentArrowResizeFrame) cancelAnimationFrame(this._combatIntentArrowResizeFrame);
+      this._combatIntentArrowResizeFrame = requestAnimationFrame(() => {
+        this._combatIntentArrowResizeFrame = null;
+        this._positionCombatIntentArrow();
+      });
+    };
+    window.addEventListener('resize', this._combatIntentArrowResizeHandler);
+    window.addEventListener('orientationchange', this._combatIntentArrowResizeHandler);
+  },
+
+  _unbindCombatIntentArrowResize() {
+    if (!this._combatIntentArrowResizeHandler) return;
+    window.removeEventListener('resize', this._combatIntentArrowResizeHandler);
+    window.removeEventListener('orientationchange', this._combatIntentArrowResizeHandler);
+    this._combatIntentArrowResizeHandler = null;
+    if (this._combatIntentArrowResizeFrame) {
+      cancelAnimationFrame(this._combatIntentArrowResizeFrame);
+      this._combatIntentArrowResizeFrame = null;
+    }
   },
 
   _animateModalDice(diceEl, finalValue, onDone = null) {
@@ -721,7 +763,7 @@ const RenderModal = {
     }
     if (!pop.children.length) return;
     const x = targetRect.left - sceneRect.left + targetRect.width / 2;
-    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 138);
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104);
     pop.style.left = `${Math.round(x)}px`;
     pop.style.top = `${Math.round(y)}px`;
     sceneEl.appendChild(pop);
@@ -739,14 +781,14 @@ const RenderModal = {
     fx.className = `combat-hit-effect hit-${effect}`;
     fx.setAttribute('aria-hidden', 'true');
     const x = targetRect.left - sceneRect.left + targetRect.width / 2;
-    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 54 : 128);
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 54 : 72);
     fx.style.left = `${Math.round(x)}px`;
     fx.style.top = `${Math.round(y)}px`;
     if (sourceRect) {
       const sourceX = sourceRect.left + sourceRect.width / 2;
       const sourceY = sourceRect.top + sourceRect.height / 2;
       const targetX = targetRect.left + targetRect.width / 2;
-      const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 128);
+      const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 72);
       const angle = Math.atan2(targetY - sourceY, targetX - sourceX) * 180 / Math.PI;
       fx.style.setProperty('--hit-angle', `${angle}deg`);
     }
@@ -764,7 +806,7 @@ const RenderModal = {
     const sourceX = sourceRect.left + sourceRect.width / 2;
     const sourceY = sourceRect.top + sourceRect.height / 2;
     const targetX = targetRect.left + targetRect.width / 2;
-    const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 128);
+    const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 72);
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
     const distance = Math.max(120, Math.hypot(dx, dy));
@@ -1453,6 +1495,7 @@ const RenderModal = {
     this._hideCombatTip();
     this._hideCombatBannerPopover();
     this._hideCombatStatusPopover();
+    this._unbindCombatIntentArrowResize();
     document.getElementById('event-modal').classList.add('hidden');
     this.fullRender();
   },

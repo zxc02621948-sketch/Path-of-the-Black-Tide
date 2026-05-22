@@ -135,6 +135,26 @@ js/core/combat-flow.js?v=attacker-active-immediate1
 - 視覺微調可以先不跑檢查，等一批完成再統一檢查。
 - 使用者喜歡邊看邊調，會直接指出「太暗」、「太大」、「位置不對」。
 
+## Current Collaboration Rule
+
+- 施工前先了解相關運行邏輯，不要看到症狀就直接 patch。
+- 如果需求或方案可能有問題，先提出疑慮與選項，不要機械執行。
+- 動手前先簡短說明要改哪些檔案/系統、為什麼、預期行為是什麼。
+- 先不要自動跑檢查；除非使用者要求，或改動風險高到不檢查很危險，才先說明後再跑。
+- 測試工具路徑和正式遊戲流程要分開判斷，不能只看其中一邊就下結論。
+
+## Current Open Issue
+
+正在處理「測試工具指定觸發吞腳泥潭」時，只在日誌顯示 `行動 -1`，但事件彈窗沒有打開的問題。
+
+已知狀態：
+
+- `吞腳泥潭` 在 `js/data/events.js` 已加上 `eventImage: 'assets/events/swallowing-mud.png'`。
+- 固定陷阱 `_triggerFixedTrap` 在 `js/core/event-traps.js` 已改成可用 `descHtml` 顯示事件插圖。
+- `style.css` 已加入 `.event-illustration-*` 樣式。
+- `js/core/dev-tool.js` 曾嘗試改成先 `_closeModal()` 再 `setTimeout(() => this._dispatchTerrainEvent(...), 0)`，但使用者回報仍然只回到大地圖、沒有彈窗。
+- 下一步應先理解 `_closeModal()`、`Render.hideModal()`、`_dispatchTerrainEvent()`、`_triggerFixedTrap()` 的互動，不要直接再 patch。
+
 ## Suggested Next Steps
 
 如果新聊天室要繼續，可能會接著做：
@@ -153,4 +173,3 @@ node --check js\core\combat-flow.js
 ```
 
 如果沒有再改資料/文字，可視情況只跑改到的 JS。
-

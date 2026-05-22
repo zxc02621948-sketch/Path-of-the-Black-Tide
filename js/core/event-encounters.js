@@ -5,8 +5,21 @@ const GameEventEncounters = {
     const enemy = randomEnemy(G.phase === 'night');
     cell.type = 'enemy';
     cell.content = { enemy, event: ev };
-    this._log(`${this._eventDiceInline(ev)}${ev.desc}`);
-    this._triggerCombat(cell);
+    this._openModal({
+      title: ev.name,
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
+      choices: [{
+        label: '進入戰鬥',
+        danger: true,
+        action: () => {
+          this._log(`${this._eventDiceInline(ev)}${ev.desc}`);
+          this._closeModal();
+          this._triggerCombat(cell);
+        },
+      }],
+    });
   },
 
   _settleTerrainCombatSmallReward(ev, enemy, attacker, roll, rollResult, combatLog = [], combatAnims = null) {
@@ -135,6 +148,8 @@ const GameEventEncounters = {
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n獲得道具：${equip.icon} ${equip.name}${countText}\n${equip.desc}${eventInfo}`;
       this._openModal({
         title: ev.name,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       desc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : `${preDesc}${progress.text}`,
       preDesc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : undefined,
       resultDesc: progress.dice ? `${preDesc}${progress.text}` : undefined,
@@ -152,6 +167,8 @@ const GameEventEncounters = {
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n沒有找到可帶走的道具。${eventInfo}`;
       this._openModal({
         title: ev.name,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       desc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : `${preDesc}${progress.text}`,
       preDesc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : undefined,
       resultDesc: progress.dice ? `${preDesc}${progress.text}` : undefined,
@@ -185,6 +202,8 @@ const GameEventEncounters = {
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${healText}${eventInfo}`;
       this._openModal({
         title: ev.name,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       desc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : `${preDesc}${progress.text}`,
       preDesc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : undefined,
       resultDesc: progress.dice ? `${preDesc}${progress.text}` : undefined,
@@ -289,6 +308,8 @@ const GameEventEncounters = {
           this._openModal({
             title: ev.name,
             desc: nextDesc,
+            eventImage: ev.eventImage || '',
+            eventImageAlt: ev.name || '',
             choices: nextChoices(nextDesc),
           });
           return;
@@ -306,6 +327,8 @@ const GameEventEncounters = {
           this._openModal({
             title: ev.name,
             desc: nextDesc,
+            eventImage: ev.eventImage || '',
+            eventImageAlt: ev.name || '',
             choices: nextChoices(nextDesc),
           });
           return;
@@ -317,6 +340,8 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices,
     });
   },

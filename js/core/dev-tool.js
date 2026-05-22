@@ -439,9 +439,20 @@ const GameDevTool = {
       desc: '選擇要直接觸發的事件。',
       choices: events.map(ev => ({
         label: `${ev.name}（${this._devEventTypeLabel(ev)}）`,
-        detail: ev.desc || '',
-        action: () => this._devTriggerEvent(terrainType, ev),
+        action: () => this._devPreviewEvent(terrainType, terrainLabel, ev),
       })).concat([{ label: '返回', action: () => this._devChooseEventTerrain() }]),
+    });
+  },
+
+  _devPreviewEvent(terrainType, terrainLabel, ev) {
+    this._openModal({
+      title: `${ev.name}（${this._devEventTypeLabel(ev)}）`,
+      desc: ev.desc || '',
+      typeText: false,
+      choices: [
+        { label: `${ev.name}（${this._devEventTypeLabel(ev)}）`, action: () => this._devTriggerEvent(terrainType, ev) },
+        { label: '返回', action: () => this._devChooseEvent(terrainType, terrainLabel) },
+      ],
     });
   },
 
@@ -489,7 +500,11 @@ const GameDevTool = {
       content: { event: { ...ev, gamblerResolved: true } },
     };
     this._log(`測試工具：觸發事件「${ev.name}」。`, 'info');
-    this._dispatchTerrainEvent(cell, cell.content.event);
+    G.modal = null;
+    document.getElementById('event-modal')?.classList.add('hidden');
+    setTimeout(() => {
+      this._dispatchTerrainEvent(cell, cell.content.event);
+    }, 0);
   },
 
   _devOpenSquadStateTool() {

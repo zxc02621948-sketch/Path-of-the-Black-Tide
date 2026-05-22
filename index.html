@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
-<link rel="stylesheet" href="style.css?v=relic-assign-hover1">
+<link rel="stylesheet" href="style.css?v=event-image-stable1">
 </head>
 <body>
 <div id="app">
@@ -91,6 +91,7 @@
         <div class="darkness-bar"><div id="darkness-bar-fill"></div></div>
       </div>
       <div id="top-controls">
+        <button id="btn-open-log" class="btn-small">日誌</button>
         <button id="btn-open-notes" class="btn-small">探險筆記</button>
         <button id="btn-dev-tool" class="btn-small dev-tool-btn">測試工具</button>
       </div>
@@ -101,7 +102,10 @@
 
       <!-- 左側：日誌面板 -->
       <div id="log-panel">
-        <div class="log-panel-title">日誌</div>
+        <div class="log-panel-title">
+          <span>日誌</span>
+          <button id="btn-close-log" class="log-panel-close" type="button">關閉</button>
+        </div>
         <div id="log-messages"></div>
       </div>
 
@@ -195,9 +199,9 @@
 <script src="js/config.js?v=map-opening-balance1"></script>
 <script src="js/data/equipment.js?v=item-icons1"></script>
 <script src="js/data/characters.js?v=scholar-odd-flaw2"></script>
-<script src="js/data/relics.js?v=eagle-feather-icon2"></script>
+<script src="js/data/relics.js?v=wager-dice-low-rate1"></script>
 <script src="js/data/enemies.js?v=dark-gift1"></script>
-<script src="js/data/events.js?v=trap-tiers2"></script>
+<script src="js/data/events.js?v=combat-event-intro1"></script>
 <script src="js/data/resonances.js?v=banner-warcry-round1"></script>
 <script src="js/core/dice.js?v=rulesnotes2"></script>
 <script src="js/core/map.js?v=map-opening-balance1"></script>
@@ -208,7 +212,7 @@
 <script src="js/core/relic-rules.js?v=pain-mask-desc1"></script>
 <script src="js/core/equipment-rules.js?v=rulesnotes2"></script>
 <script src="js/core/terrain-rules.js?v=rulesnotes2"></script>
-<script src="js/core/game.js?v=relic-info-before-assign1"></script>
+<script src="js/core/game.js?v=relic-pain-mask-class1"></script>
 <script src="js/core/inventory.js?v=relic-replace-drop1"></script>
 <script src="js/ui/icon-render.js?v=weapon-icons1"></script>
 <script src="js/core/character-details.js?v=relic-title-icons1"></script>
@@ -223,17 +227,17 @@
   <script src="js/core/combat-retreat.js?v=dark-gift1"></script>
 <script src="js/core/site-actions.js?v=altar-choice-hints1"></script>
 <script src="js/core/echo-sites.js?v=victory-anim-wait1"></script>
-<script src="js/core/event-handlers.js?v=relic-assign-lean1"></script>
-  <script src="js/core/event-treasure.js?v=dark-gift1"></script>
-<script src="js/core/event-encounters.js?v=supply-heal-detail1"></script>
-<script src="js/core/event-traps.js?v=trap-tiers1"></script>
+<script src="js/core/event-handlers.js?v=event-relic-class1"></script>
+  <script src="js/core/event-treasure.js?v=gear-reward-info2"></script>
+<script src="js/core/event-encounters.js?v=combat-event-intro1"></script>
+<script src="js/core/event-traps.js?v=choice-trap-image1"></script>
 <script src="js/core/event-notes.js?v=altar-clue-fallback1"></script>
 <script src="js/core/dark-monsters.js?v=dark-avatar-no-stack1"></script>
-<script src="js/core/dev-tool.js?v=relic-choice-icons1"></script>
+<script src="js/core/dev-tool.js?v=dev-event-modal4"></script>
 <script src="js/ui/render.js?v=relic-icons1"></script>
-<script src="js/ui/modal-render.js?v=bow-followup-card1"></script>
+<script src="js/ui/modal-render.js?v=event-image-slot1"></script>
 <script src="js/ui/notes-render.js?v=notes-scroll-top1"></script>
 <script src="js/ui/tutorial-render.js?v=tutorial-skip2"></script>
-<script src="js/main.js?v=library-relic-icons1"></script>
+<script src="js/main.js?v=mobile-log-button1"></script>
 </body>
 </html>

@@ -461,11 +461,12 @@ const Game = {
     const name = this._escapeHtmlLocal(relic.name || '未知聖物');
     const desc = this._escapeHtmlLocal(relic.desc || '');
     const loreHtml = !compact && lore ? `<div class="relic-reward-lore">「${this._escapeHtmlLocal(lore)}」</div>` : '';
+    const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
     const visual = relic.iconImage
       ? `<img class="relic-reward-img" src="${this._escapeAttrLocal(relic.iconImage)}" alt="">`
       : `<span class="relic-reward-emoji">${this._escapeHtmlLocal(relic.icon || '◆')}</span>`;
     return `
-      <div class="relic-reward-panel${compact ? ' compact' : ''}">
+      <div class="relic-reward-panel relic-${relicClass}${compact ? ' compact' : ''}">
         <div class="relic-reward-visual">${visual}</div>
         <div class="relic-reward-copy">
           <div class="relic-reward-kicker">選擇持有者</div>

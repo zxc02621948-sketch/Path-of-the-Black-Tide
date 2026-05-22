@@ -126,6 +126,14 @@ document.addEventListener('DOMContentLoaded', () => {
     Render.showNotes();
   });
 
+  document.getElementById('btn-open-log')?.addEventListener('click', () => {
+    document.body.classList.add('mobile-log-open');
+  });
+
+  document.getElementById('btn-close-log')?.addEventListener('click', () => {
+    document.body.classList.remove('mobile-log-open');
+  });
+
   document.getElementById('btn-dev-tool')?.addEventListener('click', () => {
     Game.openDevTool();
   });

@@ -230,11 +230,9 @@ const GameEventTreasure = {
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
       combatAnims,
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
-      choices: [{
-        label: `分配「${gear.name}」`,
-        action: () => this._openTreasureMimicGearModal(cell, enemy, gear, combatLog),
-      }],
+      choices: [],
     });
+    setTimeout(() => this._openTreasureMimicGearModal(cell, enemy, gear, combatLog), this._combatAnimWaitMs(combatAnims));
   },
 
   _settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
@@ -251,8 +249,13 @@ const GameEventTreasure = {
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 開啟 ${enemy.name}`),
       combatAnims,
       dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
-      choices: this._darkGiftRewardAssignChoices(cell, reward),
+      choices: reward.type === 'gear'
+        ? []
+        : this._darkGiftRewardAssignChoices(cell, reward),
     });
+    if (reward.type === 'gear') {
+      setTimeout(() => this._openDarkGiftRewardAssignModal(cell, reward, combatLog), this._combatAnimWaitMs(combatAnims));
+    }
   },
 
   _rollDarkGiftMimicReward() {
@@ -412,10 +415,132 @@ const GameEventTreasure = {
       return;
     }
 
-    this._openTreasureMimicGearModal(cell, null, reward, combatLog);
+    this._openGearRewardModal({
+      gear: reward,
+      combatLog,
+      abandonLog: `放棄黑匣擬態掉落的裝備「${reward.name}」。`,
+      clear: () => this._clearWeaponChest(cell),
+    });
   },
 
   _openTreasureMimicGearModal(cell, enemy, gear, combatLog = []) {
+    this._openGearRewardModal({
+      gear,
+      combatLog,
+      boostText: enemy?.gearDropBoost ? '命中原生弱點使掉落率提高。' : '',
+      abandonLog: `放棄寶箱擬態怪掉落的裝備「${gear.name}」。`,
+      clear: () => this._clearWeaponChest(cell),
+    });
+  },
+
+  _openGearRewardModal({ gear, combatLog = [], boostText = '', abandonLog = '', clear = null }) {
+    this._gearAssignContext = { gear, clear, abandonLog };
+    this._openModal({
+      title: `發現裝備：${gear.name}`,
+      descHtml: this._gearRewardCardHtml(gear, boostText),
+      typeText: false,
+      combatLog,
+      choices: [
+        { label: '分配裝備', action: () => this._openGearAssignTargetModal(gear, clear, abandonLog) },
+        {
+          label: '放棄裝備',
+          className: 'relic-abandon-choice',
+          action: () => {
+            this._gearAssignContext = null;
+            if (typeof clear === 'function') clear();
+            this._log(abandonLog || `放棄裝備「${gear.name}」。`, 'dim');
+            this._closeModal();
+            Render.fullRender();
+          },
+        },
+      ],
+    });
+  },
+
+  _openGearAssignTargetModal(gear, clear = null, abandonLog = '') {
+    const assignOptions = this._aliveSquad().map(char => ({
+      char,
+      actionLabel: char.gear ? '替換' : '裝備',
+      currentGear: char.gear || null,
+      action: () => this._giveGearFromTreasureMimic({ clear }, char, gear),
+    }));
+    this._gearAssignContext = { gear, options: assignOptions, clear, abandonLog };
+    this._openModal({
+      title: `發現裝備：${gear.name}`,
+      descHtml: this._gearAssignPanelHtml(assignOptions),
+      typeText: false,
+      choices: [{
+        label: '放棄裝備',
+        className: 'relic-abandon-choice',
+        action: () => {
+          this._gearAssignContext = null;
+          if (typeof clear === 'function') clear();
+          this._log(abandonLog || `放棄裝備「${gear.name}」。`, 'dim');
+          this._closeModal();
+          Render.fullRender();
+        },
+      }],
+    });
+  },
+
+  chooseGearAssignTarget(index) {
+    const option = this._gearAssignContext?.options?.[index];
+    if (option?.action) option.action();
+  },
+
+  _gearRewardCardHtml(gear, boostText = '') {
+    const visual = gear.iconImage
+      ? `<img class="relic-reward-img gear-reward-img" src="${this._escapeAttrLocal(gear.iconImage)}" alt="">`
+      : `<span class="relic-reward-emoji">${this._escapeHtmlLocal(gear.icon || '◆')}</span>`;
+    return `
+      <div class="relic-reward-panel gear-reward-panel">
+        <div class="relic-reward-visual">${visual}</div>
+        <div class="relic-reward-copy">
+          <div class="relic-reward-kicker">選擇裝備者</div>
+          <div class="relic-reward-name">${this._escapeHtmlLocal(gear.name || '未知裝備')}</div>
+          <div class="relic-reward-desc">${this._escapeHtmlLocal(gear.desc || '')}</div>
+          ${boostText ? `<div class="relic-reward-lore">${this._escapeHtmlLocal(boostText)}</div>` : ''}
+        </div>
+      </div>
+    `;
+  },
+
+  _gearAssignPanelHtml(assignOptions = []) {
+    const assignCards = assignOptions.length
+      ? assignOptions.map((option, index) => this._gearAssignTargetCardHtml(option, index)).join('')
+      : '<div class="relic-assign-empty">沒有可裝備這件裝備的角色。</div>';
+    return `
+      <div class="relic-assign-panel gear-assign-panel">
+        <div class="relic-assign-instruction">選擇要交給哪位角色。</div>
+        <div class="relic-assign-target-grid">${assignCards}</div>
+      </div>
+    `;
+  },
+
+  _gearAssignTargetCardHtml(option, index) {
+    const char = option.char;
+    const cls = CHARACTER_CLASSES[char.cls] || {};
+    const hpText = `${Math.max(0, char.hp || 0)}/${char.maxHp || 0}`;
+    const current = option.currentGear
+      ? `<span class="relic-assign-current">替換：${this._escapeHtmlLocal(option.currentGear.name || '既有裝備')}</span>`
+      : '<span class="relic-assign-current empty">空欄位</span>';
+    const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
+    const art = battleArt ? `<span class="relic-assign-art"><img src="${this._escapeAttrLocal(battleArt)}" alt=""></span>` : '';
+    return `
+      <button type="button" class="relic-assign-target-card gear-assign-target-card${option.currentGear ? ' replace' : ''}" onclick="Game.chooseGearAssignTarget(${index})">
+        ${art}
+        <span class="relic-assign-head">
+          <span class="relic-assign-class">${this._escapeHtmlLocal(cls.icon || '◆')}</span>
+          <span class="relic-assign-name">${this._escapeHtmlLocal(char.name || '')}</span>
+          <span class="relic-assign-action">${this._escapeHtmlLocal(option.actionLabel || '裝備')}</span>
+        </span>
+        <span class="relic-assign-meta">HP ${this._escapeHtmlLocal(hpText)}</span>
+        ${current}
+      </button>
+    `;
+  },
+
+  _openTreasureMimicGearAssignModal(cell, enemy, gear, combatLog = []) {
     const choices = this._aliveSquad().map(char => ({
       label: `${char.name}：裝備 ${gear.name}${char.gear ? `（替換 ${char.gear.name}）` : ''}`,
       action: () => this._giveGearFromTreasureMimic(cell, char, gear),
@@ -457,7 +582,12 @@ const GameEventTreasure = {
     const current = char.gear;
     char.gear = { ...gear };
     this._log(`${char.name} 裝備「${gear.name}」${current ? `，替換「${current.name}」` : ''}。`, 'reward');
-    this._clearWeaponChest(cell);
+    this._gearAssignContext = null;
+    if (typeof cell?.clear === 'function') {
+      cell.clear();
+    } else {
+      this._clearWeaponChest(cell);
+    }
     this._closeModal();
     Render.fullRender();
   },

@@ -71,10 +71,10 @@ const RELICS = [
     id: 'wager_dice',
     name: '賭命骰子',
     icon: '🎲',
-    iconImage: 'assets/relics/wager-dice.png',
-    rarity: 'legendary',
+    iconImage: 'assets/relics/wager-dice.png?v=2',
+    rarity: 'rare',
+    poolWeight: 0.25,
     fusable: true,
-    eventOnly: true,
     desc: '戰鬥開始後，持有者主戰前可押注 3 個骰面。若本次攻擊命中押注骰面，傷害 +4；若未命中，下次受擊回合受到的傷害 +30%，最多 3 層。',
     effect: { type: 'wager_dice', faces: 3, damageBonus: 4, missPenaltyRate: 0.30, maxMissStacks: 3 },
     fusedEffect: { type: 'wager_dice', faces: 4, damageBonus: 4, missPenaltyRate: 0.30, maxMissStacks: 3 },
@@ -83,7 +83,7 @@ const RELICS = [
       '賭命骰子沉甸甸的，像把一小段命運握在掌心。',
       '骰角有一點星光般的凹痕。命運若要翻面，也許需要一顆不肯熄滅的星替它落定。',
     ],
-    locationHint: '命運賭桌事件或聖物獎勵中可能出現。',
+    locationHint: '普通聖物獎勵中可能出現；命運賭桌事件可指定獲取。',
   },
   {
     id: 'lucky_star',
@@ -192,7 +192,7 @@ const RELICS = [
     id: 'pain_mask',
     name: '痛苦面具',
     icon: '🎭',
-    iconImage: 'assets/relics/pain-mask.png',
+    iconImage: 'assets/relics/pain-mask.png?v=2',
     rarity: 'rare',
     fusable: true,
     desc: '主戰造成傷害時，每 4 點原始傷害附加 1 層傷口。',
@@ -245,12 +245,18 @@ const RARITY_WEIGHTS = CONFIG.RARITY_WEIGHTS || { common: 5, uncommon: 3, rare: 
 
 function weightedRelicPick(pool) {
   const weighted = [];
+  let totalWeight = 0;
   for (const relic of pool) {
-    const w = RARITY_WEIGHTS[relic.rarity] ?? 0;
-    for (let i = 0; i < w; i++) weighted.push(relic);
+    const w = Number.isFinite(relic.poolWeight)
+      ? relic.poolWeight
+      : (RARITY_WEIGHTS[relic.rarity] ?? 0);
+    if (w <= 0) continue;
+    totalWeight += w;
+    weighted.push({ relic, upper: totalWeight });
   }
-  if (weighted.length === 0) return pool[0] ?? null;
-  return weighted[Math.floor(Math.random() * weighted.length)];
+  if (totalWeight <= 0) return pool[0] ?? null;
+  const roll = Math.random() * totalWeight;
+  return weighted.find(item => roll < item.upper)?.relic || weighted[weighted.length - 1]?.relic || pool[0] || null;
 }
 
 function getRelicById(id) {
