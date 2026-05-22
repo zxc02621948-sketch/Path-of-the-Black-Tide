@@ -7074,12 +7074,8 @@ body::before {
     max-height: none;
     overflow: visible;
     background:
-      linear-gradient(180deg, rgba(21, 18, 14, .94), rgba(7, 7, 7, .98));
-    border: 1px solid rgba(201, 145, 47, .34);
-    box-shadow:
-      inset 0 1px 0 rgba(255, 222, 150, .06),
-      0 -10px 28px rgba(0, 0, 0, .42);
-    backdrop-filter: blur(8px);
+      linear-gradient(180deg, rgba(20, 18, 15, .12), rgba(14, 13, 12, .94) 38%, rgba(14, 13, 12, .98));
+    box-shadow: 0 -14px 24px rgba(0, 0, 0, .34);
   }
 
   .modal-content.squad-select-layout .squad-actions button {
