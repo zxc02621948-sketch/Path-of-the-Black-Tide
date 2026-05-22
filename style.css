@@ -5026,6 +5026,17 @@ html, body {
     min-height: 86px;
   }
 
+  .tutorial-dark-grid {
+    grid-template-columns: repeat(3, 42px);
+    justify-content: center;
+    gap: 14px;
+  }
+
+  .tutorial-art:has(.tutorial-dark-grid) {
+    min-height: 74px;
+    padding: 9px 0;
+  }
+
   .guide-dark-grid {
     grid-template-columns: repeat(3, 42px);
     margin-left: 4px;
@@ -6908,10 +6919,25 @@ body::before {
     font-size: 1.12em;
   }
 
+  .modal-content.tutorial-modal {
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    overflow: hidden;
+  }
+
   #modal-desc {
     padding-right: 4px;
     padding-bottom: 14px;
     font-size: .96em;
+  }
+
+  .modal-content.tutorial-modal #modal-desc {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    margin-top: 8px;
+    padding-right: 4px;
+    -webkit-overflow-scrolling: touch;
   }
 
   .event-illustration-img {
@@ -6930,6 +6956,7 @@ body::before {
   .modal-content.tutorial-modal #modal-choices {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
+    flex: 0 0 auto;
     max-height: none;
     overflow: visible;
     gap: 8px;
