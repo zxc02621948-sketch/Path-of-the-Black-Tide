@@ -6809,7 +6809,7 @@ body::before {
 
   #map-panel {
     padding: 12px 8px 14px;
-    min-height: min(72vh, 520px);
+    min-height: min(58vh, 430px);
     overflow: hidden;
     align-items: flex-start;
     justify-content: flex-start;
@@ -6821,8 +6821,8 @@ body::before {
     max-width: none;
     flex: 1 1 auto;
     align-self: stretch;
-    min-height: min(64vh, 460px);
-    touch-action: none;
+    min-height: min(50vh, 360px);
+    touch-action: pan-y;
     cursor: grab;
   }
 
@@ -6832,7 +6832,7 @@ body::before {
 
   #map-grid {
     margin: 0;
-    touch-action: none;
+    touch-action: pan-y;
   }
 
   @media (pointer: fine) {
@@ -7437,11 +7437,11 @@ body::before {
   #map-panel {
     padding-left: 6px;
     padding-right: 6px;
-    min-height: 68vh;
+    min-height: 56vh;
   }
 
   #map-viewport {
-    min-height: 60vh;
+    min-height: 48vh;
   }
 
   .modal-content.tutorial-modal #modal-choices {

@@ -247,11 +247,11 @@ const Render = {
       if (!this._isMobileMapView()) return;
       if (!this._isTouchMapEvent(event)) return;
       if (event.button !== undefined && event.button !== 0) return;
-      viewport.setPointerCapture?.(event.pointerId);
       pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
       if (pointers.size === 1) {
         dragStart = { x: event.clientX, y: event.clientY, panX: G.mapView.panX || 0, panY: G.mapView.panY || 0, moved: false };
       } else if (pointers.size === 2) {
+        viewport.setPointerCapture?.(event.pointerId);
         dragStart = null;
         const pts = [...pointers.values()];
         const rect = viewport.getBoundingClientRect();
@@ -294,6 +294,8 @@ const Render = {
         return;
       }
       if (!dragStart || pointers.size !== 1) return;
+      const canDragMap = (G.mapView?.zoom || 1) > 1.05;
+      if (!canDragMap) return;
       const dx = event.clientX - dragStart.x;
       const dy = event.clientY - dragStart.y;
       if (Math.hypot(dx, dy) > 4) dragStart.moved = true;
