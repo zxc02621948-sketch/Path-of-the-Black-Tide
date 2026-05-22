@@ -245,6 +245,7 @@ const Render = {
       if (pointers.size === 1) {
         dragStart = { x: event.clientX, y: event.clientY, panX: G.mapView.panX || 0, panY: G.mapView.panY || 0, moved: false };
       } else if (pointers.size === 2) {
+        dragStart = null;
         const pts = [...pointers.values()];
         const rect = viewport.getBoundingClientRect();
         const centerX = (pts[0].x + pts[1].x) / 2;
@@ -297,7 +298,13 @@ const Render = {
 
     const endPointer = event => {
       pointers.delete(event.pointerId);
-      if (pointers.size < 2) pinchStart = null;
+      if (pointers.size < 2) {
+        pinchStart = null;
+        if (pointers.size === 1) {
+          const point = [...pointers.values()][0];
+          dragStart = { x: point.x, y: point.y, panX: G.mapView.panX || 0, panY: G.mapView.panY || 0, moved: false };
+        }
+      }
       if (pointers.size === 0) dragStart = null;
     };
     viewport.addEventListener('pointerup', endPointer);
@@ -349,6 +356,30 @@ const Render = {
     this._applyMapView();
   },
 
+  _clampMapPan() {
+    const viewport = document.getElementById('map-viewport');
+    const grid = document.getElementById('map-grid');
+    if (!viewport || !grid || !G.mapView) return;
+    const zoom = G.mapView.zoom || 1;
+    const contentW = grid.offsetWidth * zoom;
+    const contentH = grid.offsetHeight * zoom;
+    const viewW = viewport.clientWidth;
+    const viewH = viewport.clientHeight;
+    const margin = 18;
+
+    if (contentW <= viewW) {
+      G.mapView.panX = (viewW - contentW) / 2;
+    } else {
+      G.mapView.panX = Math.min(margin, Math.max(viewW - contentW - margin, G.mapView.panX || 0));
+    }
+
+    if (contentH <= viewH) {
+      G.mapView.panY = (viewH - contentH) / 2;
+    } else {
+      G.mapView.panY = Math.min(margin, Math.max(viewH - contentH - margin, G.mapView.panY || 0));
+    }
+  },
+
   _applyMapView(opts = {}) {
     const grid = document.getElementById('map-grid');
     if (!grid) return;
@@ -359,6 +390,7 @@ const Render = {
       return;
     }
     G.mapView.zoom = this._clampMapZoom(G.mapView.zoom || 1);
+    this._clampMapPan();
     grid.style.transform = `translate(${Math.round(G.mapView.panX || 0)}px, ${Math.round(G.mapView.panY || 0)}px) scale(${G.mapView.zoom})`;
   },
 
