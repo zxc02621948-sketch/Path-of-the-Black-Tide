@@ -291,16 +291,6 @@ const Render = {
       this._zoomMapAt(event.clientX, event.clientY, event.deltaY < 0 ? 1.12 : 1 / 1.12);
     }, { passive: false });
 
-    document.getElementById('map-controls')?.addEventListener('click', event => {
-      const action = event.target?.closest?.('[data-map-control]')?.dataset.mapControl;
-      if (!action) return;
-      if (action === 'center') {
-        this._centerMapOnPlayer();
-      } else {
-        const rect = viewport.getBoundingClientRect();
-        this._zoomMapAt(rect.left + rect.width / 2, rect.top + rect.height / 2, action === 'zoom-in' ? 1.18 : 1 / 1.18);
-      }
-    });
   },
 
   _mapZoomBounds() {
