@@ -1107,6 +1107,13 @@ html, body {
   overflow-y: auto;
 }
 
+.squad-actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 16px;
+}
+
 /* 詳情面板 */
 .char-detail-placeholder {
   color: var(--text-dim);
@@ -7053,7 +7060,7 @@ body::before {
     overflow: visible;
   }
 
-  .modal-content.squad-select-layout #modal-choices {
+  .modal-content.squad-select-layout .squad-actions {
     position: fixed;
     left: max(12px, env(safe-area-inset-left, 0px));
     right: max(12px, env(safe-area-inset-right, 0px));
@@ -7075,7 +7082,7 @@ body::before {
     backdrop-filter: blur(8px);
   }
 
-  .modal-content.squad-select-layout #modal-choices .choice-btn {
+  .modal-content.squad-select-layout .squad-actions button {
     width: 100%;
     min-width: 0;
     min-height: 48px;
