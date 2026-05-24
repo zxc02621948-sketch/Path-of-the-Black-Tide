@@ -42,12 +42,6 @@ const GameCombatVictoryFlow = {
     const combatReward = reward || cell.content?.reward || (enemy.rescueBoss ? 'rescue' : null);
     const terrainEvent = cell.content?.event || null;
     if (terrainEvent) this._completeProgressEvent(terrainEvent);
-    if (terrainEvent?.winSmallReward) {
-      G.combat = null;
-      this._settleTerrainCombatSmallReward(terrainEvent, enemy, attacker, roll, rollResult, combatResult.logs, this._combatResultAnims(attacker, combatResult, 250));
-      return true;
-    }
-
     if (combatReward === 'corrupted') {
       cell.corrupted = false;
       cell.type = 'empty';
@@ -119,7 +113,7 @@ const GameCombatVictoryFlow = {
       return true;
     }
 
-    this._settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, combatReward, combatResult);
+    this._settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, combatReward, combatResult, terrainEvent);
     return true;
   },
 
@@ -219,14 +213,15 @@ const GameCombatVictoryFlow = {
     });
   },
 
-  _settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatReward, combatResult = null) {
+  _settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatReward, combatResult = null, terrainEvent = null) {
     let droppedRelic = null;
     const combatAnims = this._combatResultAnims(attacker, combatResult, 250);
     const canDropRelic = this._canCombatDropRelic(enemy, combatReward);
     const pool = canDropRelic
       ? this._getAvailableRelics(this._relicRewardPoolForPhase())
       : [];
-    if (pool.length > 0 && Math.random() < CONFIG.COMBAT_RELIC_DROP_CHANCE) {
+    const dropChance = this._combatRelicDropChance(enemy);
+    if (pool.length > 0 && Math.random() < dropChance) {
       droppedRelic = weightedRelicPick(pool);
       cell.content = { relic: { ...droppedRelic } };
       cell.cleared = false;
@@ -253,6 +248,10 @@ const GameCombatVictoryFlow = {
         ? ''
         : `\n\n掉落聖物「${droppedRelic.name}」，可選擇拾取。`
       : '';
+    if (!droppedRelic && terrainEvent?.winSmallReward) {
+      this._settleTerrainCombatSmallReward(terrainEvent, enemy, attacker, roll, rollResult, logs, combatAnims);
+      return;
+    }
     this._openModal({
       title: '戰鬥勝利',
       desc: `${enemy.name} 被擊敗。\n${finalHitDesc}${dropDesc}`,
@@ -274,6 +273,19 @@ const GameCombatVictoryFlow = {
     if (!enemy) return false;
     if (enemy.boss || enemy.rescueBoss || enemy.echoGuardian || enemy.treasureMimic || enemy.darkGiftMimic) return false;
     return !['rescue', 'corrupted', 'treasure_mimic', 'dark_gift_mimic', 'echo_site', 'dev_test'].includes(combatReward);
+  },
+
+  _combatRelicDropChance(enemy) {
+    const tier = enemy?.tier;
+    if (!['weak', 'medium'].includes(tier)) return CONFIG.COMBAT_RELIC_DROP_CHANCE || 0;
+    const table = Array.isArray(CONFIG.COMBAT_RELIC_DROP_CHANCES) ? CONFIG.COMBAT_RELIC_DROP_CHANCES : [];
+    const day = Math.max(1, G.day || 1);
+    let active = null;
+    for (const row of table) {
+      if (day >= (row.minDay || 1)) active = row;
+    }
+    if (!active || !Number.isFinite(active[tier])) return CONFIG.COMBAT_RELIC_DROP_CHANCE || 0;
+    return Math.max(0, Math.min(1, active[tier]));
   },
 
   _combatAnimWaitMs(combatAnims = null) {

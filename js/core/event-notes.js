@@ -19,6 +19,8 @@ const GameEventNotes = {
     this._openModal({
       title: `探險筆記：${ev.name}`,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.noteText || '你們記下了這段線索。'}${rescueClue}${altarClue}${revealNote}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: noteChoices,
     });
   },
@@ -52,6 +54,8 @@ const GameEventNotes = {
       preDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.noteText || '你們記下了這段線索。'}${rescueClue}${revealNote}\n\n正在進行淨化判定。`,
       resultDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.noteText || '你們記下了這段線索。'}${rescueClue}${revealNote}${resultText}`,
       resultAppend: resultText,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: success ? 'neutral' : 'danger', label: '淨化骰', value: roll, raw: roll, animate: true },
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -175,7 +179,6 @@ const GameEventNotes = {
     delete cell.hiddenSite;
     cell.revealed = true;
     cell.cleared = false;
-    cell.reserved = false;
 
     if (site.type === 'altar') {
       cell.type = 'altar';

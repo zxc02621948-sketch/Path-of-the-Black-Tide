@@ -13,6 +13,8 @@ const GameEventTraps = {
       this._openModal({
         title: ev.name,
         desc: (ev.desc || '') + `\n\n${attacker.name} 將進行探索骰判定，門檻 ${ev.successMin || 3}。`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         choices: [{ label: '擲探索骰', action: () => this._rollTrapWithAnimation(ev, attacker) }],
       });
       return;
@@ -39,6 +41,9 @@ const GameEventTraps = {
       preDesc,
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
+      resultFx: success ? 'event-clear' : 'event-hit',
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: success ? 'neutral' : 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
     });
@@ -54,6 +59,8 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇通過方式。小心通過需要探索骰，失敗會讓隨機隊員受傷；硬闖會讓全隊受傷但直接通過。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [
         { label: `小心通過（探索骰門檻 ${ev.successMin || 3}，失敗隨機隊員 -${ev.failDamage || 3} HP）`, action: () => this._rollDarknessSeepWithAnimation(cell, ev) },
         { label: '硬闖（全隊 -2 HP，直接通過）', danger: true, action: () => this._forceDarknessSeep(cell, ev) },
@@ -78,6 +85,9 @@ const GameEventTraps = {
         preDesc,
         resultDesc: `${preDesc}\n\n${resultText}`,
         resultAppend: resultText,
+        resultFx: 'event-clear',
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -97,6 +107,9 @@ const GameEventTraps = {
       preDesc,
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
+      resultFx: 'event-dark-hit',
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
       choices: [
         {
@@ -132,6 +145,9 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
+      resultFx: 'event-hit',
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
     });
   },
@@ -173,6 +189,7 @@ const GameEventTraps = {
         preDesc,
         resultDesc: `${preDesc}\n\n${resultText}`,
         resultAppend: resultText,
+        resultFx: 'event-clear',
         eventImage: ev.eventImage || '',
         eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
@@ -194,6 +211,7 @@ const GameEventTraps = {
       preDesc,
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
+      resultFx: 'event-hit',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
@@ -231,6 +249,7 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.forceDesc || ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
+      resultFx: 'event-hit',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
@@ -278,6 +297,7 @@ const GameEventTraps = {
     this._openModal({
       title: ev.name,
       desc: descText,
+      resultFx: (ev.partyDamage > 0 || ev.targetDamage > 0) ? 'event-hit' : 'event-clear',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       typeText: !ev.eventImage,

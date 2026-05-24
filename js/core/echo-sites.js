@@ -25,11 +25,22 @@ const GameEchoSites = {
       hideEventHeader: true,
       noReserve: true,
       echoSystemId: system.id,
+      eventBackdrop: this._echoSiteClueBackdrop(system.id),
       desc: [
         system.clueText || '你們找到一段殘缺的聖物線索。',
         `它指向一處被黑暗守住的遺址，裡面殘留著「${system.name}」的氣息。`,
       ].join('\n\n'),
     };
+  },
+
+  _echoSiteClueBackdrop(systemId) {
+    const backdrops = {
+      wound: 'assets/events/echo-site-wound.png',
+      eagle: 'assets/events/echo-site-eagle.png',
+      fate: 'assets/events/echo-site-fate.png',
+      banner: 'assets/events/echo-site-banner.png',
+    };
+    return backdrops[systemId] || '';
   },
 
   _activeEchoSites() {
@@ -64,6 +75,7 @@ const GameEchoSites = {
       this._openModal({
         title: '共鳴遺址的線索',
         desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n線索已經破碎，沒有找到可前往的遺址。`,
+        eventBackdrop: ev.eventBackdrop || ev.eventImage || '',
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
       return;
@@ -78,6 +90,7 @@ const GameEchoSites = {
         system.siteText || '',
         system.guardianText || '',
       ].filter(Boolean).join('\n\n'),
+      eventBackdrop: ev.eventBackdrop || ev.eventImage || '',
       choices: [{ label: '標記遺址', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
@@ -123,7 +136,7 @@ const GameEchoSites = {
     const cy = Math.floor(CONFIG.MAP_SIZE / 2);
     for (const row of G.map || []) {
       for (const cell of row || []) {
-        if (!cell || cell.cleared || cell.content || cell.hiddenSite || cell.reserved) continue;
+        if (!cell || cell.cleared || cell.content || cell.hiddenSite) continue;
         if (cell.type !== 'empty') continue;
         if (MapGen.distance(cx, cy, cell.x, cell.y) < 4) continue;
         candidates.push(cell);

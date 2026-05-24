@@ -526,9 +526,9 @@ const RenderNotes = {
   _renderTerrainNotes(container) {
     const terrains = [
       { icon: '◇', name: '平地', desc: '常見的空曠地形，通常觸發普通事件或資源事件。', tags: ['普通', '事件', '探索'] },
-      { image: 'assets/terrain/forest-tile.png', icon: '🌲', name: '森林', desc: '樹影遮蔽視線，較容易遇到探索事件、資源與潛伏危險。', tags: ['探索', '資源', '危險'] },
-      { image: 'assets/terrain/ruins-tile.png', icon: '🏚️', name: '廢墟', desc: '舊文明殘跡，常藏有事件、聖物線索與陷阱。', tags: ['事件', '聖物', '陷阱'] },
-      { image: 'assets/terrain/cave-tile.png', icon: '🕳️', name: '洞穴', desc: '黑暗與迷失並存，可能帶來高風險事件與寶藏。', tags: ['危險', '寶藏', '探索'] },
+      { image: 'assets/terrain/forest-tile.png?v=2', icon: '🌲', name: '森林', desc: '樹影遮蔽視線，較容易遇到探索事件、資源與潛伏危險。', tags: ['探索', '資源', '危險'] },
+      { image: 'assets/terrain/ruins-tile.png?v=2', icon: '🏚️', name: '廢墟', desc: '舊文明殘跡，常藏有事件、聖物線索與陷阱。', tags: ['事件', '聖物', '陷阱'] },
+      { image: 'assets/terrain/cave-tile.png?v=2', icon: '🕳️', name: '洞穴', desc: '黑暗與迷失並存，可能帶來高風險事件與寶藏。', tags: ['危險', '寶藏', '探索'] },
       { image: 'assets/terrain/altar-tile.png', icon: '⛩️', name: '神壇', desc: '每日可使用一次，可血祭降低黑暗或融合聖物。', tags: ['血祭', '融合', '黑暗'] },
       { image: 'assets/terrain/rest-tile.png', icon: '🔥', name: '休息點', desc: '可恢復生命。用過後會熄滅，等待規則刷新後再次可用。', tags: ['恢復', '休息', '刷新'] },
     ];
@@ -582,7 +582,7 @@ const RenderNotes = {
         desc: '戰鬥開始後，持有者主戰前可押注骰面。若本次攻擊命中押注骰面，傷害 +4；若未命中，下次受擊回合受到的傷害 +30%，最多 3 層。',
         fusedDesc: '可押注 4 個骰面，命中仍為傷害 +4；懊悔懲罰仍最多 3 層。',
         lore: ['骰子沉甸甸的，像把一小段命運握在掌心。'],
-        locationHint: '命運賭桌事件或聖物獎勵中可能出現。',
+        locationHint: '普通聖物獎勵中可能出現。',
       },
       lucky_star: {
         name: '幸運星',

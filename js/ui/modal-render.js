@@ -21,6 +21,17 @@ const RenderModal = {
     contentEl.classList.toggle('character-detail-content', !!cfg.characterDetail);
     contentEl.classList.toggle('wager-modal-content', !!cfg.wagerModal);
     contentEl.classList.toggle('tutorial-modal', !!cfg.tutorialModal);
+    contentEl.classList.toggle('event-backdrop-modal', !!cfg.eventBackdrop);
+    contentEl.classList.remove(
+      'fate-roll-success',
+      'fate-fail-blood',
+      'fate-fail-night',
+      'fate-fail-life',
+      'event-hit',
+      'event-dark-hit',
+      'event-clear',
+      'event-ambush'
+    );
     if (cfg.titleHtml) {
       titleEl.innerHTML = cfg.titleHtml;
     } else {
@@ -32,6 +43,7 @@ const RenderModal = {
     );
     const hasDeferredResult = shouldAnimateDice && !cfg.descHtml
       && (typeof cfg.resultDesc === 'string' || typeof cfg.resultAppend === 'string');
+    if (cfg.resultFx && !hasDeferredResult) contentEl.classList.add(cfg.resultFx);
     if (cfg.descHtml) {
       descEl.innerHTML = cfg.descHtml;
     } else if (hasDeferredResult) {
@@ -54,10 +66,28 @@ const RenderModal = {
       } else {
         delete descEl.dataset.resultAppend;
       }
+      if (cfg.resultTitle) {
+        descEl.dataset.resultTitle = cfg.resultTitle;
+      } else {
+        delete descEl.dataset.resultTitle;
+      }
+      if (cfg.resultBackdrop) {
+        descEl.dataset.resultBackdrop = cfg.resultBackdrop;
+      } else {
+        delete descEl.dataset.resultBackdrop;
+      }
+      if (cfg.resultFx) {
+        descEl.dataset.resultFx = cfg.resultFx;
+      } else {
+        delete descEl.dataset.resultFx;
+      }
     } else {
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
       delete descEl.dataset.resultAppend;
+      delete descEl.dataset.resultTitle;
+      delete descEl.dataset.resultBackdrop;
+      delete descEl.dataset.resultFx;
     }
 
     const choicesEl = document.getElementById('modal-choices');
@@ -146,26 +176,68 @@ const RenderModal = {
         }
         tip.classList.remove('visible');
 
+        const usesTouchTooltip = !!window.matchMedia?.('(pointer: coarse)').matches;
         sceneEl.querySelectorAll('.combat-unit.selectable').forEach(unit => {
           const charId = unit.dataset.charId;
           const charData = cfg.combat.squad.find(c => c.id === charId);
           if (!charData) return;
 
-          unit.addEventListener('mouseenter', () => {
-            tip.innerHTML = this._combatCharInfoHtml(charData);
-            tip.classList.add('visible');
-          });
-          unit.addEventListener('mousemove', e => {
-            const x = e.clientX + 16;
-            const y = e.clientY + 12;
-            // Section.
-            const maxX = window.innerWidth - tip.offsetWidth - 8;
-            tip.style.left = Math.min(x, maxX) + 'px';
-            tip.style.top = y + 'px';
-          });
-          unit.addEventListener('mouseleave', () => {
-            tip.classList.remove('visible');
-          });
+          if (usesTouchTooltip) {
+            let longPressTimer = null;
+            let startX = 0;
+            let startY = 0;
+            const clearLongPress = () => {
+              if (!longPressTimer) return;
+              clearTimeout(longPressTimer);
+              longPressTimer = null;
+            };
+            const showTouchTip = ev => {
+              tip.innerHTML = this._combatCharInfoHtml(charData);
+              tip.classList.add('visible');
+              const rect = unit.getBoundingClientRect();
+              const maxX = window.innerWidth - tip.offsetWidth - 8;
+              const x = Math.max(8, Math.min(rect.left, maxX));
+              const y = Math.max(8, rect.top - tip.offsetHeight - 10);
+              tip.style.left = x + 'px';
+              tip.style.top = y + 'px';
+              unit.dataset.longPressSuppressClick = 'true';
+              ev.preventDefault();
+            };
+            unit.addEventListener('pointerdown', ev => {
+              if (ev.pointerType === 'mouse') return;
+              startX = ev.clientX;
+              startY = ev.clientY;
+              clearLongPress();
+              longPressTimer = setTimeout(() => showTouchTip(ev), 560);
+            });
+            unit.addEventListener('pointermove', ev => {
+              if (Math.hypot(ev.clientX - startX, ev.clientY - startY) > 10) clearLongPress();
+            });
+            unit.addEventListener('pointerup', clearLongPress);
+            unit.addEventListener('pointercancel', clearLongPress);
+            unit.addEventListener('click', ev => {
+              if (unit.dataset.longPressSuppressClick !== 'true') return;
+              ev.preventDefault();
+              ev.stopImmediatePropagation();
+              delete unit.dataset.longPressSuppressClick;
+            }, true);
+          } else {
+            unit.addEventListener('mouseenter', () => {
+              tip.innerHTML = this._combatCharInfoHtml(charData);
+              tip.classList.add('visible');
+            });
+            unit.addEventListener('mousemove', e => {
+              const x = e.clientX + 16;
+              const y = e.clientY + 12;
+              // Section.
+              const maxX = window.innerWidth - tip.offsetWidth - 8;
+              tip.style.left = Math.min(x, maxX) + 'px';
+              tip.style.top = y + 'px';
+            });
+            unit.addEventListener('mouseleave', () => {
+              tip.classList.remove('visible');
+            });
+          }
         });
       }
     }
@@ -207,7 +279,12 @@ const RenderModal = {
       }
     }
 
-    if (cfg.eventImage) {
+    if (cfg.eventBackdrop) {
+      const backdrop = document.createElement('div');
+      backdrop.className = 'modal-extra event-backdrop-img';
+      backdrop.style.backgroundImage = `url("${String(cfg.eventBackdrop).replace(/"/g, '%22')}")`;
+      contentEl.prepend(backdrop);
+    } else if (cfg.eventImage) {
       const image = document.createElement('img');
       image.className = 'modal-extra event-illustration-img';
       image.src = cfg.eventImage;
@@ -221,7 +298,8 @@ const RenderModal = {
     const actionHost = combatActionsEl || choicesEl;
     for (const choice of (cfg.choices || [])) {
       const btn = document.createElement('button');
-      const extraClass = choice.className ? ` ${choice.className}` : '';
+      const combatContinueClass = cfg.combat && choice.label === '繼續' ? ' combat-continue-choice' : '';
+      const extraClass = `${combatContinueClass}${choice.className ? ` ${choice.className}` : ''}`;
       btn.className = `choice-btn${choice.danger ? ' danger-choice' : ''}${choice.hint ? ' has-choice-hint' : ''}${extraClass}`;
       btn.title = choice.hint ? `${choice.label || ''}\n${choice.hint}` : (choice.label || '');
       const label = document.createElement('span');
@@ -527,8 +605,10 @@ const RenderModal = {
     const MS = 75;
     if (roleDiceEl) {
       roleDiceEl.classList.add('dice-rolling');
+      this._setModalDiceFace(faceEl, roleDiceEl, Math.ceil(Math.random() * sides));
     } else {
       diceEl.classList.add('dice-rolling');
+      this._setModalDiceFace(faceEl, roleDiceEl, Math.ceil(Math.random() * sides));
     }
     const timer = setInterval(() => {
       count++;
@@ -588,9 +668,28 @@ const RenderModal = {
       const preDesc = descEl.dataset.preDesc || '';
       const hasExplicitAppend = 'resultAppend' in descEl.dataset;
       const resultAppend = descEl.dataset.resultAppend;
+      const resultTitle = descEl.dataset.resultTitle;
+      const resultBackdrop = descEl.dataset.resultBackdrop;
+      const resultFx = descEl.dataset.resultFx;
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
       delete descEl.dataset.resultAppend;
+      delete descEl.dataset.resultTitle;
+      delete descEl.dataset.resultBackdrop;
+      delete descEl.dataset.resultFx;
+      if (resultTitle) {
+        const titleEl = document.getElementById('modal-title');
+        if (titleEl) titleEl.textContent = resultTitle;
+      }
+      if (resultBackdrop) {
+        const contentEl = document.querySelector('#event-modal .modal-content');
+        const backdropEl = contentEl?.querySelector('.event-backdrop-img');
+        if (backdropEl) backdropEl.style.backgroundImage = `url("${String(resultBackdrop).replace(/"/g, '%22')}")`;
+      }
+      if (resultFx) {
+        const contentEl = document.querySelector('#event-modal .modal-content');
+        contentEl?.classList.add(resultFx);
+      }
       if (this._modalTypeTimer) {
         clearInterval(this._modalTypeTimer);
         this._modalTypeTimer = null;
@@ -609,6 +708,14 @@ const RenderModal = {
       resultEl.textContent = '';
       resultEl.hidden = false;
       resultEl.classList.remove('typing');
+      resultEl.classList.remove(
+        'fate-result-reveal',
+        'fate-roll-success',
+        'fate-fail-blood',
+        'fate-fail-night',
+        'fate-fail-life'
+      );
+      if (resultFx) resultEl.classList.add('fate-result-reveal', resultFx);
       const currentText = introEl ? introEl.textContent : descEl.textContent;
       const resultText = hasExplicitAppend
         ? resultAppend
@@ -763,7 +870,7 @@ const RenderModal = {
     }
     if (!pop.children.length) return;
     const x = targetRect.left - sceneRect.left + targetRect.width / 2;
-    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104);
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104) + (opts.offsetY || 0);
     pop.style.left = `${Math.round(x)}px`;
     pop.style.top = `${Math.round(y)}px`;
     sceneEl.appendChild(pop);
@@ -797,7 +904,7 @@ const RenderModal = {
   },
 
   _showCombatAttackTrail(targetEl, trail = '', opts = {}) {
-    if (!targetEl || !trail || !['pierce', 'slash', 'strike'].includes(trail)) return;
+    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(trail)) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     if (!sceneEl || !sourceRect) return;
@@ -805,19 +912,40 @@ const RenderModal = {
     const sceneRect = sceneEl.getBoundingClientRect();
     const sourceX = sourceRect.left + sourceRect.width / 2;
     const sourceY = sourceRect.top + sourceRect.height / 2;
-    const targetX = targetRect.left + targetRect.width / 2;
-    const targetY = targetRect.top + (opts.side === 'ally' ? 54 : 72);
+    const sourceWeaponFamily = opts.sourceEl?.dataset?.weaponFamily || '';
+    const swordSlash = trail === 'slash' && sourceWeaponFamily === 'sword';
+    const daggerSlash = trail === 'slash' && sourceWeaponFamily === 'dagger';
+    const ironScabbard = trail === 'iron_scabbard';
+    const starHunterEye = trail === 'star_hunter_eye';
+    const starBreaker = trail === 'star_breaker';
+    const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker;
+    const enemyFigureRect = fixedTargetTrail && opts.side === 'enemy'
+      ? targetEl.querySelector('.combat-enemy-figure')?.getBoundingClientRect?.()
+      : null;
+    const enemySpriteRect = fixedTargetTrail && opts.side === 'enemy' && !targetEl.classList.contains('has-card-bg')
+      ? targetEl.querySelector('.combat-enemy-sprite')?.getBoundingClientRect?.()
+      : null;
+    const impactRect = enemySpriteRect || enemyFigureRect || targetRect;
+    const targetX = impactRect.left + impactRect.width / 2;
+    const targetY = targetEl.classList.contains('has-card-bg') && fixedTargetTrail
+      ? targetRect.top + 118
+      : (impactRect === targetRect ? targetRect.top + (opts.side === 'ally' ? 54 : 72) : impactRect.top + impactRect.height / 2);
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
     const distance = Math.max(120, Math.hypot(dx, dy));
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const fx = document.createElement('div');
-    fx.className = `combat-attack-trail trail-${trail}`;
+    const trailClass = String(trail).replace(/_/g, '-');
+    fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}`;
     fx.setAttribute('aria-hidden', 'true');
-    if (trail === 'pierce') {
+    if (trail === 'pierce' || trail === 'silver_bee_pin') {
       fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
       fx.style.top = `${Math.round(sourceY - sceneRect.top)}px`;
       fx.style.width = `${Math.round(distance)}px`;
+      fx.style.setProperty('--trail-angle', `${angle}deg`);
+    } else if (fixedTargetTrail) {
+      fx.style.left = `${Math.round(targetX - sceneRect.left)}px`;
+      fx.style.top = `${Math.round(targetY - sceneRect.top)}px`;
       fx.style.setProperty('--trail-angle', `${angle}deg`);
     } else {
       fx.style.left = `${Math.round(targetX - sceneRect.left)}px`;
@@ -889,15 +1017,42 @@ const RenderModal = {
             const damageEvent = damageEvents[i];
             if (damageEvent) {
               this._pulseCombatImpact(combatScene, damageEvent.damage);
-              const attackTrail = damageEvent.attackTrail || damageEvent.hitEffect;
+              const relicFx = damageEvent.relicFx || '';
+              const delayedRelicFx = ['star_hunter_eye', 'star_breaker'].includes(relicFx);
+              const attackTrail = delayedRelicFx
+                ? (damageEvent.attackTrail || damageEvent.hitEffect)
+                : (relicFx || damageEvent.attackTrail || damageEvent.hitEffect);
               const hitEffect = damageEvent.hitEffect || '';
-              const layeredWeaponHit = ['slash', 'strike', 'pierce'].includes(attackTrail);
-              const visualHitEffect = hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect;
+              const layeredWeaponHit = ['slash', 'strike', 'pierce', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(attackTrail);
+              const visualHitEffect = relicFx ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
+              const heavyRelicImpact = ['iron_scabbard', 'star_breaker'].includes(relicFx);
               this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
-              if (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail) {
+              if (delayedRelicFx) {
+                setTimeout(() => {
+                  this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
+                }, 180);
+              }
+              if (heavyRelicImpact) {
+                setTimeout(() => {
+                  enemyCard.classList.add('anim-heavy-relic-hit');
+                  setTimeout(() => enemyCard.classList.remove('anim-heavy-relic-hit'), 460);
+                }, delayedRelicFx ? 180 : 0);
+              }
+              if (relicFx === 'iron_scabbard' && attackerEl) {
+                setTimeout(() => {
+                  attackerEl.classList.add('anim-iron-scabbard-empower');
+                  setTimeout(() => attackerEl.classList.remove('anim-iron-scabbard-empower'), 760);
+                }, 160);
+              }
+              if (visualHitEffect && (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail)) {
                 this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
               }
-              this._showCombatDamageNumber(enemyCard, damageEvent.damage, { side: 'enemy', scene: combatScene });
+              const showDamageNumber = () => this._showCombatDamageNumber(enemyCard, damageEvent.damage, {
+                side: 'enemy',
+                scene: combatScene,
+                offsetY: relicFx ? -24 : 0,
+              });
+              setTimeout(showDamageNumber, delayedRelicFx ? 300 : (relicFx ? 220 : 140));
             }
             setTimeout(() => enemyCard.classList.remove('anim-hit'), 300);
           }, 120);
@@ -945,7 +1100,7 @@ const RenderModal = {
           if (!event?.targetId) continue;
           const targetEl = findAllyUnit(event.targetId);
           if (targetEl) this._pulseCombatImpact(combatScene, event.damage);
-          if (targetEl) this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene });
+          if (targetEl) setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene }), 140);
           if (Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
         }
       } else if (counterTarget) {
@@ -954,7 +1109,7 @@ const RenderModal = {
           el.classList.add('anim-hit');
           const event = incomingEvents.find(item => item?.targetId === counterTarget);
           if (event) this._pulseCombatImpact(combatScene, event.damage);
-          if (event) this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene });
+          if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene }), 140);
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         }
         const event = incomingEvents.find(item => item?.targetId === counterTarget);
@@ -1073,9 +1228,10 @@ const RenderModal = {
         ? `onclick="Render.triggerCombatFollowUp('${char.id}')"`
         : (selectable && !isDown ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
       const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
+      const weaponFamily = char.weapon?.family || char.weapon?.id || '';
       return `
         <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${isFollowUpTarget ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
-          data-char-id="${char.id}" ${clickAttr}>
+          data-char-id="${char.id}" data-weapon-family="${weaponFamily}" ${clickAttr}>
           ${isFollowUpTarget ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           <div class="combat-unit-main">
@@ -1137,11 +1293,14 @@ const RenderModal = {
       ? ` style="--enemy-card-bg: url('${combat.enemy.cardBgImage}')"`
       : '';
     const enemyCardBgClass = combat.enemy.cardBgImage ? ' has-card-bg' : '';
+    const enemyCardIdClass = combat.enemy.id
+      ? ` enemy-${String(combat.enemy.id).replace(/[^a-z0-9_-]/gi, '-')}`
+      : '';
 
     return `
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}"${enemyCardBgStyle}>
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}"${enemyCardBgStyle}>
         ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
         <div class="combat-side-label" aria-hidden="true"></div>
         <div class="combat-enemy-figure">

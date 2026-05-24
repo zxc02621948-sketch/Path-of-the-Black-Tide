@@ -184,6 +184,64 @@ const GameDarkMonsters = {
     return true;
   },
 
+  _maybeSpawnUniqueStrongEnemy() {
+    const enemyId = 'dice_corruptor';
+    const threshold = CONFIG.UNIQUE_STRONG_ENEMY_DARKNESS || 12;
+    if (G.phase !== 'night') return false;
+    if ((G.darkness || 0) < threshold) return false;
+    if (!Array.isArray(G.spawnedUniqueEnemies)) G.spawnedUniqueEnemies = [];
+    if (!Array.isArray(G.defeatedUniqueEnemies)) G.defeatedUniqueEnemies = [];
+    if (G.spawnedUniqueEnemies.includes(enemyId) || G.defeatedUniqueEnemies.includes(enemyId)) return false;
+    if (this._mapHasEnemy(enemyId)) {
+      G.spawnedUniqueEnemies.push(enemyId);
+      return false;
+    }
+    if (typeof getEnemyById !== 'function') return false;
+    const enemy = getEnemyById(enemyId);
+    if (!enemy) return false;
+    const cell = this._pickUniqueStrongSpawnCell();
+    if (!cell) return false;
+    cell.type = 'enemy';
+    cell.revealed = true;
+    cell.cleared = false;
+    cell.visited = false;
+    cell.hiddenSite = null;
+    cell.corrupted = false;
+    cell.content = { enemy: { ...enemy }, uniqueStrong: true };
+    G.spawnedUniqueEnemies.push(enemyId);
+    this._log(`黑暗 ${G.darkness}：深污腐骰宿主在遠處現身。`, 'danger');
+    return true;
+  },
+
+  _mapHasEnemy(enemyId) {
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (cell?.content?.enemy?.id === enemyId && !cell.cleared) return true;
+      }
+    }
+    return false;
+  },
+
+  _pickUniqueStrongSpawnCell() {
+    const candidates = [];
+    const minDistance = CONFIG.DARKNESS_BOSS_MIN_DISTANCE || 5;
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared) continue;
+        if (cell.x === G.playerX && cell.y === G.playerY) continue;
+        if (this._darkMonsterOccupies(cell.x, cell.y)) continue;
+        if (MapGen.distance(G.playerX, G.playerY, cell.x, cell.y) < minDistance) continue;
+        candidates.push(cell);
+      }
+    }
+    if (candidates.length === 0) return null;
+    candidates.sort((a, b) =>
+      MapGen.distance(G.playerX, G.playerY, b.x, b.y) -
+      MapGen.distance(G.playerX, G.playerY, a.x, a.y)
+    );
+    return candidates[Math.floor(Math.random() * Math.min(8, candidates.length))];
+  },
+
   _updateDarkMonstersDaily() {
     if (!Array.isArray(G.darkMonsters)) G.darkMonsters = [];
     for (const monster of G.darkMonsters) {

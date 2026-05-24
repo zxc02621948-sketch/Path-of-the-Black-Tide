@@ -3,6 +3,12 @@ const GameCombatTooltips = {
   showCombatEnemyDetail(ev = null) {
     const enemy = G.combat?.enemy;
     if (!enemy) return;
+    const existingPopover = document.getElementById('combat-status-popover');
+    if (existingPopover?.classList.contains('visible') && existingPopover.dataset.combatPopoverKind === 'enemy-detail') {
+      existingPopover.classList.remove('visible');
+      existingPopover.dataset.combatPopoverKind = '';
+      return;
+    }
     const intent = G.combat?.intent || null;
     const intentView = typeof this._combatIntentView === 'function'
       ? this._combatIntentView(intent, enemy)
@@ -51,6 +57,8 @@ const GameCombatTooltips = {
       states.length ? `目前狀態：${states.join('、')}` : '',
     ].filter(Boolean).join('\n\n');
     this._showCombatStatusPopover(titleText, descText, ev);
+    const popover = document.getElementById('combat-status-popover');
+    if (popover) popover.dataset.combatPopoverKind = 'enemy-detail';
   },
 
   showCombatStatusDetail(charId, statusType, ev = null) {
@@ -92,6 +100,7 @@ const GameCombatTooltips = {
     close.addEventListener('click', () => popover.classList.remove('visible'));
     popover.append(title, desc, close);
 
+    popover.dataset.combatPopoverKind = 'status';
     popover.classList.add('visible');
     const target = ev?.currentTarget || null;
     const rect = target?.getBoundingClientRect?.() || null;
@@ -156,6 +165,7 @@ const GameCombatTooltips = {
     close.addEventListener('click', () => popover.classList.remove('visible'));
     popover.append(title, desc, close);
 
+    popover.dataset.combatPopoverKind = 'status';
     popover.classList.add('visible');
     const target = ev?.currentTarget || null;
     const rect = target?.getBoundingClientRect?.() || null;
@@ -206,6 +216,7 @@ const GameCombatTooltips = {
     close.addEventListener('click', () => popover.classList.remove('visible'));
     popover.append(title, desc, close);
 
+    popover.dataset.combatPopoverKind = 'status';
     popover.classList.add('visible');
     const target = ev?.currentTarget || null;
     const rect = target?.getBoundingClientRect?.() || null;
@@ -288,6 +299,7 @@ const GameCombatTooltips = {
     close.addEventListener('click', () => popover.classList.remove('visible'));
     popover.append(title, desc, close);
 
+    popover.dataset.combatPopoverKind = 'status';
     popover.classList.add('visible');
     const target = ev?.currentTarget || null;
     const rect = target?.getBoundingClientRect?.() || null;
@@ -373,6 +385,7 @@ const GameCombatTooltips = {
     close.addEventListener('click', () => popover.classList.remove('visible'));
     popover.append(title, desc, close);
 
+    popover.dataset.combatPopoverKind = 'status';
     popover.classList.add('visible');
     const target = ev?.currentTarget || null;
     const rect = target?.getBoundingClientRect?.() || null;

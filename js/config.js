@@ -39,6 +39,14 @@ const CONFIG = {
   // 戰鬥
   RETREAT_HP_COST: 1,         // 撤退時每名成員扣血
   COMBAT_RELIC_DROP_CHANCE: 0.25,
+  COMBAT_RELIC_DROP_CHANCES: [
+    { minDay: 1, weak: 0.15, medium: 0 },
+    { minDay: 4, weak: 0.18, medium: 0.22 },
+    { minDay: 7, weak: 0.22, medium: 0.28 },
+    { minDay: 10, weak: 0.26, medium: 0.34 },
+    { minDay: 13, weak: 0.30, medium: 0.40 },
+  ],
+  UNIQUE_STRONG_ENEMY_DARKNESS: 12,
   TREASURE_MIMIC_GEAR_DROP_CHANCE: 0.50,
   TREASURE_MIMIC_WEAKNESS_GEAR_DROP_CHANCE: 0.80,
   DAY_EVENT_RELIC_DROP_CHANCE: 0.10,
@@ -60,9 +68,6 @@ const CONFIG = {
   SUPPORT_FAIL_REDUCE: 1,     // 輔助降低失敗傷害
   FIRST_AID_HEAL: 2,
   BLOOD_PRICE_SHIELD: 2,
-
-  // 探索者
-  EXPLORER_RESERVE_COOLDOWN_DAYS: 5,
 
   // 補給
   SUPPLY_EQUIPMENT_CHANCE: 0.35,

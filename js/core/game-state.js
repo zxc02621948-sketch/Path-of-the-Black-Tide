@@ -38,6 +38,9 @@ const GameStateHelpers = {
     }
     const reachedMilestone = delta > 0 ? this._nextDarknessMilestone(prev, G.darkness) : null;
     if (this._checkDevoured()) return;
+    if (delta > 0 && typeof this._maybeSpawnUniqueStrongEnemy === 'function') {
+      this._maybeSpawnUniqueStrongEnemy();
+    }
     if (reachedMilestone) this._showDarknessMilestoneOnce(reachedMilestone);
     Render.renderTopBar();
   },

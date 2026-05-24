@@ -46,7 +46,7 @@ const RenderTutorial = {
         title: '裝備取得',
         kicker: '補上角色的手感',
         icon: '🧰',
-        image: 'assets/terrain/ruins-tile.png',
+        image: 'assets/terrain/ruins-tile.png?v=2',
         body: [
           '武器決定攻擊節奏，裝備則補強生存、支援或流派條件。',
           '裝備通常不直接形成共鳴，但會讓聖物流派更穩。',

@@ -41,6 +41,7 @@ const EVENT_POOL = {
       id: 'forest_ancestral_pyre',
       name: '祖靈火塘',
       desc: '熄滅已久的火塘忽然燃起一線暖光，壓住了周圍黑霧。',
+      eventImage: 'assets/events/forest-ancestral-pyre.png',
       type: 'supply',
       rarity: 'epic',
       category: 2,
@@ -83,6 +84,7 @@ const EVENT_POOL = {
       id: 'forest_inscription',
       name: '樹幹上的刻字',
       desc: '有人在樹幹上刻了幾行字，刻痕沿著年輪彎曲，像是在標記某個古老方位。',
+      eventImage: 'assets/events/forest-inscription.png',
       type: 'note',
       rarity: 'common',
       category: 6,
@@ -106,6 +108,7 @@ const EVENT_POOL = {
       id: 'forest_dark_growth',
       name: '黑色菌絲',
       desc: '樹幹上的黑色菌絲忽然收縮，像嗅到活人的氣味。腐爛的木皮裂開，藏在林間的東西正被你們驚醒。',
+      eventImage: 'assets/events/forest-dark-growth.png',
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -127,7 +130,8 @@ const EVENT_POOL = {
     {
       id: 'ruins_enemy',
       name: '廢墟中的響動',
-      desc: '腳步踩上碎石，廢墟深處傳來低沉的嘶吼。',
+      desc: '碎石在腳下滾落，聲音沿著半塌的牆面傳進黑暗。廢墟深處有什麼被驚醒了，低沉的嘶吼正朝你們逼近。',
+      eventImage: 'assets/events/ruins-enemy.png',
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -137,6 +141,7 @@ const EVENT_POOL = {
       id: 'ruins_inscription',
       name: '殘破的告示牌',
       desc: '一塊幾乎腐朽的木板斜靠在廢墟邊，刻痕被黑霧磨得模糊，只剩幾行仍能辨認。',
+      eventImage: 'assets/events/ruins-inscription.png',
       type: 'note',
       rarity: 'common',
       category: 6,
@@ -149,7 +154,8 @@ const EVENT_POOL = {
     {
       id: 'ruins_trap',
       name: '不穩的地板',
-      desc: '腳下傳來裂縫聲，地板正在崩塌。',
+      desc: '腳下的木板先是輕輕下沉，接著裂縫像黑線一樣往四周爬開。下方傳來空洞回音，整片地板正在崩塌。',
+      eventImage: 'assets/events/ruins-unstable-floor.png',
       type: 'trap',
       rarity: 'rare',
       category: 1,
@@ -172,6 +178,7 @@ const EVENT_POOL = {
       id: 'ruins_falling_debris',
       name: '落石碎瓦',
       desc: '頭頂傳來細碎聲響，半塌的樑柱突然鬆動，碎瓦像雨一樣砸落。',
+      eventImage: 'assets/events/ruins-falling-debris.png',
       type: 'trap',
       rarity: 'rare',
       category: 1,
@@ -184,6 +191,7 @@ const EVENT_POOL = {
       id: 'ruins_supply_cache',
       name: '半塌的倉庫',
       desc: '一間倉庫只剩半面牆，但角落裡似乎還壓著能用的補給。',
+      eventImage: 'assets/events/ruins-supply-cache.png',
       type: 'supply',
       rarity: 'rare',
       category: 2,
@@ -193,7 +201,8 @@ const EVENT_POOL = {
     {
       id: 'ruins_old_shrine',
       name: '守夜殘壇',
-      desc: '斷裂的祭壇底下還埋著守夜餘燼，能短暫驅散侵蝕。',
+      desc: '斷裂的石壇刻著褪色星芒，底下仍有守夜餘燼微微發亮，短暫壓住周圍翻湧的黑霧。',
+      eventImage: 'assets/events/ruins-old-shrine.png',
       type: 'note',
       rarity: 'epic',
       category: 6,
@@ -209,6 +218,7 @@ const EVENT_POOL = {
       id: 'ruins_wounded_stranger',
       name: '牆後的刻痕',
       desc: '廢墟牆後有新刻下的求救記號，但人已經被什麼東西拖走了。',
+      eventImage: 'assets/events/ruins-wall-marks.png',
       type: 'note',
       rarity: 'rare',
       category: 3,
@@ -224,7 +234,8 @@ const EVENT_POOL = {
     {
       id: 'cave_enemy',
       name: '黑暗中的眼睛',
-      desc: '洞穴深處有什麼東西在盯著你們。',
+      desc: '火光照不到的裂縫裡亮起一排濕冷的眼睛。石壁傳來細碎爬行聲，某個東西正沿著黑暗貼近你們。',
+      eventImage: 'assets/events/cave-eyes.png',
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -244,7 +255,8 @@ const EVENT_POOL = {
     {
       id: 'cave_dark_trap',
       name: '洞穴迷失',
-      desc: '視線幾乎為零。在黑暗中摸索前進，有人絆倒了。',
+      desc: '火把的光被潮濕石壁吞沒，前方只剩一片濃黑。你們沿著回音摸索前進，直到腳下忽然踩空，有人重重摔進看不見的凹陷裡。',
+      eventImage: 'assets/events/cave-dark-trap.png',
       type: 'trap',
       rarity: 'common',
       category: 1,
@@ -267,6 +279,7 @@ const EVENT_POOL = {
       id: 'cave_razor_stone',
       name: '割腳石灘',
       desc: '洞底鋪滿薄刃般的碎石，踩上去時石片沿著靴縫割進皮肉。',
+      eventImage: 'assets/events/cave-razor-stone.png',
       type: 'trap',
       rarity: 'common',
       category: 1,
@@ -279,6 +292,7 @@ const EVENT_POOL = {
       id: 'cave_inscription',
       name: '洞壁上的記號',
       desc: '有人在洞壁上刻了奇怪的符號，像是某種地圖。',
+      eventImage: 'assets/events/cave-inscription.png',
       type: 'note',
       rarity: 'common',
       category: 6,
@@ -292,6 +306,7 @@ const EVENT_POOL = {
       id: 'cave_dripping_water',
       name: '地下水窪',
       desc: '岩壁上的水珠一滴一滴落下，在洞穴低處聚成一小灘水窪。\n\n水面很冷，卻沒有結冰。微弱的光在水下晃動，像是倒映著某片不存在的星空。\n\n你們蹲下檢查，確認水裡沒有黑色菌絲，也沒有腐敗的氣味。\n\n這或許不是安全的地方，但至少能讓人短暫喘一口氣。',
+      eventImage: 'assets/events/cave-dripping-water.png',
       type: 'supply',
       rarity: 'common',
       category: 2,
@@ -305,6 +320,7 @@ const EVENT_POOL = {
       id: 'cave_starlight_shard',
       name: '星光碎片',
       desc: '岩縫裡嵌著冷白碎晶，握在手心時黑暗退了一步。',
+      eventImage: 'assets/events/cave-starlight-shard.png',
       type: 'supply',
       rarity: 'epic',
       category: 2,
@@ -318,6 +334,7 @@ const EVENT_POOL = {
       id: 'cave_lost_voice',
       name: '遠處的呼喊',
       desc: '洞穴深處傳來人的聲音，忽遠忽近，只留下散落的布條與火石。',
+      eventImage: 'assets/events/cave-lost-voice.png',
       type: 'supply',
       rarity: 'rare',
       category: 3,
@@ -335,6 +352,7 @@ const EVENT_POOL = {
       id: 'empty_supply',
       name: '路旁的遺落物',
       desc: '不知是誰遺落在路邊的背包，裡面還有些用得上的東西。',
+      eventImage: 'assets/events/empty-supply.png',
       type: 'supply',
       rarity: 'common',
       category: 2,
@@ -345,6 +363,7 @@ const EVENT_POOL = {
       id: 'empty_survivor_clue',
       name: '腳印與布條',
       desc: '泥地上留著新鮮腳印，旁邊撕下的布條纏在枯枝上，像是刻意留下的記號。',
+      eventImage: 'assets/events/empty-survivor-clue.png',
       type: 'supply',
       rarity: 'rare',
       category: 3,
@@ -357,17 +376,19 @@ const EVENT_POOL = {
       id: 'empty_shadow_passage',
       name: '湧動的陰影',
       desc: '地面上的陰影像水面般起伏，從腳邊無聲退開，只留下刺骨的寒意。',
+      eventImage: 'assets/events/empty-shadow-passage.png',
       type: 'note',
       rarity: 'rare',
       category: 1,
       weight: 2,
-      noteText: '「只有黑夜才敢在光天化日下湧動。」記錄此異象後，黑暗 +1。',
+      noteText: '「它們已經不再等到夜裡。」記錄此異象後，黑暗 +1。',
       darknessChange: 1,
     },
     {
       id: 'empty_darkness_seep',
       name: '地面的裂縫',
       desc: '地面裂縫滲出黑霧，踏上去時有什麼沿著腳底往上蔓延。',
+      eventImage: 'assets/events/empty-darkness-seep.png',
       type: 'trap',
       rarity: 'rare',
       category: 5,
@@ -382,6 +403,7 @@ const EVENT_POOL = {
       id: 'empty_old_camp',
       name: '廢棄的臨時營地',
       desc: '地上還有熄滅不久的篝火痕跡，旁邊散落著幾件能用的物資。',
+      eventImage: 'assets/events/empty-old-camp.png',
       type: 'supply',
       rarity: 'rare',
       category: 2,
@@ -393,6 +415,7 @@ const EVENT_POOL = {
       id: 'empty_dark_whisper',
       name: '低語',
       desc: '什麼都沒有。但有人說他聽到了自己的名字，聲音還指向遠處某個不該出現的黑匣。',
+      eventImage: 'assets/events/empty-dark-whisper.png',
       type: 'note',
       rarity: 'common',
       category: 6,
@@ -403,6 +426,7 @@ const EVENT_POOL = {
       id: 'empty_treasure_map',
       name: '藏寶圖',
       desc: '你們在泥土與碎石之間找到一張沾滿灰塵的舊地圖。圖上用褪色墨線標出某處埋藏點，但紙張已經脆得像枯葉。',
+      eventImage: 'assets/events/empty-treasure-map.png',
       type: 'treasure_map',
       rarity: 'rare',
       category: 2,
@@ -420,33 +444,36 @@ function createFateGamblingTableEvent(baseEvent = null) {
     rarity: 'legendary',
     condition: state => (state?.darkness || 0) >= 5
       && !state?.fateGamblingTableTriggered
-      && !state?.squadHasRelic?.('wager_dice')
-      && !state?.relicIdInRun?.('wager_dice')
-      && (state?.squad || []).some(c => !c.dead && c.hp > 0),
+      && (state?.squad || []).some(c => !c.dead && c.hp > 0)
+      && (
+        state?.canFindEventRelic?.() !== false ||
+        (state?.squad || []).some(c => !c.dead && c.hp > 0 && c.relic && c.relic.fusable !== false && !c.fusedRelic)
+      ),
     category: 6,
     categoryRoll: baseEvent?.categoryRoll || 6,
     categoryName: baseEvent?.categoryName || '特殊事件',
-    categoryDesc: baseEvent?.categoryDesc || '最高稀有度的搏命者專屬事件。',
+    categoryDesc: baseEvent?.categoryDesc || '最高稀有度的三重賭局事件。',
+    eventImage: 'assets/events/fate-gambling-table.png',
     noReserve: true,
     desc: [
       '黑暗邊界的霧氣忽然安靜下來。',
       '',
       '你們在廢墟深處看見一張老舊賭桌。桌面乾裂，邊角腐朽，卻乾淨得不像是被遺棄之物。桌中央放著一只骨骰，骰面上刻著模糊的黑色紋路，像血乾掉後留下的痕跡。',
       '',
-      '搏命者停下腳步。',
+      '隊伍停下腳步。',
       '',
-      '他聽見骰子在桌上輕輕滾動的聲音。',
+      '每個人都聽見骰子在桌上輕輕滾動的聲音。',
       '',
       '可是沒有人碰它。',
       '',
-      '賭桌旁沒有莊家，沒有對手，只有一張空椅子，正對著他。',
+      '賭桌旁沒有莊家，沒有對手，只有一張空椅子，正對著你們。',
       '',
       '黑暗中傳來低語：',
       '',
       '「押上你的命，命運才會回頭看你。」',
       '',
-      '搏命者知道，這不是普通的賭局。',
-      '這張桌子不要金幣，不要聖物，也不要承諾。',
+      '你們知道，這不是普通的賭局。',
+      '這張桌子不要金幣，不要承諾，也不保證公平。',
       '',
       '它只收一樣東西。',
       '',
@@ -523,7 +550,15 @@ function randomTerrainEvent(terrainType, state = null) {
   const pool = [...basePool, ..._specialTerrainEvents(terrainType)];
   const eventState = _eventState(state);
   const rolledRarity = _rollEventRarity();
+  const searched = new Set();
   for (const rarity of _raritySearchOrder(rolledRarity)) {
+    searched.add(rarity);
+    const candidates = pool.filter(ev => (ev.rarity || 'common') === rarity && _eventConditionPass(ev, eventState));
+    const picked = _pickWeightedEvent(candidates);
+    if (picked) return _decorateEvent(picked, rarity);
+  }
+  for (const rarity of EVENT_RARITY_FALLBACK) {
+    if (searched.has(rarity)) continue;
     const candidates = pool.filter(ev => (ev.rarity || 'common') === rarity && _eventConditionPass(ev, eventState));
     const picked = _pickWeightedEvent(candidates);
     if (picked) return _decorateEvent(picked, rarity);

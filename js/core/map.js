@@ -125,7 +125,6 @@ const MapGen = {
       revealed: false,
       cleared: false,
       visited: false,
-      reserved: false,
       content: null,
     };
   },
@@ -218,7 +217,7 @@ const MapGen = {
     for (const row of grid) {
       for (const cell of row) {
         if (openingSet.has(cell)) continue;
-        if (cell.revealed || cell.reserved) continue;
+        if (cell.revealed) continue;
         if (cell.hiddenSite) continue;
         if (predicate(cell)) candidates.push(cell);
       }

@@ -8,6 +8,8 @@ const GameEventTreasure = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n使用探索骰判定藏寶圖結果：單數會使藏寶圖破損，但仍會顯示一個可能有危險的寶箱；雙數會顯示只出武器的寶箱。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [
         { label: `${attacker.name} 擲探索骰`, action: () => this._rollTreasureMap(ev, attacker) },
         { label: '暫時離開', action: () => { this._closeModal(); Render.fullRender(); } },
@@ -49,6 +51,8 @@ const GameEventTreasure = {
       preDesc,
       resultDesc: `${preDesc}\n\n${desc}`,
       resultAppend: desc,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: roll % 2 === 0 ? 'neutral' : 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: true, charCls: rollResult.charCls },
       choices,
     });
@@ -58,7 +62,7 @@ const GameEventTreasure = {
     const candidates = [];
     for (const row of G.map || []) {
       for (const cell of row || []) {
-        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared || cell.reserved) continue;
+        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared) continue;
         if (cell.x === G.playerX && cell.y === G.playerY) continue;
         candidates.push(cell);
       }
@@ -85,6 +89,8 @@ const GameEventTreasure = {
     this._openModal({
       title: ev.name,
       desc: `${ev.desc || ''}\n\n「黑暗記得每個進來的人的名字。」\n\n黑暗 +1。\n${foundText}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
@@ -493,11 +499,9 @@ const GameEventTreasure = {
       ? `<img class="relic-reward-img gear-reward-img" src="${this._escapeAttrLocal(gear.iconImage)}" alt="">`
       : `<span class="relic-reward-emoji">${this._escapeHtmlLocal(gear.icon || '◆')}</span>`;
     return `
-      <div class="relic-reward-panel gear-reward-panel">
+      <div class="relic-reward-panel relic-reward-display gear-reward-panel">
         <div class="relic-reward-visual">${visual}</div>
         <div class="relic-reward-copy">
-          <div class="relic-reward-kicker">選擇裝備者</div>
-          <div class="relic-reward-name">${this._escapeHtmlLocal(gear.name || '未知裝備')}</div>
           <div class="relic-reward-desc">${this._escapeHtmlLocal(gear.desc || '')}</div>
           ${boostText ? `<div class="relic-reward-lore">${this._escapeHtmlLocal(boostText)}</div>` : ''}
         </div>
@@ -602,152 +606,437 @@ const GameEventTreasure = {
     const candidates = this._aliveSquad();
     if (candidates.length === 0) { Render.fullRender(); return; }
     G.fateGamblingTableTriggered = true;
-    const choices = candidates.map(char => ({
-      label: `讓 ${char.name} 坐上賭桌`,
-      action: () => this._rollFateGamblingTable(char, 0),
-    }));
-    choices.push({ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } });
+    this._openFateTableIntro(ev);
+  },
+
+  _openFateTableIntro(ev) {
     this._openModal({
       title: ev.name,
       desc: this._eventDiceText(ev) + (ev.desc || ''),
-      choices,
-    });
-  },
-
-  _rollFateGamblingTable(gambler, failureCount) {
-    const roll = Dice.rollRaw();
-    const isOdd = roll % 2 === 1;
-    if (isOdd) {
-      const preDesc = gambler.name + ' 將命運骰擲向賭桌。';
-      const resultAppend = [
-        gambler.name + ' 擲出 ' + Dice.face(roll) + '（' + roll + '），骰面為單數。',
-        '',
-        '骨骰停止。黑霧像被刀切開一樣散去。',
-        '黑暗中的聲音低低笑了起來：「命運看見你了。」',
-        '',
-        '你可以取走賭桌上的骰子，也可以讓它換成另一件聖物。',
-      ].join('\n');
-      this._openModal({
-        title: '命運賭桌：成功',
-        desc: preDesc,
-        preDesc,
-        resultAppend,
-        dice: { type: 'neutral', label: gambler.name + ' 的命運骰', value: roll, raw: roll, animate: true, charCls: gambler.cls },
-        choices: [
-          { label: '取得賭命骰子', action: () => this._awardWagerDiceFromFateTable(gambler) },
-          { label: '換成隨機聖物', action: () => this._awardRandomRelicFromFateTable(gambler) },
-        ],
-      });
-      return;
-    }
-
-    const nextFailureCount = failureCount + 1;
-    const damage = 2 + nextFailureCount * 2;
-    gambler.hp = Math.max(0, gambler.hp - damage);
-    if (gambler.hp <= 0) {
-      this._removeGamblerAtFateTable(gambler);
-      const preDesc = gambler.name + ' 將命運骰擲向賭桌。';
-      const resultAppend = [
-        gambler.name + ' 擲出 ' + Dice.face(roll) + '（' + roll + '），骰面為雙數。',
-        '',
-        '賭桌傷害 ' + damage + ' 點讓 ' + gambler.name + ' 倒下。',
-        '黑影從桌面裂縫中伸出，把他按回那張空椅子。',
-        '',
-        gambler.name + ' 永久離隊，未獲得賭命骰子。',
-      ].join('\n');
-      this._openModal({
-        title: '命運賭桌：倒下',
-        desc: preDesc,
-        preDesc,
-        resultAppend,
-        dice: { type: 'danger', label: gambler.name + ' 的命運骰', value: roll, raw: roll, animate: true, charCls: gambler.cls },
-        choices: [{ label: '離開賭桌', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
-      });
-      return;
-    }
-
-    const desc = nextFailureCount === 1
-      ? [
-          gambler.name + ' 擲出 ' + Dice.face(roll) + '（' + roll + '），骰面為雙數。',
-          '',
-          '第一次失敗：' + gambler.name + ' 受到 ' + damage + ' 傷害。',
-          '賭桌沒有聲音，卻像是在笑。',
-          '',
-          '下一次失敗傷害提高為 ' + (damage + 2) + '。',
-        ].join('\n')
-      : [
-          gambler.name + ' 再次擲出 ' + Dice.face(roll) + '（' + roll + '），仍是雙數。',
-          '',
-          '連續失敗：' + gambler.name + ' 受到 ' + damage + ' 傷害。',
-          '黑色裂紋沿著桌面爬上他的手臂。',
-          '',
-          '下一次失敗傷害提高為 ' + (damage + 2) + '。',
-        ].join('\n');
-
-    const nextDamage = damage + 2;
-    const preDesc = gambler.name + (nextFailureCount === 1 ? ' 將命運骰擲向賭桌。' : ' 再次將命運骰擲向賭桌。');
-    this._openModal({
-      title: '命運賭桌：失敗',
-      desc: preDesc,
-      preDesc,
-      resultAppend: desc,
-      dice: { type: 'danger', label: gambler.name + ' 的命運骰', value: roll, raw: roll, animate: true, charCls: gambler.cls },
+      eventBackdrop: ev.eventImage || '',
       choices: [
-        { label: '繼續擲骰（下次失敗 ' + nextDamage + ' 傷害）', action: () => this._rollFateGamblingTable(gambler, nextFailureCount) },
-        { label: '停手離開', action: () => this._leaveFateGamblingTable(gambler) },
+        { label: '進入賭桌', action: () => this._openFateTableRoundSetup({ ev, round: 1 }) },
+        { label: '轉身離開', action: () => { this._closeModal(); Render.fullRender(); } },
       ],
     });
   },
 
-  _leaveFateGamblingTable(gambler) {
+  _fateTableRoundInfo(round) {
+    const rounds = {
+      1: {
+        name: '第一局：血賭',
+        rule: '賭奇數。必須賭到成功才可進入下一局；失敗時上桌角色受傷，傷害逐次提高。',
+        diceLabel: '血賭骰',
+        successText: '奇數',
+        rewardText: '命運贈禮：聖物二選一。',
+      },
+      2: {
+        name: '第二局：夜賭',
+        rule: '賭偶數。必須賭到成功才可進入下一局；失敗時黑暗依序 +2、+4、+8。',
+        diceLabel: '夜賭骰',
+        successText: '偶數',
+        rewardText: '命運贈禮：免費融合一次。',
+      },
+      3: {
+        name: '第三局：命賭',
+        rule: '先選大或小。小為 1-3，大為 4-6；失敗時上桌角色受到 15 傷害，且黑暗 +1。',
+        diceLabel: '命賭骰',
+        successText: '你選中的大小',
+        rewardText: '命運贈禮：聖物二選一，並免費融合一次。',
+      },
+    };
+    return rounds[round] || rounds[1];
+  },
+
+  _fateTableLeavePenalty(round) {
+    if (round >= 3) return 2;
+    if (round >= 2) return 1;
+    return 0;
+  },
+
+  _fateTableRoundBackdrop(round) {
+    if (round === 1) return 'assets/events/fate-table-blood-wager.png';
+    if (round === 2) return 'assets/events/fate-table-night-wager.png';
+    if (round === 3) return 'assets/events/fate-table-life-wager.png';
+    return '';
+  },
+
+  _fateTableFailureBackdrop(round) {
+    if (round === 1) return 'assets/events/fate-table-blood-fail.png';
+    if (round === 2) return 'assets/events/fate-table-night-fail.png';
+    if (round === 3) return 'assets/events/fate-table-life-fail.png';
+    return '';
+  },
+
+  _fateTableFailureFx(round) {
+    if (round === 1) return 'fate-fail-blood';
+    if (round === 2) return 'fate-fail-night';
+    if (round === 3) return 'fate-fail-life';
+    return '';
+  },
+
+  _fateTableNextFailureText(round, ctx = {}) {
+    if (round === 1) {
+      const damage = 4 + Math.max(0, ctx.bloodLosses || 0) * 2;
+      return `下一次血賭失敗：上桌角色受到 ${damage} 傷害。`;
+    }
+    if (round === 2) {
+      const dark = Math.min(8, 2 * Math.pow(2, Math.max(0, ctx.darkLosses || 0)));
+      return `下一次夜賭失敗：黑暗 +${dark}。`;
+    }
+    return '命賭失敗固定：上桌角色受到 15 傷害，黑暗 +1。';
+  },
+
+  _openFateTableRoundSetup(ctx) {
+    const candidates = this._aliveSquad();
+    if (candidates.length === 0) { Render.fullRender(); return; }
+    const round = Math.max(1, Math.min(3, ctx?.round || 1));
+    const info = this._fateTableRoundInfo(round);
+    const leavePenalty = this._fateTableLeavePenalty(round);
+    const choices = [];
+
+    if (round === 2) {
+      choices.push({
+        label: '開始夜賭',
+        danger: true,
+        action: () => this._rollFateGamblingTable({ ...ctx, round }, null),
+      });
+    } else {
+      for (const char of candidates) {
+        if (round === 3) {
+          choices.push({
+            label: `讓 ${char.name} 坐上賭桌（HP ${char.hp}/${char.maxHp}）`,
+            action: () => this._openFateTableHighLowChoice({ ...ctx, round }, char),
+          });
+        } else {
+          choices.push({
+            label: `讓 ${char.name} 坐上賭桌（HP ${char.hp}/${char.maxHp}）`,
+            action: () => this._rollFateGamblingTable({ ...ctx, round }, char),
+          });
+        }
+      }
+    }
+
+    choices.push({
+      label: leavePenalty > 0 ? `離開賭桌（黑暗 +${leavePenalty}）` : '離開賭桌',
+      danger: leavePenalty > 0,
+      action: () => this._leaveFateGamblingTable(round),
+    });
+
     this._openModal({
-      title: '命運賭桌：停手離開',
+      title: `命運賭桌：${info.name}`,
       desc: [
-        gambler.name + ' 的手停在骰子上方。',
+        round === 1
+          ? '你們走到空椅前。骨骰安靜地躺在桌中央，像是在等第一個名字。'
+          : round === 2
+            ? '第二枚骰子自行滾上桌面。這一次，賭桌不看任何人的血，只看黑夜願意吞下多少光。'
+            : '你已經把手伸進賭局，桌面仍在等待下一枚骰子。',
         '',
-        '最後，他把手收了回來。',
-        '黑暗中的聲音像是在嘲笑，又像是在惋惜。',
+        info.rule,
+        this._fateTableNextFailureText(round, ctx),
+        info.rewardText,
+        leavePenalty > 0 ? `此時離桌必須支付黑暗 +${leavePenalty}。` : '此時離桌沒有代價。',
+      ].filter(Boolean).join('\n'),
+      eventBackdrop: this._fateTableRoundBackdrop(round),
+      choices,
+    });
+  },
+
+  _openFateTableHighLowChoice(ctx, gambler) {
+    if (!gambler || gambler.dead || gambler.hp <= 0) {
+      this._openFateTableRoundSetup(ctx);
+      return;
+    }
+    this._openModal({
+      title: '命運賭桌：第三局・命賭',
+      desc: [
+        `${gambler.name} 坐上空椅。`,
         '',
-        '「活著的人，才有下一把。」',
+        '選擇這一局要賭大或小。',
+        '小為 1-3，大為 4-6。',
+        this._fateTableNextFailureText(3, ctx),
+      ].join('\n'),
+      choices: [
+        { label: '賭小（1-3）', action: () => this._rollFateGamblingTable(ctx, gambler, 'low') },
+        { label: '賭大（4-6）', action: () => this._rollFateGamblingTable(ctx, gambler, 'high') },
+        { label: '返回選人', action: () => this._openFateTableRoundSetup(ctx) },
+      ],
+    });
+  },
+
+  _rollFateGamblingTable(ctx, gambler, guess = null) {
+    const round = Math.max(1, Math.min(3, ctx?.round || 1));
+    if (round !== 2 && (!gambler || gambler.dead || gambler.hp <= 0)) {
+      this._openFateTableRoundSetup(ctx);
+      return;
+    }
+    const rollerName = gambler?.name || '賭桌';
+    const rollerCls = gambler?.cls || '';
+    const roll = Dice.rollRaw();
+    const isSuccess = round === 1
+      ? roll % 2 === 1
+      : round === 2
+        ? roll % 2 === 0
+        : (guess === 'low' ? roll <= 3 : roll >= 4);
+
+    if (isSuccess) {
+      this._resolveFateTableSuccess(ctx, gambler, roll, guess, rollerName, rollerCls);
+    } else {
+      this._resolveFateTableFailure(ctx, gambler, roll, guess, rollerName, rollerCls);
+    }
+  },
+
+  _resolveFateTableSuccess(ctx, gambler, roll, guess = null, rollerName = null, rollerCls = '') {
+    const round = Math.max(1, Math.min(3, ctx?.round || 1));
+    const info = this._fateTableRoundInfo(round);
+    const name = rollerName || gambler?.name || '賭桌';
+    const guessText = round === 3 ? `你選擇${guess === 'low' ? '小' : '大'}，` : '';
+    const preDesc = round === 2
+      ? `賭桌自行擲出${info.diceLabel}。`
+      : `${name} 將${info.diceLabel}擲向賭桌。`;
+    const resultAppend = [
+      `${name} 擲出 ${Dice.face(roll)}（${roll}）。${guessText}賭局命中${info.successText}。`,
+      '',
+      round === 1
+        ? '骰聲停下時，桌面裂開一道細光。命運看見了你的影子。'
+        : round === 2
+          ? '黑夜沒有退去，只是替你讓出了一條歪斜的路。'
+          : '命運終於抬眼。它沒有微笑，卻把不屬於你的東西推到你面前。',
+      '',
+      info.rewardText,
+    ].join('\n');
+
+    const acceptAction = round === 1
+      ? () => this._openFateTableRelicChoice(ctx, '命運贈禮：聖物', '桌面上浮現兩件被黑霧托起的聖物。選擇一件帶走。', () => this._openFateTableDecision(ctx))
+      : round === 2
+        ? () => this._openFateTableFusionChoice(ctx, '命運贈禮：融合', '命運替一件聖物打開了不經神壇的縫隙。選擇要融合的角色。', () => this._openFateTableDecision(ctx))
+        : () => this._acceptFinalFateTableGift(ctx);
+
+    this._openModal({
+      title: `命運賭桌：${info.name}`,
+      desc: preDesc,
+      preDesc,
+      resultAppend,
+      resultTitle: `命運賭桌：${info.name}成功`,
+      resultFx: 'fate-roll-success',
+      dice: { type: 'neutral', label: `${name} 的${info.diceLabel}`, value: roll, raw: roll, animate: true, charCls: rollerCls },
+      eventBackdrop: this._fateTableRoundBackdrop(round),
+      choices: [{ label: '接受命運贈禮', action: acceptAction }],
+    });
+  },
+
+  _resolveFateTableFailure(ctx, gambler, roll, guess = null, rollerName = null, rollerCls = '') {
+    const round = Math.max(1, Math.min(3, ctx?.round || 1));
+    const info = this._fateTableRoundInfo(round);
+    const name = rollerName || gambler?.name || '賭桌';
+    const guessText = round === 3 ? `你選擇${guess === 'low' ? '小' : '大'}，` : '';
+    const preDesc = round === 2
+      ? `賭桌自行擲出${info.diceLabel}。`
+      : `${name} 將${info.diceLabel}擲向賭桌。`;
+    let resultAppend = '';
+    let dead = false;
+    let nextCtx = { ...ctx, round };
+
+    if (round === 1) {
+      const damage = 4 + Math.max(0, ctx?.bloodLosses || 0) * 2;
+      nextCtx.bloodLosses = Math.max(0, ctx?.bloodLosses || 0) + 1;
+      gambler.hp = Math.max(0, gambler.hp - damage);
+      dead = gambler.hp <= 0;
+      if (dead) this._removeGamblerAtFateTable(gambler);
+      resultAppend = [
+        `${name} 擲出 ${Dice.face(roll)}（${roll}），不是奇數。`,
         '',
-        '事件結束，未獲得賭命骰子。',
+        `血賭失利：${name} 受到 ${damage} 傷害。`,
+        dead ? `${name} 被桌下的黑影拖離隊伍。` : `賭桌沒有聲音，卻像是在笑。下一次血賭失敗將受到 ${damage + 2} 傷害。`,
+      ].join('\n');
+    } else if (round === 2) {
+      const lossCount = Math.max(0, ctx?.darkLosses || 0);
+      const dark = Math.min(8, 2 * Math.pow(2, lossCount));
+      nextCtx.darkLosses = lossCount + 1;
+      this._applyDarkness(dark, '命運賭桌夜賭失利');
+      if (G.phase === 'over') return;
+      const nextDark = Math.min(8, dark * 2);
+      resultAppend = [
+        `${name} 擲出 ${Dice.face(roll)}（${roll}），不是偶數。`,
+        '',
+        `夜賭失利：黑暗 +${dark}。`,
+        '你們沒有失去血，卻聽見遠處有什麼東西因此醒來。',
+        `下一次夜賭失敗將使黑暗 +${nextDark}。`,
+      ].join('\n');
+    } else {
+      const damage = 15;
+      gambler.hp = Math.max(0, gambler.hp - damage);
+      this._applyDarkness(1, '命運賭桌命賭失利');
+      if (G.phase === 'over') return;
+      dead = gambler.hp <= 0;
+      if (dead) this._removeGamblerAtFateTable(gambler);
+      resultAppend = [
+        `${name} 擲出 ${Dice.face(roll)}（${roll}）。${guessText}賭局落空。`,
+        '',
+        `命賭失利：${name} 受到 ${damage} 傷害，黑暗 +1。`,
+        dead ? `${name} 的名字被刻進桌面，再也沒有回應。` : '命運沒有收回視線，只是把代價推到你面前。',
+      ].join('\n');
+    }
+
+    const leavePenalty = this._fateTableLeavePenalty(round);
+    const choices = [
+      {
+        label: `繼續${info.name}`,
+        danger: round >= 3,
+        action: () => { if (dead && this._checkLose()) return; this._openFateTableRoundSetup(nextCtx); },
+      },
+      {
+        label: leavePenalty > 0 ? `離開賭桌（黑暗 +${leavePenalty}）` : '離開賭桌',
+        danger: leavePenalty > 0,
+        action: () => { if (dead && this._checkLose()) return; this._leaveFateGamblingTable(round); },
+      },
+    ];
+
+    this._openModal({
+      title: `命運賭桌：${info.name}`,
+      desc: preDesc,
+      preDesc,
+      resultAppend,
+      resultTitle: `命運賭桌：${info.name}失敗`,
+      resultBackdrop: this._fateTableFailureBackdrop(round),
+      resultFx: this._fateTableFailureFx(round),
+      dice: { type: 'neutral', label: `${name} 的${info.diceLabel}`, value: roll, raw: roll, animate: true, charCls: rollerCls },
+      eventBackdrop: this._fateTableRoundBackdrop(round),
+      choices,
+    });
+  },
+
+  _openFateTableDecision(ctx) {
+    const round = Math.max(1, Math.min(3, ctx?.round || 1));
+    const nextRound = round + 1;
+    if (nextRound > 3) {
+      this._finishFateGamblingTable('命運賭桌：賭局結束', '賭桌收起所有聲音。命運沒有道別，只留下你們仍在呼吸。');
+      return;
+    }
+    const leavePenalty = this._fateTableLeavePenalty(round);
+    const choices = [
+      {
+        label: `繼續下注：${this._fateTableRoundInfo(nextRound).name}`,
+        danger: nextRound >= 3,
+        action: () => this._openFateTableRoundSetup({ ...ctx, round: nextRound }),
+      },
+      {
+        label: leavePenalty > 0 ? `離開賭桌（黑暗 +${leavePenalty}）` : '離開賭桌',
+        danger: leavePenalty > 0,
+        action: () => this._leaveFateGamblingTable(round),
+      },
+    ];
+    this._openModal({
+      title: '命運賭桌：是否繼續',
+      desc: [
+        '你可以把手收回，也可以把下一個人推向空椅。',
+        '',
+        leavePenalty > 0
+          ? `現在離桌會支付黑暗 +${leavePenalty}。這不是失敗，是貪婪留下的帳。`
+          : '現在離桌沒有代價。第一把只是試探命運。',
+      ].join('\n'),
+      choices,
+    });
+  },
+
+  _leaveFateGamblingTable(round = 1) {
+    const penalty = this._fateTableLeavePenalty(round);
+    if (penalty > 0) {
+      this._applyDarkness(penalty, '命運賭桌離桌代價');
+      if (G.phase === 'over') return;
+    }
+    this._openModal({
+      title: '命運賭桌：離桌',
+      desc: [
+        penalty > 0
+          ? '你把手抽回來，但桌面仍留下你的指紋。黑夜記住了這筆債。'
+          : '你們沒有坐下。骰子輕輕轉了一圈，像是在笑。',
+        '',
+        penalty > 0 ? `黑暗 +${penalty}。` : '事件結束。',
       ].join('\n'),
       choices: [{ label: '離開', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
 
-  _awardWagerDiceFromFateTable(gambler) {
-    const relic = getEventRelicById('wager_dice') || getRelicById('wager_dice');
-    if (!relic) {
+  _finishFateGamblingTable(title, desc) {
+    this._openModal({
+      title,
+      desc,
+      choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _openFateTableRelicChoice(ctx, title, intro, onDone) {
+    const pool = this._getAvailableRelics([...getDayRelics(), ...getNightRelics()]);
+    const relicChoices = typeof this._pickEventRelicChoices === 'function'
+      ? this._pickEventRelicChoices(pool)
+      : pool.slice(0, 2);
+    if (relicChoices.length === 0) {
       this._openModal({
-        title: '命運賭桌：空無一物',
-        desc: '賭桌上的骰子碎成粉末，什麼也沒有留下。',
-        choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+        title,
+        desc: `${intro}\n\n桌面上的霧散得太快，沒有聖物成形。`,
+        choices: [{ label: '繼續', action: onDone }],
       });
       return;
     }
-    this._openFateTableRelicAssignModal({
-      title: '命運賭桌：取得賭命骰子',
-      intro: gambler.name + ' 收下賭桌上的骰子。黑暗中的笑聲逐漸遠去。',
-      relic,
+
+    G.fateTableRelicChoiceContext = { ctx, title, intro, relicChoices, onDone };
+
+    this._openModal({
+      title,
+      descHtml: `
+        <div class="event-relic-choice-intro">
+          <p>${this._escapeEventHtml(intro)}</p>
+          <p>命運把兩件聖物推到桌面，只允許你們帶走其中一件。</p>
+        </div>
+        <div class="event-relic-choice-grid">
+          ${relicChoices.map((relic, index) => this._fateTableRelicChoiceCardHtml(relic, index)).join('')}
+        </div>
+      `,
+      typeText: false,
+      choices: [{
+        label: '放棄聖物',
+        action: () => {
+          G.fateTableRelicChoiceContext = null;
+          if (typeof onDone === 'function') onDone();
+        },
+      }],
     });
   },
 
-  _awardRandomRelicFromFateTable(gambler) {
-    const pool = this._getAvailableRelics([...getDayRelics(), ...getNightRelics()]);
-    if (pool.length === 0) {
-      this._awardWagerDiceFromFateTable(gambler);
-      return;
-    }
-    const relic = weightedRelicPick(pool);
+  _fateTableRelicChoiceCardHtml(relic, index) {
+    const lore = this._getFirstLore(relic.id);
+    const shortDesc = this._shortEventRelicDesc(relic.desc || '');
+    const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
+    const visual = relic.iconImage
+      ? `<img class="event-relic-choice-img" src="${this._escapeEventAttr(relic.iconImage)}" alt="">`
+      : `<span class="event-relic-choice-emoji">${this._escapeEventHtml(relic.icon || '◆')}</span>`;
+    return `
+      <button type="button" class="event-relic-choice relic-${relicClass}" onclick="Game.chooseFateTableRelicChoice(${index})">
+        <span class="event-relic-choice-visual">${visual}</span>
+        <span class="event-relic-choice-body">
+          <span class="event-relic-choice-kicker">接受命運贈禮</span>
+          <span class="event-relic-choice-name">${this._escapeEventHtml(relic.name || '未知聖物')}</span>
+          <span class="event-relic-choice-desc">${this._escapeEventHtml(shortDesc)}</span>
+          ${lore ? `<span class="event-relic-choice-lore">「${this._escapeEventHtml(this._shortEventRelicDesc(lore, 32))}」</span>` : ''}
+        </span>
+      </button>
+    `;
+  },
+
+  chooseFateTableRelicChoice(index) {
+    const ctx = G.fateTableRelicChoiceContext;
+    const relic = ctx?.relicChoices?.[index];
+    if (!ctx || !relic) return;
     this._openFateTableRelicAssignModal({
-      title: '命運賭桌：隨機聖物',
-      intro: gambler.name + ' 推開賭桌上的骰子，黑霧凝成另一件聖物。',
+      title: ctx.title,
+      intro: ctx.intro,
       relic,
+      onDone: ctx.onDone,
     });
   },
 
-  _openFateTableRelicAssignModal({ title, intro, relic }) {
+  _openFateTableRelicAssignModal({ title, intro, relic, onDone }) {
     if (!relic) return;
     const carriers = relic.scholarOnly
       ? this._aliveSquad().filter(c => c.cls === 'scholar')
@@ -757,6 +1046,7 @@ const GameEventTreasure = {
       detail: char.relic ? `目前效果：${char.relic.desc}` : '',
       action: () => {
         const result = this._grantFateTableRelic(char, relic);
+        G.fateTableRelicChoiceContext = null;
         this._openModal({
           title: `${title}：完成`,
           desc: [
@@ -764,7 +1054,7 @@ const GameEventTreasure = {
             result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
             this._resonanceActivatedText(result?.newly || []),
           ].filter(Boolean).join('\n'),
-          choices: [{ label: '離開賭桌', action: () => { this._closeModal(); Render.fullRender(); } }],
+          choices: [{ label: '繼續', action: onDone }],
         });
       },
     }));
@@ -772,8 +1062,8 @@ const GameEventTreasure = {
       label: '放棄聖物',
       action: () => {
         this._log(`命運賭桌：放棄聖物「${relic.name}」。`, 'dim');
-        this._closeModal();
-        Render.fullRender();
+        G.fateTableRelicChoiceContext = null;
+        if (typeof onDone === 'function') onDone();
       },
     });
 
@@ -782,6 +1072,84 @@ const GameEventTreasure = {
       desc: `${intro}\n\n獲得「${relic.name}」。\n${relic.desc}`,
       choices,
     });
+  },
+
+  _fateTableFusionCandidates() {
+    return this._aliveSquad().filter(char =>
+      char.relic &&
+      char.relic.fusable !== false &&
+      !char.fusedRelic
+    );
+  },
+
+  _openFateTableFusionChoice(ctx, title, intro, onDone) {
+    const candidates = this._fateTableFusionCandidates();
+    if (candidates.length === 0) {
+      this._openModal({
+        title,
+        desc: `${intro}\n\n目前沒有可融合的聖物。命運的贈禮在桌面上空響了一聲。`,
+        choices: [{ label: '繼續', action: onDone }],
+      });
+      return;
+    }
+
+    const choices = candidates.map(char => ({
+      label: `${char.name}：融合「${char.relic.name}」`,
+      action: () => {
+        const result = this._grantFateTableFusion(char);
+        this._openModal({
+          title: `${title}：完成`,
+          desc: [
+            `${char.name} 免費融合聖物「${result.relic?.name || '未知聖物'}」。`,
+            this._resonanceActivatedText(result.newly || []),
+          ].filter(Boolean).join('\n'),
+          choices: [{ label: '繼續', action: onDone }],
+        });
+      },
+    }));
+    choices.push({ label: '放棄融合', action: onDone });
+
+    this._openModal({
+      title,
+      desc: `${intro}\n\n本次融合不消耗行動，也不降低最大生命。`,
+      choices,
+    });
+  },
+
+  _grantFateTableFusion(char) {
+    if (!char?.relic || char.relic.fusable === false || char.fusedRelic) return { relic: null, newly: [] };
+    const relic = char.relic;
+    const fusedRelic = { ...relic };
+    if (fusedRelic.fusedEffect) fusedRelic.effect = { ...fusedRelic.fusedEffect };
+
+    char.fusedRelic = fusedRelic;
+    char.relic = null;
+
+    this._applyFusionBonus(char, fusedRelic);
+    this._removeMapRelicsById(fusedRelic.id);
+    this._unlockNote(fusedRelic.id, true);
+    const newly = this._updateResonances();
+    this._log(`${char.name} 在命運賭桌免費融合聖物「${fusedRelic.name}」。`, 'reward');
+    return { relic: fusedRelic, newly };
+  },
+
+  _acceptFinalFateTableGift(ctx) {
+    const finish = () => this._finishFateGamblingTable(
+      '命運賭桌：命運贈禮',
+      '命運把最後一枚籌碼推回你們面前。賭桌上的光熄滅，只剩黑夜慢慢合攏。'
+    );
+    const fusionStep = () => this._openFateTableFusionChoice(
+      ctx,
+      '命運贈禮：融合',
+      '最後的賭局讓一件聖物短暫鬆動，像是等著被塞進另一段命運。',
+      finish
+    );
+    this._openFateTableRelicChoice(
+      ctx,
+      '命運贈禮：聖物',
+      '賭桌裂開一道細光，兩件聖物從黑霧裡浮起。',
+      fusionStep
+    );
   },
 
   _grantFateTableRelic(char, relic) {

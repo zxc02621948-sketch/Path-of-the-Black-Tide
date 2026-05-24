@@ -172,6 +172,8 @@ const ENEMIES = [
     id: 'cage_warden',
     name: '囚籠看守',
     icon: '🗝️',
+    cardBgImage: 'assets/enemies/cage-warden.png',
+    hideIconInCombat: true,
     desc: '拖著鏽鐵鑰匙的看守，身後傳來被囚者的低聲呼救。若拖得太久，牠會處刑牢中的倖存者。',
     hp: 36,
     block: 3,
@@ -213,6 +215,8 @@ const ENEMIES = [
     id: 'treasure_mimic',
     name: '寶箱擬態怪',
     icon: '▣',
+    cardBgImage: 'assets/enemies/treasure-mimic.png',
+    hideIconInCombat: true,
     desc: '破損寶箱裡蜷伏的怪物，硬殼裡卡著尚能使用的裝備。',
     hp: 34,
     block: 5,
@@ -235,6 +239,8 @@ const ENEMIES = [
     id: 'dark_gift_mimic',
     name: '黑匣擬態',
     icon: '◈',
+    cardBgImage: 'assets/enemies/dark-gift-mimic.png',
+    hideIconInCombat: true,
     desc: '黑暗贈禮寶箱裡蜷伏的怪物。它的鎖孔每次遭遇都會換一個原生弱點，若以天然骰面命中原生弱點，箱體會直接開啟。',
     hp: 42,
     block: 6,
@@ -403,7 +409,14 @@ const ENEMIES = [
 function resolveEnemyTier(base, day) {
   if (!base.tiers) return { ...base };
   const idx = Math.min(base.tiers.length - 1, Math.floor((day - 1) / base.tierUpDays));
-  return { ...base, ...base.tiers[idx], tiers: undefined };
+  return {
+    ...base,
+    ...base.tiers[idx],
+    tiers: undefined,
+    tierStageIndex: idx,
+    tierStageCount: base.tiers.length,
+    tierResolvedDay: day,
+  };
 }
 
 // ── 意圖解算 ──────────────────────────────────────────────────
@@ -480,16 +493,8 @@ function getNightEnemies() {
 
 function randomEnemyForDay(isNight, dayOverride = null) {
   const day = dayOverride || (typeof G !== 'undefined' && G?.day) || 1;
-  const defeatedUnique = new Set((typeof G !== 'undefined' && Array.isArray(G.defeatedUniqueEnemies)) ? G.defeatedUniqueEnemies : []);
   const baseTiers = day <= 3 ? ['weak'] : ['weak', 'medium'];
   const source = isNight ? getNightEnemies() : getDayEnemies();
-  const strongPool = !isNight && day >= 10
-    ? source
-      .filter(e => e.tier === 'strong' && !e.boss && !defeatedUnique.has(e.id))
-    : [];
-  if (strongPool.length > 0 && Math.random() < 0.08) {
-    return { ...strongPool[Math.floor(Math.random() * strongPool.length)] };
-  }
   const pool = source
     .filter(e => !e.boss && !e.rescueBoss)
     .filter(e => baseTiers.includes(e.tier));

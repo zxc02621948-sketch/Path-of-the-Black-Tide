@@ -4,8 +4,9 @@ const GameCombatFlow = {
   // Section.
   // Section.
   _triggerCombat(cell, opts = {}) {
-    const enemy = cell.content?.enemy;
+    const enemy = this._resolveCombatEnemyForCurrentDay(cell.content?.enemy, cell, opts);
     if (!enemy) { cell.cleared = true; Render.fullRender(); return; }
+    cell.content.enemy = enemy;
     for (const char of G.squad) {
       char._ironShardUsed = false;
       char._boneDiceBagUses = 0;
@@ -58,6 +59,16 @@ const GameCombatFlow = {
 
     G.combatMods = [...G.combatMods];
     this._showCombatModal();
+  },
+
+  _resolveCombatEnemyForCurrentDay(enemy, cell = null, opts = {}) {
+    if (!enemy || opts.source === 'devTest') return enemy;
+    if (cell?.content?.reward) return enemy;
+    if (!['weak', 'medium'].includes(enemy.tier)) return enemy;
+    if (typeof getEnemyById !== 'function' || typeof resolveEnemyTier !== 'function') return enemy;
+    const base = getEnemyById(enemy.id);
+    if (!base?.tiers) return enemy;
+    return resolveEnemyTier(base, G.day || 1);
   },
 
   _showCombatModal() {

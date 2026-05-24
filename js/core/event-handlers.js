@@ -10,56 +10,17 @@ const GameEventHandlers = {
         delete cell.content.eventPending;
       }
     }
-    if (!ev) { cell.cleared = true; Render.fullRender(); return; }
+    if (!ev) { this._triggerEmptyTerrainSearch(cell); return; }
 
     if (ev.type === 'echo_site_clue' && !this._isEchoSiteClueStillValid(ev)) {
       ev = this._rerollTerrainEventWithoutEchoSite(cell);
-      if (!ev) { cell.cleared = true; Render.fullRender(); return; }
+      if (!ev) { this._triggerEmptyTerrainSearch(cell); return; }
       cell.content.event = ev;
     }
 
     if (!ev.gamblerResolved && this._maybePromptGamblerEventReroll(cell, ev)) return;
 
-    // Section.
-    if (cell.reserved) {
-      cell.reserved = false;
-      G.explorerReserved = null;
-      G.explorerCooldownExpires = TerrainRules.reserveCooldownEnd(G.day);
-      this._log(`探索者保留的事件開始處理：${ev.name}。`, 'info');
-      this._dispatchTerrainEvent(cell, ev);
-      return;
-    }
-
-    // Section.
-    if (TerrainRules.canReserveEvent(G, cell, ev)) {
-      this._showReserveModal(cell, ev);
-      return;
-    }
-
     this._dispatchTerrainEvent(cell, ev);
-  },
-
-  _showReserveModal(cell, ev) {
-    this._openModal({
-      title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n探索者可以先記下這裡，稍後再處理這個事件。`,
-      choices: [
-        {
-          label: '現在處理',
-          action: () => { this._closeModal(); this._dispatchTerrainEvent(cell, ev); },
-        },
-        {
-          label: '先保留事件',
-          action: () => {
-            cell.reserved = true;
-            G.explorerReserved = { x: cell.x, y: cell.y };
-            this._log(`探索者保留了事件「${ev.name}」。`, 'info');
-            this._closeModal();
-            Render.fullRender();
-          },
-        },
-      ],
-    });
   },
 
   _maybePromptGamblerEventReroll(cell, ev) {
@@ -94,8 +55,7 @@ const GameEventHandlers = {
             const next = this._rollTerrainEventForCell(cell);
             if (!next) {
               this._closeModal();
-              cell.cleared = true;
-              Render.fullRender();
+              this._triggerEmptyTerrainSearch(cell);
               return;
             }
             next.gamblerResolved = true;
@@ -109,6 +69,19 @@ const GameEventHandlers = {
       ],
     });
     return true;
+  },
+
+  _triggerEmptyTerrainSearch(cell) {
+    cell.cleared = true;
+    delete cell.content?.eventPending;
+    const names = { forest: '森林', ruins: '廢墟', cave: '洞穴' };
+    const name = names[cell.type] || '地形';
+    this._openModal({
+      title: `${name}探索`,
+      desc: `你們仔細搜索這處${name}，沒有找到值得停留的線索。`,
+      resultFx: 'event-clear',
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
   },
 
   _dispatchTerrainEvent(cell, ev) {
@@ -180,7 +153,7 @@ const GameEventHandlers = {
   _canPlaceTreasureChest() {
     for (const row of G.map || []) {
       for (const cell of row || []) {
-        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared || cell.reserved) continue;
+        if (!cell || cell.type !== 'empty' || cell.content || cell.hiddenSite || cell.cleared) continue;
         if (cell.x === G.playerX && cell.y === G.playerY) continue;
         return true;
       }

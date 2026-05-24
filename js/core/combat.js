@@ -633,10 +633,15 @@ const CombatRules = {
       ? 'pierce'
       : (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit)
         ? 'eagle-mark'
-        : (weapon?.family === 'sword' ? 'slash' : 'strike');
+        : (['sword', 'dagger', 'katana'].includes(weapon?.family) ? 'slash' : 'strike');
     logs.push(`最終傷害：${damage}`);
     const primaryHpBefore = enemy.hp;
     enemy.hp = Math.max(0, enemy.hp - damage);
+    const rapierStrike = !!rapierRelic &&
+      weapon?.family === 'sword' &&
+      roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
+      damage > 0 &&
+      enemy.hp > 0;
     if (damage > 0) {
       playerDamageEvents.push({
         type: 'primary',
@@ -645,6 +650,13 @@ const CombatRules = {
         to: enemy.hp,
         hitEffect: primaryHitEffect,
         attackTrail: primaryAttackTrail,
+        relicFx: greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
+          ? 'iron_scabbard'
+          : (rapierStrike && rapierRelic?.id === 'silver_bee_pin'
+            ? 'silver_bee_pin'
+            : (starBreakerFixedDamage > 0
+              ? 'star_breaker'
+              : (starHunterEyeDamageBonus > 0 ? 'star_hunter_eye' : ''))),
       });
     }
     let rapierFollowHits = 0;
@@ -663,11 +675,6 @@ const CombatRules = {
         }
       }
     }
-    const rapierStrike = !!rapierRelic &&
-      weapon?.family === 'sword' &&
-      roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
-      damage > 0 &&
-      enemy.hp > 0;
     if (rapierStrike) {
       const rate = Math.max(0, rapierRelic.effect?.damageRate ?? 0.5);
       const followBaseDamage = Math.max(damage, preBlockDamage);
@@ -706,6 +713,7 @@ const CombatRules = {
           to: enemy.hp,
           hitEffect: 'pierce',
           attackTrail: 'pierce',
+          relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
         });
         playerDamageEvents.push({
           type: 'rapier',
@@ -714,6 +722,7 @@ const CombatRules = {
           to: enemy.hp,
           hitEffect: 'pierce',
           attackTrail: 'pierce',
+          relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
         });
         damage += currentFollowDamage;
         rapierFollowHits++;

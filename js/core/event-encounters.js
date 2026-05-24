@@ -8,6 +8,7 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}`,
+      resultFx: 'event-ambush',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices: [{
@@ -78,6 +79,8 @@ const GameEventEncounters = {
       this._openModal({
         title: ev.name,
         desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n目前沒有可救援的新職業。`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         choices: [{ label: '繼續', action: () => this._closeModal() }],
       });
       return;
@@ -119,6 +122,8 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n你們找到了 ${newChar.name}（${CHARACTER_CLASSES[newChar.cls]?.name || newChar.cls}）。\n${newChar.flavor || ''}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices,
     });
   },
@@ -236,6 +241,8 @@ const GameEventEncounters = {
       this._openModal({
         title: ev.name,
         desc,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         choices: this._manualProgressChoices(ev, desc),
       });
       return;
@@ -253,6 +260,8 @@ const GameEventEncounters = {
       this._openModal({
         title: ev.name,
         desc,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         choices: this._manualProgressChoices(ev, desc),
       });
       return;
@@ -282,6 +291,8 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: this._manualProgressChoices(ev, desc),
     });
   },
@@ -366,6 +377,8 @@ const GameEventEncounters = {
       preDesc: result.dice ? `${desc}\n\n正在進行淨化判定。` : undefined,
       resultDesc: result.dice ? `${desc}${result.text}` : undefined,
       resultAppend: result.dice ? result.text : undefined,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: result.dice ? { ...result.dice, animate: true } : null,
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -376,6 +389,8 @@ const GameEventEncounters = {
       this._openModal({
         title: ev.name,
         desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n星光碎片需要擲骰判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         choices: [{
           label: '擲淨化骰',
           action: () => {
@@ -398,6 +413,8 @@ const GameEventEncounters = {
         preDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n正在進行淨化判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
         resultDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n擲出 ${Dice.face(roll)}（${roll}），淨化失敗，黑暗不變。`,
         resultAppend: `擲出 ${Dice.face(roll)}（${roll}），淨化失敗，黑暗不變。`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         dice: { type: 'danger', label: '淨化骰', value: roll, raw: roll, animate: !!rollResult.animate },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -420,6 +437,8 @@ const GameEventEncounters = {
         preDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n正在進行淨化判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
         resultDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n大成功：你們獲得 ${equip.icon} ${equip.name}${countText}。\n${equip.desc}`,
         resultAppend: `大成功：你們獲得 ${equip.icon} ${equip.name}${countText}。\n${equip.desc}`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: '淨化骰', value: roll, raw: roll, animate: !!rollResult.animate },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -435,6 +454,8 @@ const GameEventEncounters = {
       preDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n正在進行淨化判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
       resultDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n擲出 ${Dice.face(roll)}（${roll}），${roll === 6 ? '大成功' : '成功'}：黑暗 -${reduction.actual}。${reduction.text.replace(/^\n\n/, '')}`,
       resultAppend: `擲出 ${Dice.face(roll)}（${roll}），${roll === 6 ? '大成功' : '成功'}：黑暗 -${reduction.actual}。${reduction.text.replace(/^\n\n/, '')}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: 'neutral', label: '淨化骰', value: roll, raw: roll, animate: !!rollResult.animate },
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -448,6 +469,8 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n全隊先恢復 ${heal} HP。你們可以選擇是否翻找營地。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       choices: [
         { label: '翻找營地', action: () => this._resolveOldCampGamble(cell, ev) },
         { label: '離開', action: () => { this._closeModal(); Render.fullRender(); } },
@@ -491,6 +514,8 @@ const GameEventEncounters = {
         preDesc: `${modeText}\n\n正在翻找營地。`,
         resultDesc: `${modeText}\n\n擲出 ${Dice.face(roll)}（${roll}），成功獲得 ${equip.icon} ${equip.name}。\n${equip.desc}`,
         resultAppend: `擲出 ${Dice.face(roll)}（${roll}），成功獲得 ${equip.icon} ${equip.name}。\n${equip.desc}`,
+        eventImage: ev.eventImage || '',
+        eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: '翻找骰', value: roll, raw: roll, animate: true },
         choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
       });
@@ -503,6 +528,8 @@ const GameEventEncounters = {
       preDesc: `${modeText}\n\n正在翻找營地。`,
       resultDesc: `${modeText}\n\n擲出 ${Dice.face(roll)}（${roll}），沒有找到可用物資。`,
       resultAppend: `擲出 ${Dice.face(roll)}（${roll}），沒有找到可用物資。`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: '翻找骰', value: roll, raw: roll, animate: true },
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });

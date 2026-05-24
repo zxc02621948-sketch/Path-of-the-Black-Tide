@@ -22,6 +22,8 @@ const Game = {
       pendingSystemModals: [],
       fateGamblingTableTriggered: false,
       echoSites: [],
+      spawnedUniqueEnemies: [],
+      defeatedUniqueEnemies: [],
 
       map: MapGen.generate(),
       playerX: cx,
@@ -42,9 +44,6 @@ const Game = {
 
       // Section.
       _altarRollGranted: false,
-
-      // Section.
-      explorerCooldownExpires: 0,   // 探索者路標冷卻到期日，0 = 可使用。
 
       // Section.
       library: this._loadLibrary(),
@@ -221,6 +220,9 @@ const Game = {
     G.phase = 'night';
     this._log('黑夜降臨，邊境變得更加危險。', 'night');
     this._log('黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。', 'night');
+    if (typeof this._maybeSpawnUniqueStrongEnemy === 'function') {
+      this._maybeSpawnUniqueStrongEnemy();
+    }
 
     // 夜晚只放置目前的黑夜聖物；舊黑夜遺匣流程已移除。
     this._placeNightRelics();
@@ -458,7 +460,6 @@ const Game = {
   },
 
   _relicRewardCardHtml(relic, lore = '', compact = false) {
-    const name = this._escapeHtmlLocal(relic.name || '未知聖物');
     const desc = this._escapeHtmlLocal(relic.desc || '');
     const loreHtml = !compact && lore ? `<div class="relic-reward-lore">「${this._escapeHtmlLocal(lore)}」</div>` : '';
     const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
@@ -466,11 +467,9 @@ const Game = {
       ? `<img class="relic-reward-img" src="${this._escapeAttrLocal(relic.iconImage)}" alt="">`
       : `<span class="relic-reward-emoji">${this._escapeHtmlLocal(relic.icon || '◆')}</span>`;
     return `
-      <div class="relic-reward-panel relic-${relicClass}${compact ? ' compact' : ''}">
+      <div class="relic-reward-panel relic-reward-display relic-${relicClass}${compact ? ' compact' : ''}">
         <div class="relic-reward-visual">${visual}</div>
         <div class="relic-reward-copy">
-          <div class="relic-reward-kicker">選擇持有者</div>
-          <div class="relic-reward-name">${name}</div>
           ${compact ? '' : `<div class="relic-reward-desc">${desc}</div>`}
           ${loreHtml}
         </div>
