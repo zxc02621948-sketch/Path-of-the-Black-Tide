@@ -261,7 +261,8 @@ const EnemyAbilities = {
       logs.push('短暫破曉：本次閉眼沒有獲得格檔。');
       return state;
     }
-    const block = Math.max(0, ability.closedBlock || 5);
+    const darkness = Math.max(0, Math.floor(Number.isFinite(enemy.finalBossDarkness) ? enemy.finalBossDarkness : (state.darkness || 0)));
+    const block = Math.max(0, this._finalBossTierValue(ability, darkness, 'closedBlock', ability.closedBlock || 5));
     if (block > 0) {
       CombatStatus.raiseBlock(enemy, block);
       logs.push(`${enemy.name} 閉眼遮蔽，獲得格檔 ${block}。`);
@@ -278,6 +279,19 @@ const EnemyAbilities = {
       };
     }
     return enemy.abilityState.executionCountdown;
+  },
+
+  _finalBossDarknessTier(ability, darkness = 0) {
+    const tiers = Array.isArray(ability?.darknessTiers) ? ability.darknessTiers : [];
+    const available = tiers
+      .filter(tier => Math.max(0, tier?.minDarkness || 0) <= darkness)
+      .sort((a, b) => Math.max(0, a.minDarkness || 0) - Math.max(0, b.minDarkness || 0));
+    return available.length > 0 ? available[available.length - 1] : null;
+  },
+
+  _finalBossTierValue(ability, darkness, key, fallback = 0) {
+    const tier = this._finalBossDarknessTier(ability, darkness);
+    return Number.isFinite(tier?.[key]) ? tier[key] : fallback;
   },
 
   handlers: {
@@ -322,7 +336,8 @@ const EnemyAbilities = {
           const darkness = Math.max(0, Math.floor(Number.isFinite(enemy.finalBossDarkness) ? enemy.finalBossDarkness : ((typeof G !== 'undefined' && G?.darkness) || 0)));
           state.scaled = true;
           state.darkness = darkness;
-          const hpBonus = darkness * Math.max(0, ability.hpPerDarkness || 0);
+          const tierHpBonus = EnemyAbilities._finalBossTierValue(ability, darkness, 'hpBonus', 0);
+          const hpBonus = darkness * Math.max(0, ability.hpPerDarkness || 0) + Math.max(0, tierHpBonus);
           const attackBonus = Math.floor(darkness / Math.max(1, ability.attackPerDarkness || 5));
           if (!enemy.finalBossPrescaled) {
             enemy.maxHp = Math.max(1, (enemy.maxHp || enemy.hp || 1) + hpBonus);
@@ -348,7 +363,9 @@ const EnemyAbilities = {
         if (!intent?.finalEye || result.counterDmg <= 0 || !result.counterTarget) return;
         const state = EnemyAbilities._finalBossState(enemy);
         const roll = Math.ceil(Math.random() * 6);
-        const bonus = Math.ceil(roll / 2);
+        const darkness = Math.max(0, Math.floor(Number.isFinite(enemy.finalBossDarkness) ? enemy.finalBossDarkness : (state.darkness || 0)));
+        const eyeDamageBonus = Math.max(0, EnemyAbilities._finalBossTierValue(ability, darkness, 'eyeDamageBonus', 0));
+        const bonus = Math.ceil(roll / 2) + eyeDamageBonus;
         result.enemyDiceRoll = roll;
         result.counterDmg += bonus;
         logs.push(`${enemy.name} 開眼擲骰 ${roll}，本次攻擊傷害 +${bonus}。`);
@@ -359,14 +376,19 @@ const EnemyAbilities = {
           return;
         }
 
-        const splash = Math.max(0, ability.splashDamage || 0);
-        if (splash <= 0) return;
-        result.aoeCounter = splash;
+        const splash = Math.max(0, EnemyAbilities._finalBossTierValue(ability, darkness, 'splashDamage', ability.splashDamage || 0));
+        const blackLight = Math.max(0, EnemyAbilities._finalBossTierValue(ability, darkness, 'blackLightDamage', 0));
+        if (splash <= 0 && blackLight <= 0) return;
         result.aoeDamageByChar = {};
+        let highestAoe = 0;
         for (const char of EnemyAbilities._aliveSquad(squad)) {
-          result.aoeDamageByChar[char.id] = char.id === result.counterTarget.id ? 0 : splash;
+          const value = (char.id === result.counterTarget.id ? 0 : splash) + blackLight;
+          result.aoeDamageByChar[char.id] = value;
+          highestAoe = Math.max(highestAoe, value);
         }
-        logs.push(`${enemy.name} 開眼濺射，非目標隊友各受到 ${splash} 傷害。`);
+        result.aoeCounter = highestAoe;
+        if (splash > 0) logs.push(`${enemy.name} 開眼濺射，非目標隊友各受到 ${splash} 傷害。`);
+        if (blackLight > 0) logs.push(`${enemy.name} 終夜黑光，全隊各受到 ${blackLight} 傷害。`);
       },
     },
 

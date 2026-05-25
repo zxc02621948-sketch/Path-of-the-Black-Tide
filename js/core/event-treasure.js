@@ -445,6 +445,7 @@ const GameEventTreasure = {
       title: `發現裝備：${gear.name}`,
       descHtml: this._gearRewardCardHtml(gear, boostText),
       typeText: false,
+      resultFx: 'event-reward',
       combatLog,
       choices: [
         { label: '分配裝備', action: () => this._openGearAssignTargetModal(gear, clear, abandonLog) },

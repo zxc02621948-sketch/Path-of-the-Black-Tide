@@ -8,7 +8,7 @@ const CHARACTER_CLASSES = {
     maxHp: 26,
     attack: 5,
     passive: 'combat_floor',
-    passiveDesc: '戰鬥骰最低 3',
+    passiveDesc: '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面的格檔，最多 6',
   },
   explorer: {
     id: 'explorer',
@@ -18,7 +18,7 @@ const CHARACTER_CLASSES = {
     maxHp: 20,
     attack: 3,
     passive: 'suspicious_flaw',
-    passiveDesc: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中',
+    passiveDesc: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
   },
   scholar: {
     id: 'scholar',
@@ -28,17 +28,17 @@ const CHARACTER_CLASSES = {
     maxHp: 20,
     attack: 4,
     passive: 'gambler_attack',
-    passiveDesc: '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空',
+    passiveDesc: '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空。戰鬥中實際損失 HP 後，下回合獲得損失 HP x2 的格檔',
   },
   support: {
     id: 'support',
     name: '輔助',
     icon: '✚',
-    desc: '維持隊伍生存，每日恢復並降低失敗傷害。',
+    desc: '維持隊伍生存，在戰鬥中持續替全隊穩住傷勢。',
     maxHp: 18,
     attack: 2,
-    passive: 'tactical_support',
-    passiveDesc: '若輔助不是主戰者，主戰者本回合第一次攻擊傷害 +1；若主戰者本回合受到敵人攻擊，該次傷害 -1',
+    passive: 'team_heal',
+    passiveDesc: '我方攻擊回合結束時，若輔助存活，全隊回復 1 HP；若輔助是本回合主戰者，改為全隊回復 2 HP。觸發後輔助仇恨 +1',
   },
 };
 

@@ -59,10 +59,12 @@ const EVENT_POOL = {
       category: 1,
       weight: 1,
       diceType: 'explore',
-      successMin: 3,
+      successMin: 4,
       failDamage: 2,
       successDesc: '探索者及時察覺，輕鬆脫身。',
       failDesc: '陷阱觸發，有人受傷了。',
+      failSfx: 'forestSnareTrapFail',
+      failSfxVolume: 0.52,
       choiceTrap: true,
       forceDamage: 1,
       forceDesc: '你們選擇直接衝過陷阱。\n\n繩索被硬生生扯斷，藏在樹叢裡的木刺與碎石同時彈出，擦傷了所有人。\n\n全隊受到 1 點陷阱傷害，直接通過。',
@@ -101,7 +103,7 @@ const EVENT_POOL = {
       type: 'find_relic',
       rarity: 'epic',
       category: 4,
-      weight: 1,
+      weight: 0.45,
       condition: state => state?.canFindEventRelic?.() !== false,
     },
     {
@@ -109,6 +111,8 @@ const EVENT_POOL = {
       name: '黑色菌絲',
       desc: '樹幹上的黑色菌絲忽然收縮，像嗅到活人的氣味。腐爛的木皮裂開，藏在林間的東西正被你們驚醒。',
       eventImage: 'assets/events/forest-dark-growth.png',
+      eventSfx: 'forestDarkGrowth',
+      eventSfxVolume: 0.34,
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -124,7 +128,7 @@ const EVENT_POOL = {
       type: 'find_relic',
       rarity: 'epic',
       category: 4,
-      weight: 1,
+      weight: 0.45,
       condition: state => state?.canFindEventRelic?.() !== false,
     },
     {
@@ -132,6 +136,8 @@ const EVENT_POOL = {
       name: '廢墟中的響動',
       desc: '碎石在腳下滾落，聲音沿著半塌的牆面傳進黑暗。廢墟深處有什麼被驚醒了，低沉的嘶吼正朝你們逼近。',
       eventImage: 'assets/events/ruins-enemy.png',
+      eventSfx: 'ruinsEnemy',
+      eventSfxVolume: 0.36,
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -236,6 +242,8 @@ const EVENT_POOL = {
       name: '黑暗中的眼睛',
       desc: '火光照不到的裂縫裡亮起一排濕冷的眼睛。石壁傳來細碎爬行聲，某個東西正沿著黑暗貼近你們。',
       eventImage: 'assets/events/cave-eyes.png',
+      eventSfx: 'caveEyes',
+      eventSfxVolume: 0.35,
       type: 'combat',
       rarity: 'rare',
       category: 5,
@@ -249,7 +257,7 @@ const EVENT_POOL = {
       type: 'find_relic',
       rarity: 'epic',
       category: 4,
-      weight: 1,
+      weight: 0.45,
       condition: state => state?.canFindEventRelic?.() !== false,
     },
     {
@@ -280,6 +288,8 @@ const EVENT_POOL = {
       name: '割腳石灘',
       desc: '洞底鋪滿薄刃般的碎石，踩上去時石片沿著靴縫割進皮肉。',
       eventImage: 'assets/events/cave-razor-stone.png',
+      resultSfx: 'caveRazorStoneInjury',
+      resultSfxVolume: 0.38,
       type: 'trap',
       rarity: 'common',
       category: 1,
@@ -458,7 +468,7 @@ function createFateGamblingTableEvent(baseEvent = null) {
     desc: [
       '黑暗邊界的霧氣忽然安靜下來。',
       '',
-      '你們在廢墟深處看見一張老舊賭桌。桌面乾裂，邊角腐朽，卻乾淨得不像是被遺棄之物。桌中央放著一只骨骰，骰面上刻著模糊的黑色紋路，像血乾掉後留下的痕跡。',
+      '你們在黑暗邊界看見一張老舊賭桌。桌面乾裂，邊角腐朽，卻乾淨得不像是被遺棄之物。桌中央放著一只骨骰，骰面上刻著模糊的黑色紋路，像血乾掉後留下的痕跡。',
       '',
       '隊伍停下腳步。',
       '',
@@ -567,7 +577,7 @@ function randomTerrainEvent(terrainType, state = null) {
 }
 
 function _specialTerrainEvents(terrainType) {
-  if (!['forest', 'ruins', 'cave', 'empty'].includes(terrainType)) return [];
+  if (terrainType !== 'empty') return [];
   return [createFateGamblingTableEvent()];
 }
 

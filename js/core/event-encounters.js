@@ -11,6 +11,8 @@ const GameEventEncounters = {
       resultFx: 'event-ambush',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
+      eventSfx: ev.eventSfx || '',
+      eventSfxVolume: ev.eventSfxVolume,
       choices: [{
         label: '進入戰鬥',
         danger: true,

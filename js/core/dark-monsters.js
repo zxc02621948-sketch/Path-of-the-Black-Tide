@@ -1,7 +1,7 @@
 // Extracted from js/core/game.js. Keeps the original object API while making this system easier to maintain.
 const GameDarkMonsters = {
   _triggerPendingDarkMonsterChase() {
-    if (G.modal || G.phase === 'over' || G.combat) return false;
+    if (G.modal || G.phase === 'over' || G.combat || G.nightTransitionActive) return false;
     const monster = this._nextPendingDarkMonster();
     if (!monster) return false;
 
@@ -181,6 +181,7 @@ const GameDarkMonsters = {
       y: cell.y,
       chaseTimer: 3,
     });
+    AudioManager?.playSfx?.('darkMonsterGrowl', 0.62);
     return true;
   },
 

@@ -1,5 +1,6 @@
 // 入口：頁面載入後初始化
 document.addEventListener('DOMContentLoaded', () => {
+  AudioManager?.init?.();
   const startScreen  = document.getElementById('start-screen');
   const gameScreen   = document.getElementById('game-screen');
   const gameoverScr  = document.getElementById('gameover-screen');
@@ -104,12 +105,14 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // ─── 啟動遊戲 ────────────────────────────────────────────
   function startGame(classes, startingLibraryRelicId = null, startingLibraryCarrierCls = null) {
+    AudioManager?.unlock?.();
     startScreen.style.display = 'none';
     gameoverScr.style.display = 'none';
     gameoverScr.classList.remove('active');
     gameScreen.style.display = 'flex';
     gameScreen.classList.add('active');
     Game.init(classes, startingLibraryRelicId, startingLibraryCarrierCls);
+    AudioManager?.sync?.();
   }
 
   // ─── 結束今天 ────────────────────────────────────────────
@@ -148,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameoverScr.classList.remove('active');
     startScreen.style.display = 'flex';
     startScreen.classList.add('active');
+    AudioManager?.sync?.();
   });
 
   // ─── 檢查聖物庫狀態，決定是否顯示筆記按鈕 ───────────────

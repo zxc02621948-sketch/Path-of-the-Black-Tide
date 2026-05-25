@@ -8,7 +8,7 @@
 //
 // 意圖類型：
 //   attack       → 攻擊主戰者（傷害 = enemy.attack）
-//   block        → 格檔（值 = enemy.block），本回合不反擊
+//   block        → 格檔（值 = enemy.block），本回合不攻擊
 //   block_attack → 格檔 + 攻擊主戰者
 //   aoe          → 全體攻擊（傷害 = max(1, enemy.attack - 2)）
 //   dice_attack  → 擲 1d6 決定攻擊力
@@ -27,7 +27,7 @@ const ENEMIES = [
     tier: 'weak',
     tierUpDays: 3,
     weakness: 3,
-    weaknessEffect: { type: 'stun', desc: '蠕蟲被震懾，本回合不反擊' },
+    weaknessEffect: { type: 'stun', desc: '蠕蟲被震懾，本回合不攻擊' },
     nightOnly: false,
     lore: '邊境封鎖後第三年，首次出現在北方廢墟。沒有眼睛，靠震動感知獵物。',
     intents: [
@@ -60,7 +60,7 @@ const ENEMIES = [
       { type: 'attack',      weight: 1 },
     ],
     tiers: [
-      { name: '腐骨爬蟲', desc: '甲殼厚重，常以格檔抵擋攻擊再反擊',                 hp: 20, block: 3, attack: 2 },
+      { name: '腐骨爬蟲', desc: '甲殼厚重，常以格檔抵擋攻擊後再發起攻擊',           hp: 20, block: 3, attack: 2 },
       { name: '腐甲爬蟲', desc: '甲殼已被黑暗強化，格檔值更高',                     hp: 25, block: 4, attack: 3 },
       { name: '黑鐵爬蟲', desc: '幾乎無法正面擊穿，弱點縫隙是唯一機會',             hp: 31, block: 5, attack: 4 },
       { name: '深淵爬蟲', desc: '外殼已完全黑化，格檔幾乎無懈可擊',                 hp: 37, block: 6, attack: 4 },
@@ -205,9 +205,9 @@ const ENEMIES = [
     darkMonsterBase: true,
     lore: '沒有人知道它來自哪裡。有人說黑夜本身就是它的家。黑暗化身生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%；每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。',
     intents: [
-      { type: 'block',        weight: 3 },
+      { type: 'attack',       weight: 3 },
       { type: 'block_attack', weight: 1 },
-      { type: 'attack',       weight: 2 },
+      { type: 'block',        weight: 1 },
     ],
   },
 
@@ -378,7 +378,19 @@ const ENEMIES = [
     noRetreat: true,
     lore: '那不是怪物的眼睛，而是黑夜本身第一次注視你們。',
     abilities: [
-      { type: 'final_boss', hpPerDarkness: 4, attackPerDarkness: 5, closedBlock: 4, splashDamage: 1 },
+      {
+        type: 'final_boss',
+        hpPerDarkness: 5,
+        attackPerDarkness: 5,
+        closedBlock: 6,
+        splashDamage: 1,
+        blockPierceDamage: 3,
+        darknessTiers: [
+          { minDarkness: 10, hpBonus: 20, closedBlock: 8, splashDamage: 2, blockPierceDamage: 4 },
+          { minDarkness: 15, hpBonus: 50, closedBlock: 10, splashDamage: 2, blockPierceDamage: 6, eyeDamageBonus: 1 },
+          { minDarkness: 19, hpBonus: 90, closedBlock: 12, splashDamage: 3, blockPierceDamage: 8, eyeDamageBonus: 2, blackLightDamage: 1 },
+        ],
+      },
     ],
     intents: [
       { type: 'attack', weight: 1 },
@@ -457,13 +469,24 @@ function getFinalBossEnemy(darkness = null) {
   const boss = getEnemyById('night_heart');
   if (!boss) return null;
   const value = Math.max(0, Math.floor(Number.isFinite(darkness) ? darkness : ((typeof G !== 'undefined' && G?.darkness) || 0)));
+  const ability = Array.isArray(boss.abilities) ? boss.abilities.find(item => item?.type === 'final_boss') : null;
+  const tier = finalBossDarknessTier(ability, value);
+  const hpPerDarkness = Math.max(0, ability?.hpPerDarkness ?? 5);
   return {
     ...boss,
-    hp: (boss.hp || 1) + value * 5,
+    hp: (boss.hp || 1) + value * hpPerDarkness + Math.max(0, tier?.hpBonus || 0),
     attack: (boss.attack || 0) + Math.floor(value / 5),
     finalBossDarkness: value,
     finalBossPrescaled: true,
   };
+}
+
+function finalBossDarknessTier(ability, darkness = 0) {
+  const tiers = Array.isArray(ability?.darknessTiers) ? ability.darknessTiers : [];
+  const available = tiers
+    .filter(tier => Math.max(0, tier?.minDarkness || 0) <= darkness)
+    .sort((a, b) => Math.max(0, a.minDarkness || 0) - Math.max(0, b.minDarkness || 0));
+  return available.length > 0 ? available[available.length - 1] : null;
 }
 
 function getDarkMonsterEnemy(darkness = null) {

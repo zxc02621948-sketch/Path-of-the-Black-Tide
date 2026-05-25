@@ -14,6 +14,7 @@ const GameDevTool = {
         { label: '替換角色裝備', action: () => this._devChooseGear() },
         { label: '指定怪物戰鬥', action: () => this._devChooseEnemyCombat() },
         { label: '指定觸發事件', action: () => this._devChooseEventTerrain() },
+        { label: '效果演出測試', action: () => this._devOpenEffectTool() },
         { label: '直接開始神壇', action: () => this._devStartAltar() },
         { label: '調整隊伍狀態', action: () => this._devOpenSquadStateTool() },
         { label: '關閉', action: () => this._closeModal() },
@@ -413,6 +414,219 @@ const GameDevTool = {
     };
     this._log('測試工具：開啟神壇。', 'info');
     this._triggerAltar(cell);
+  },
+
+  _devOpenEffectTool() {
+    this._openModal({
+      title: '測試工具：效果演出',
+      desc: '選擇要預覽的演出。戰鬥演出會開啟假戰鬥場景，播放期間也可以直接關閉。',
+      typeText: false,
+      choices: [
+        { label: '戰鬥演出', action: () => this._devChooseCombatEffect() },
+        { label: '事件演出', action: () => this._devChooseEventEffect() },
+        { label: '返回', action: () => this.openDevTool() },
+      ],
+    });
+  },
+
+  _devChooseCombatEffect() {
+    const options = this._devCombatEffectOptions();
+    this._openModal({
+      title: '測試工具：戰鬥演出',
+      desc: '選擇要在假戰鬥畫面中播放的效果。',
+      typeText: false,
+      choices: options.map(option => ({
+        label: option.name,
+        detail: option.detail || '',
+        action: () => this._devPreviewCombatEffect(option.id),
+      })).concat([{ label: '返回', action: () => this._devOpenEffectTool() }]),
+    });
+  },
+
+  _devCombatEffectOptions() {
+    return [
+      { id: 'bow', name: '弓射擊', detail: '一般弓箭飛行與命中。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', damage: 5 },
+      { id: 'sword', name: '劍攻擊', detail: '劍系斬擊 sprite。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', damage: 6 },
+      { id: 'dagger', name: '匕首攻擊', detail: '匕首斬擊 sprite。', weaponFamily: 'dagger', attackTrail: 'slash', hitEffect: 'slash', damage: 5 },
+      { id: 'silver_bee_pin', name: '銀蜂針', detail: '銀蜂針共鳴射擊。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'silver_bee_pin', damage: 6 },
+      { id: 'iron_scabbard', name: '沉鐵劍鞘', detail: '重擊命中與持有者強化。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'iron_scabbard', damage: 8 },
+      { id: 'star_hunter_eye', name: '獵星之眼', detail: '弓箭先命中，準星再啟動。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_hunter_eye', damage: 7 },
+      { id: 'star_breaker', name: '裂星破滅', detail: '弓箭命中後觸發裂星爆破與重擊。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_breaker', damage: 12 },
+      { id: 'wound_burst', name: '痛痕傷口爆發', detail: '傷口引爆 hitEffect。', weaponFamily: 'sword', hitEffect: 'wound-burst', damage: 10 },
+      { id: 'eagle_mark', name: '命中原生弱點', detail: '弱點命中標記。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'eagle-mark', damage: 6 },
+    ];
+  },
+
+  _devPreviewCombatEffect(effectId) {
+    const option = this._devCombatEffectOptions().find(item => item.id === effectId);
+    if (!option) return;
+    const combat = this._devEffectCombatScene(option);
+    const attackerId = combat.attackerId;
+    const damage = Math.max(1, option.damage || 6);
+    const enemyHp = combat.enemy.hp;
+    const damageEvent = {
+      type: 'primary',
+      damage,
+      from: enemyHp,
+      to: Math.max(0, enemyHp - damage),
+      attackTrail: option.attackTrail || option.hitEffect || 'strike',
+      hitEffect: option.hitEffect || option.attackTrail || 'strike',
+      relicFx: option.relicFx || '',
+    };
+    this._openModal({
+      title: `效果演出：${option.name}`,
+      desc: option.detail || '戰鬥演出預覽。',
+      typeText: false,
+      combat,
+      combatAnims: {
+        delay: 120,
+        lockActions: false,
+        playerAttacker: attackerId,
+        playerFollowHits: 1,
+        playerDamageEvents: [damageEvent],
+      },
+      choices: [
+        { label: '重播', action: () => this._devReplayEffectPreview(() => this._devPreviewCombatEffect(effectId)) },
+        { label: '返回', action: () => this._devChooseCombatEffect() },
+        { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
+      ],
+    });
+  },
+
+  _devEffectCombatScene(option = {}) {
+    const alive = this._aliveSquad();
+    const attacker = alive[0] || G.squad?.find(char => !char.dead) || G.squad?.[0];
+    const attackerId = attacker?.id || 'dev_attacker';
+    const weapon = {
+      ...(attacker?.weapon || {}),
+      name: '演出測試武器',
+      family: option.weaponFamily || attacker?.weapon?.family || 'sword',
+    };
+    const squad = (G.squad || []).map((char, index) => ({
+      ...char,
+      hp: Math.max(1, char.hp || char.maxHp || 10),
+      maxHp: char.maxHp || 10,
+      weapon: index === 0 || char.id === attackerId ? weapon : (char.weapon || null),
+      block: CombatStatus.getBlock(char),
+      threat: 0,
+      activeBanners: [],
+      wagerDiceFaces: [],
+      gazeWeaknesses: [...CombatStatus.nativeWeaknesses(char, 'gaze')],
+    }));
+    if (squad.length === 0) {
+      squad.push({
+        id: attackerId,
+        name: '測試者',
+        cls: 'warrior',
+        hp: 12,
+        maxHp: 12,
+        attack: 5,
+        weapon,
+        block: 0,
+        threat: 0,
+        activeBanners: [],
+        wagerDiceFaces: [],
+        gazeWeaknesses: [],
+      });
+    }
+    return {
+      status: `演出測試：${option.name || '戰鬥效果'}`,
+      attackerId,
+      selectable: false,
+      canGuard: false,
+      canUseBag: false,
+      enemy: {
+        id: 'dev_effect_target',
+        name: '演出假想敵',
+        icon: '◆',
+        desc: '測試用目標。',
+        hp: 34,
+        maxHp: 34,
+        attack: 5,
+        weakness: 6,
+        block: 0,
+        currentBlock: 0,
+        woundMax: 15,
+        wounds: option.id === 'wound_burst' ? 10 : 0,
+        extraWeaknesses: [],
+        disabledNativeWeaknesses: [],
+        nativeWeaknessSources: {},
+        tempWeakness: null,
+        eagleTempWeakness: null,
+        eagleNativeWeakness: null,
+        suspiciousFlaw: false,
+        gamblerNativeWeakness: null,
+        gamblerTempWeakness: null,
+        gamblerTempWeaknesses: [],
+        weaknessDesc: '',
+      },
+      squad,
+    };
+  },
+
+  _devChooseEventEffect() {
+    const options = this._devEventEffectOptions();
+    this._openModal({
+      title: '測試工具：事件演出',
+      desc: '選擇要用事件視窗預覽的效果。',
+      typeText: false,
+      choices: options.map(option => ({
+        label: option.name,
+        detail: option.detail || '',
+        action: () => this._devPreviewEventEffect(option.id),
+      })).concat([{ label: '返回', action: () => this._devOpenEffectTool() }]),
+    });
+  },
+
+  _devEventEffectOptions() {
+    return [
+      { id: 'event-hit', name: '事件受擊', detail: '一般事件傷害震動。', fx: 'event-hit' },
+      { id: 'event-dark-hit', name: '黑暗衝擊', detail: '黑暗傷害/侵蝕演出。', fx: 'event-dark-hit' },
+      { id: 'event-clear', name: '事件成功', detail: '成功或解除危機。', fx: 'event-clear' },
+      { id: 'event-scene', name: '一般事件登場', detail: '帶事件圖的一般事件預設登場。', introFx: 'scene', backdrop: 'assets/events/echo-site-fate.png' },
+      { id: 'event-ambush', name: '戰鬥遭遇', detail: '遭遇戰切入。', fx: 'event-ambush' },
+      { id: 'event-discover', name: '發現聖物', detail: '聖物/遺物浮現演出。', fx: 'event-discover' },
+      { id: 'event-reward', name: '發現裝備', detail: '裝備掉落與分配前演出。', fx: 'event-reward' },
+      { id: 'event-quiet', name: '探索無果', detail: '安靜搜索後沒有發現。', fx: 'event-quiet' },
+      { id: 'fate-roll-success', name: '命運賭桌成功', detail: '賭桌成功光效。', fx: 'fate-roll-success', backdrop: 'assets/events/fate-table-blood-wager.png' },
+      { id: 'fate-fail-blood', name: '命運賭桌失敗：血', detail: '第一局失敗。', fx: 'fate-fail-blood', backdrop: 'assets/events/fate-table-blood-fail.png' },
+      { id: 'fate-fail-night', name: '命運賭桌失敗：黑夜', detail: '第二局失敗。', fx: 'fate-fail-night', backdrop: 'assets/events/fate-table-night-fail.png' },
+      { id: 'fate-fail-life', name: '命運賭桌失敗：命', detail: '第三局失敗。', fx: 'fate-fail-life', backdrop: 'assets/events/fate-table-life-fail.png' },
+      { id: 'night-transition', name: '第十天黑夜過渡', detail: '全畫面黑夜降臨覆蓋演出。', nightTransition: true },
+    ];
+  },
+
+  _devPreviewEventEffect(effectId) {
+    const option = this._devEventEffectOptions().find(item => item.id === effectId);
+    if (!option) return;
+    if (option.nightTransition) {
+      Render.showNightTransition();
+    }
+    this._openModal({
+      title: `效果演出：${option.name}`,
+      desc: option.nightTransition
+        ? '已播放第十天黑夜過渡覆蓋演出。'
+        : '事件演出預覽。',
+      typeText: false,
+      eventBackdrop: option.backdrop || '',
+      introFx: option.introFx || '',
+      resultFx: option.fx || '',
+      choices: [
+        { label: '重播', action: () => this._devReplayEffectPreview(() => this._devPreviewEventEffect(effectId)) },
+        { label: '返回', action: () => this._devChooseEventEffect() },
+        { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
+      ],
+    });
+  },
+
+  _devReplayEffectPreview(callback) {
+    G.modal = null;
+    document.getElementById('event-modal')?.classList.add('hidden');
+    FxPlayer.frame(() => {
+      FxPlayer.after(40, () => {
+        if (typeof callback === 'function') callback();
+      });
+    });
   },
 
   _devChooseEventTerrain() {

@@ -1,6 +1,6 @@
 ﻿// Combat rules used by Game.
 const CombatRules = {
-  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, deferEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null, supportTacticalDamageBonus = 0, supportTacticalDamageReduce = 0 }) {
+  resolveRound({ attacker, enemy, squad, rollResult, combatMods, resonanceAttackBonus, intent, round, suppressEnemyAction = false, deferEnemyAction = false, allowNativeWeaknessEffect = true, eagleFeatherDamageBonus = 0, eagleFeatherNativeCandidate = false, starHunterEyeDamageBonus = 0, bowFollowUpDamageBonus = 0, starBreakerActive = false, wagerDice = null, battleDrumAttackBonus = 0, banner = null }) {
     const rawRoll = rollResult.value;
     const diceRaw = rollResult.raw ?? rollResult.value;
     const naturalRaw = rollResult.naturalRaw ?? diceRaw;
@@ -81,11 +81,6 @@ const CombatRules = {
       damage += bowFollowUpDamageBonus;
       logs.push(`${weapon.name}：追加攻擊傷害 +${bowFollowUpDamageBonus}`);
     }
-    if (supportTacticalDamageBonus > 0 && damage > 0) {
-      damage += supportTacticalDamageBonus;
-      logs.push(`輔助戰術支援：本回合首次攻擊傷害 +${supportTacticalDamageBonus}`);
-    }
-
     const luckyStar = attacker.fusedRelic?.effect?.type === 'lucky_star'
       ? attacker.fusedRelic
       : (attacker.relic?.effect?.type === 'lucky_star' ? attacker.relic : null);
@@ -158,7 +153,7 @@ const CombatRules = {
     let resonanceWeaknessHit = !!resonanceWeaknessSource;
     let suspiciousFlawSource = null;
     if (!realWeaknessHit && allowFinalNativeWeakness && attacker.cls === 'explorer' && enemy.suspiciousFlaw) {
-      suspiciousFlawSource = activeNativeWeaknesses.find(w => Math.abs(roll - w) === 1 || Math.abs(diceRaw - w) === 1);
+      suspiciousFlawSource = activeNativeWeaknesses.find(w => this._isAdjacentNativeWeakness(roll, w) || this._isAdjacentNativeWeakness(diceRaw, w));
       if (suspiciousFlawSource) {
         enemy.suspiciousFlaw = false;
         realWeaknessHit = true;
@@ -200,6 +195,7 @@ const CombatRules = {
     const nativeWeaknessFace = suspiciousFlawSource || (activeNativeWeaknesses.includes(roll) ? roll : diceRaw);
     const weaknessHit = realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit || tempWeaknessHit || gamblerTempWeaknessHit || scholarOddFlawHit;
     let starBreakerFixedDamage = 0;
+    let starHunterEyeLockTriggered = false;
 
     const applyNativeWeaknessEffect = (prefix = '弱點') => {
       const result = WeaknessEffects.apply({
@@ -245,7 +241,9 @@ const CombatRules = {
           logs.push('鷹眼透鏡：未能看穿新的原生弱點，下次命中原生弱點時可再嘗試');
         }
       }
-      if (enemy.eagleNativeWeakness?.source === 'star_hunter_eye' && enemy.eagleNativeWeakness.value === nativeWeaknessFace) {
+      if (!rollResult.starHunterForceSixNoWeakness && enemy.eagleNativeWeakness?.source === 'star_hunter_eye' && enemy.eagleNativeWeakness.value === nativeWeaknessFace) {
+        starHunterEyeLockTriggered = true;
+        logs.push(`獵星之眼：鎖定鷹眼弱點 ${nativeWeaknessFace}，本回合弓追擊不再需要命中原生弱點。`);
         CombatStatus.setEagleNativeWeakness(enemy, null);
         const nextStarHunterWeakness = this._nextEagleWeakness(enemy, nativeWeaknessFace);
         if (nextStarHunterWeakness) {
@@ -263,8 +261,8 @@ const CombatRules = {
       }
       if (starBreakerActive && !rollResult.starHunterForceSixNoWeakness && weapon?.effect?.type === 'bow_followup') {
         if (this._shatterNativeWeakness(enemy, nativeWeaknessFace)) {
-          starBreakerFixedDamage += 10;
-          logs.push(`裂星破滅：破壞原生弱點 ${nativeWeaknessFace}，造成 10 點固定傷害`);
+          starBreakerFixedDamage += 20;
+          logs.push(`裂星破滅：破壞原生弱點 ${nativeWeaknessFace}，造成 20 點固定傷害`);
         } else {
           logs.push('裂星破滅：沒有可破壞的原生弱點。');
         }
@@ -522,7 +520,7 @@ const CombatRules = {
     const preSoulCutterDamage = damage;
     let predictedWoundGain = 0;
     if (damage > 0) {
-      if (painResonanceActive) predictedWoundGain += Math.max(0, roll || 0);
+      if (painResonanceActive) predictedWoundGain += Math.ceil(Math.max(0, roll || 0) / 2);
       if (weapon?.effect?.type === 'wound_on_hit') predictedWoundGain += weapon.effect.stacks || 1;
       const predictedWoundBanner = banners.find(activeBanner =>
         !activeBanner.usedThisRound && this._bannerValue(activeBanner, 'first_hit_wound') > 0
@@ -537,8 +535,8 @@ const CombatRules = {
       if (predictedSerratedOil && !attacker._serratedOilUsedRound && roll >= (predictedSerratedOil.rollMin || 5)) {
         predictedWoundGain += predictedSerratedOil.stacks || 1;
       }
-      if (painSplinterBadge?.effect?.woundOnRoll && roll === painSplinterBadge.effect.woundOnRoll) {
-        predictedWoundGain += Math.max(0, painSplinterBadge.effect.woundStacks || 0);
+      if (!painResonanceActive && painSplinterBadge?.effect?.woundOnHit) {
+        predictedWoundGain += Math.max(0, painSplinterBadge.effect.woundOnHit || 0);
       }
     }
     const explodeAtWounds = painResonanceActive ? 10 : painMask?.effect?.explodeAtWounds;
@@ -554,14 +552,16 @@ const CombatRules = {
     if (!painResonanceActive && currentWounds > 0 && damage > 0) {
       let woundBonusRate = currentWounds * 0.05;
       const painScarResonanceActive = attacker.fusedRelic?.id === 'pain_splinter_badge' && attacker.relic?.id === 'pain_mask';
-      if (painSplinterBadge && currentWounds >= (painSplinterBadge.effect.threshold || 5)) {
-        woundBonusRate += painSplinterBadge.effect.bonusRate || 0.20;
-        logs.push(`裂痛徽記：目標傷口 ${currentWounds} 層，傷害額外提高 ${Math.round((painSplinterBadge.effect.bonusRate || 0.20) * 100)}%`);
+      const badgeBonusRate = this._painSplinterBadgeBonusRate(painSplinterBadge?.effect, currentWounds);
+      if (badgeBonusRate > 0) {
+        woundBonusRate += badgeBonusRate;
+        logs.push(`${painSplinterBadge.name}：目標傷口 ${currentWounds} 層，傷害額外提高 ${Math.round(badgeBonusRate * 100)}%`);
       }
-      const painScarThreshold = 6;
+      const painScarThreshold = 5;
       if (painScarResonanceActive && currentWounds >= painScarThreshold) {
-        woundBonusRate += 0.20;
-        logs.push(`痛痕共鳴・折磨：目標傷口 ${currentWounds} 層達到 ${painScarThreshold} 層，擊中傷害額外提高 20%`);
+        const painScarBonusRate = currentWounds >= 10 ? 0.50 : 0.30;
+        woundBonusRate += painScarBonusRate;
+        logs.push(`痛痕共鳴・折磨：目標傷口 ${currentWounds} 層，擊中傷害額外提高 ${Math.round(painScarBonusRate * 100)}%`);
       }
       const woundBonus = Math.floor(damage * woundBonusRate);
       if (woundBonus > 0) {
@@ -611,6 +611,11 @@ const CombatRules = {
       CombatStatus.raiseBlock(attacker, playerBlockValue);
       logs.push(`${attacker.gear.name}：${attacker.name} 獲得格檔 ${playerBlockValue}`);
     }
+    const warriorBlockValue = this._warriorGuardBlock(attacker, roll);
+    if (warriorBlockValue > 0) {
+      attacker._warriorGuardPendingBlock = Math.max(attacker._warriorGuardPendingBlock || 0, warriorBlockValue);
+      logs.push(`戰士：${attacker.name} 穩住架勢，下回合獲得格檔 ${warriorBlockValue}`);
+    }
     if (attacker.gear?.effect?.type === 'edge_face_damage' && diceRaw === attacker.gear.effect.backlashFace) {
       const backlash = Math.max(0, attacker.gear.effect.backlashDamage || 0);
       if (backlash > 0) {
@@ -640,8 +645,7 @@ const CombatRules = {
     const rapierStrike = !!rapierRelic &&
       weapon?.family === 'sword' &&
       roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
-      damage > 0 &&
-      enemy.hp > 0;
+      damage > 0;
     if (damage > 0) {
       playerDamageEvents.push({
         type: 'primary',
@@ -650,6 +654,15 @@ const CombatRules = {
         to: enemy.hp,
         hitEffect: primaryHitEffect,
         attackTrail: primaryAttackTrail,
+        sfx: weapon?.family === 'bow'
+          ? 'bowShot'
+          : (greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
+            ? 'ironScabbardSlice'
+            : (rapierStrike && rapierRelic?.id === 'silver_bee_pin'
+            ? 'silverBeePinCut'
+            : (weapon?.family === 'sword'
+            ? 'swordWoosh'
+            : (weapon?.family === 'dagger' ? 'daggerWoosh' : '')))),
         relicFx: greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
           ? 'iron_scabbard'
           : (rapierStrike && rapierRelic?.id === 'silver_bee_pin'
@@ -673,6 +686,13 @@ const CombatRules = {
           attacker._greatswordMomentum = beforeExtra + extra;
           logs.push(`${greatswordResonance.name}：重劍共鳴，額外氣勢 +${extra}（${beforeExtra} → ${attacker._greatswordMomentum}）。`);
         }
+      }
+    } else if (greatswordResonance && weapon?.family === 'sword') {
+      const loss = Math.max(0, greatswordResonance.effect?.momentumLossOnMiss || 0);
+      const before = Math.max(0, attacker._greatswordMomentum || 0);
+      if (loss > 0 && before > 0) {
+        attacker._greatswordMomentum = Math.max(0, before - loss);
+        logs.push(`${greatswordResonance.name}：未打出重劍，氣勢 -${before - attacker._greatswordMomentum}（${before} → ${attacker._greatswordMomentum}）。`);
       }
     }
     if (rapierStrike) {
@@ -713,6 +733,7 @@ const CombatRules = {
           to: enemy.hp,
           hitEffect: 'pierce',
           attackTrail: 'pierce',
+          sfx: rapierRelic?.id === 'silver_bee_pin' ? 'silverBeePinCut' : '',
           relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
         });
         playerDamageEvents.push({
@@ -722,6 +743,7 @@ const CombatRules = {
           to: enemy.hp,
           hitEffect: 'pierce',
           attackTrail: 'pierce',
+          sfx: rapierRelic?.id === 'silver_bee_pin' ? 'silverBeePinCut' : '',
           relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
         });
         damage += currentFollowDamage;
@@ -746,8 +768,9 @@ const CombatRules = {
     if (damage > 0) {
       let woundGain = 0;
       if (painResonanceActive) {
-        woundGain += Math.max(0, roll || 0);
-        logs.push(`痛痕共鳴・爆發：本次造成傷害，附加 ${roll} 層傷口`);
+        const resonanceWounds = Math.ceil(Math.max(0, roll || 0) / 2);
+        woundGain += resonanceWounds;
+        logs.push(`痛痕共鳴・爆發：本次造成傷害，最終骰面 ${roll} 減半附加 ${resonanceWounds} 層傷口`);
       }
       if (weapon?.effect?.type === 'wound_on_hit') {
         const weaponWounds = weapon.effect.stacks || 1;
@@ -778,11 +801,11 @@ const CombatRules = {
         attacker._serratedOilUsedRound = true;
         logs.push(`${attacker.gear.name}：攻擊骰面 ${roll}，額外施加 ${serratedOil.stacks || 1} 層傷口`);
       }
-      if (painSplinterBadge?.effect?.woundOnRoll && roll === painSplinterBadge.effect.woundOnRoll) {
-        const badgeWounds = Math.max(0, painSplinterBadge.effect.woundStacks || 0);
+      if (!painResonanceActive && painSplinterBadge?.effect?.woundOnHit) {
+        const badgeWounds = Math.max(0, painSplinterBadge.effect.woundOnHit || 0);
         if (badgeWounds > 0) {
           woundGain += badgeWounds;
-          logs.push(`${painSplinterBadge.name}：攻擊骰面 ${roll}，附加 ${badgeWounds} 層傷口`);
+          logs.push(`${painSplinterBadge.name}：主戰造成傷害，附加 ${badgeWounds} 層傷口`);
         }
       }
       if (woundGain > 0) {
@@ -920,50 +943,55 @@ const CombatRules = {
       const armorReduce = (combatMods || []).filter(m => m.type === 'damage_reduce').reduce((s, m) => s + m.value, 0);
       if (armorReduce > 0) {
         counterDmg = Math.max(0, counterDmg - armorReduce);
-        logs.push(`護甲道具：反擊 -${armorReduce}，剩餘 ${counterDmg}`);
-      }
-      if (supportTacticalDamageReduce > 0 && counterTarget.id === attacker.id) {
-        counterDmg = Math.max(0, counterDmg - supportTacticalDamageReduce);
-        logs.push(`輔助戰術支援：${attacker.name} 受擊傷害 -${supportTacticalDamageReduce}，剩餘 ${counterDmg}`);
+        logs.push(`護甲道具：敵方攻擊 -${armorReduce}，剩餘 ${counterDmg}`);
       }
       if (weapon?.effect?.type === 'zero_dmg_counter_reduce' && damage === 0) {
         counterDmg = Math.max(0, counterDmg - weapon.effect.value);
-        logs.push(`弓：未造成傷害，反擊 -${weapon.effect.value}，剩餘 ${counterDmg}`);
+        logs.push(`弓：未造成傷害，敵方攻擊 -${weapon.effect.value}，剩餘 ${counterDmg}`);
       }
       counterDmg = CombatStatus.applyWoundTakenBonus(counterTarget, counterDmg, logs);
       counterDmg = CombatStatus.applyBannerBearerDamageReduction(counterTarget, counterDmg, logs);
+      counterDmg = CombatStatus.applyExplorerEvasion(counterTarget, counterDmg, logs, '敵方攻擊傷害');
+      let finalEyePierceDamage = 0;
       if (CombatStatus.getBlock(counterTarget) > 0) {
         const blockResult = CombatStatus.consumeBlock(counterTarget, counterDmg);
         counterDmg = blockResult.damage;
-        logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，反擊 ${counterDmg}`);
+        logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，敵方攻擊 ${counterDmg}`);
+        if (intent?.finalEye && blockResult.absorbed > 0) {
+          finalEyePierceDamage = this._finalEyeBlockPierceDamage(enemy);
+          if (finalEyePierceDamage > 0) logs.push(`${enemy.name} 破盾滲光：格檔吸收黑夜開眼，額外造成 ${finalEyePierceDamage} 固定傷害。`);
+        }
       }
-      if (counterDmg > 0) {
+      if (counterDmg > 0 || finalEyePierceDamage > 0) {
         counterDmg = CombatStatus.applyIncomingRiskBonuses(counterTarget, counterDmg, {
           allowRemorse: !wagerDice?.active,
           allowBacklash: true,
           logs,
           damageLabel: '受擊傷害',
-          resultLabel: '反擊',
+          resultLabel: '敵方攻擊',
         });
+        const totalCounterDamage = counterDmg + finalEyePierceDamage;
         const beforeHp = counterTarget.hp;
-        counterTarget.hp = Math.max(0, counterTarget.hp - counterDmg);
+        counterTarget.hp = Math.max(0, counterTarget.hp - totalCounterDamage);
+        CombatStatus.recordGamblerPainBlock(counterTarget, beforeHp, counterTarget.hp, logs);
         incomingDamageEvents.push({
           type: 'counter',
           targetId: counterTarget.id,
-          damage: counterDmg,
+          damage: totalCounterDamage,
           from: beforeHp,
           to: counterTarget.hp,
         });
+        counterDmg = totalCounterDamage;
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
-        logs.push(`${enemy.name} 的反擊被完全抵消。`);
+        logs.push(`${enemy.name} 的攻擊被完全抵消。`);
       }
     } else if (suppressEnemyAction && !enemyDead && !deferEnemyAction) {
       logs.push('追加攻擊不觸發敵人行動。');
     } else if (stunned) {
       logs.push(`${enemy.name} 被震懾，無法行動。`);
     } else if (intent?.type === 'block' && !enemyDead) {
-      logs.push(`${enemy.name} 採取防禦，沒有反擊。`);
+      logs.push(`${enemy.name} 採取防禦，沒有攻擊。`);
     } else if (intent?.type === 'banner_switch' && !enemyDead && !enemyActionResult.bannerSummary) {
       logs.push(`${enemy.name} 換旗整隊，沒有攻擊。`);
     }
@@ -1006,6 +1034,7 @@ const CombatRules = {
       realWeaknessHit,
       eagleFeatherNativeHit,
       resonanceWeaknessHit,
+      starHunterEyeLockTriggered,
       grapplingHookAssisted,
       rapierFollowHits,
       rapierDamageEvents,
@@ -1052,6 +1081,42 @@ const CombatRules = {
     return Math.max(minimum, Math.floor((roll || 0) / divisor));
   },
 
+  _warriorGuardBlock(attacker, roll) {
+    if (attacker?.cls !== 'warrior') return 0;
+    return Math.max(0, Math.min(6, Math.floor(roll || 0)));
+  },
+
+  _finalEyeBlockPierceDamage(enemy) {
+    const ability = Array.isArray(enemy?.abilities)
+      ? enemy.abilities.find(item => item?.type === 'final_boss')
+      : null;
+    const darkness = Math.max(0, Math.floor(Number.isFinite(enemy?.finalBossDarkness) ? enemy.finalBossDarkness : 0));
+    return Math.max(0, this._finalBossTierValue(ability, darkness, 'blockPierceDamage', ability?.blockPierceDamage || 0));
+  },
+
+  _finalBossDarknessTier(ability, darkness = 0) {
+    const tiers = Array.isArray(ability?.darknessTiers) ? ability.darknessTiers : [];
+    const available = tiers
+      .filter(tier => Math.max(0, tier?.minDarkness || 0) <= darkness)
+      .sort((a, b) => Math.max(0, a.minDarkness || 0) - Math.max(0, b.minDarkness || 0));
+    return available.length > 0 ? available[available.length - 1] : null;
+  },
+
+  _finalBossTierValue(ability, darkness, key, fallback = 0) {
+    const tier = this._finalBossDarknessTier(ability, darkness);
+    return Number.isFinite(tier?.[key]) ? tier[key] : fallback;
+  },
+
+  _painSplinterBadgeBonusRate(effect, wounds = 0) {
+    if (effect?.type !== 'wound_damage_bonus' || wounds <= 0) return 0;
+    const base = Math.max(0, effect.bonusBaseRate ?? effect.bonusRate ?? 0);
+    const stepWounds = Math.max(1, effect.bonusStepWounds || 3);
+    const stepRate = Math.max(0, effect.bonusStepRate || 0);
+    const maxRate = Math.max(base, effect.bonusMaxRate ?? base);
+    const steps = Math.floor(Math.max(0, wounds) / stepWounds);
+    return Math.min(maxRate, base + steps * stepRate);
+  },
+
   _bannerEagleNativeDamage(banner) {
     if (!banner || banner.faceType !== 'eagle_native_weakness') return 0;
     const values = Array.isArray(banner.nativeDamage) ? banner.nativeDamage : [];
@@ -1075,6 +1140,14 @@ const CombatRules = {
       if (!used.has(value)) return value;
     }
     return null;
+  },
+
+  _isAdjacentNativeWeakness(face, weakness) {
+    const value = Math.floor(Number(face) || 0);
+    const target = Math.floor(Number(weakness) || 0);
+    if (value < 1 || value > 6 || target < 1 || target > 6) return false;
+    if (Math.abs(value - target) === 1) return true;
+    return (value === 1 && target === 6) || (value === 6 && target === 1);
   },
 
   _nativeWeaknessSet(enemy) {

@@ -444,10 +444,19 @@ const GameStateHelpers = {
     Render.renderLog();
   },
 
-  _openModal(cfg) { G.modal = cfg; Render.showModal(cfg); },
+  _openModal(cfg) {
+    const waitCombatAnimAudio = !!(cfg?.combat && cfg?.combatAnims && !G.combat);
+    const modalCfg = waitCombatAnimAudio
+      ? { ...cfg, syncAudioAfterCombatAnims: true }
+      : cfg;
+    G.modal = modalCfg;
+    Render.showModal(modalCfg);
+    if (!waitCombatAnimAudio) AudioManager?.sync?.();
+  },
   _closeModal() {
     G.modal = null;
     Render.hideModal();
+    AudioManager?.sync?.();
     if (this._flushSystemModal()) return;
     this._triggerPendingDarkMonsterChase?.();
   },

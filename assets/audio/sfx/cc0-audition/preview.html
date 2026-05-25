@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CC0 音效試聽</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 24px;
+      background: #15120d;
+      color: #e8dcc4;
+      font-family: "Microsoft JhengHei", "Noto Sans TC", sans-serif;
+    }
+
+    h1 {
+      margin: 0 0 8px;
+      color: #d6a83f;
+      font-size: 28px;
+    }
+
+    p {
+      margin: 0 0 20px;
+      color: #b6a98f;
+      line-height: 1.6;
+    }
+
+    .list {
+      display: grid;
+      gap: 12px;
+      max-width: 760px;
+    }
+
+    .item {
+      display: grid;
+      grid-template-columns: 180px 1fr;
+      align-items: center;
+      gap: 16px;
+      padding: 12px 14px;
+      border: 1px solid rgba(214, 168, 63, 0.28);
+      background: rgba(0, 0, 0, 0.24);
+    }
+
+    .name {
+      color: #f0d28a;
+      font-weight: 700;
+    }
+
+    audio {
+      width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <h1>CC0 音效試聽</h1>
+  <p>這裡只是候選音效，不代表已接進遊戲。</p>
+  <main class="list">
+    <section class="item"><span class="name">UI 點擊</span><audio controls src="ui-click.ogg"></audio></section>
+    <section class="item"><span class="name">UI 確認</span><audio controls src="ui-confirm.ogg"></audio></section>
+    <section class="item"><span class="name">UI 拒絕</span><audio controls src="ui-deny.ogg"></audio></section>
+    <section class="item"><span class="name">刀刃</span><audio controls src="combat-blade.ogg"></audio></section>
+    <section class="item"><span class="name">受擊</span><audio controls src="combat-hurt.ogg"></audio></section>
+    <section class="item"><span class="name">擊倒</span><audio controls src="combat-defeat.ogg"></audio></section>
+    <section class="item"><span class="name">聖物/寶石</span><audio controls src="reward-relic.ogg"></audio></section>
+    <section class="item"><span class="name">戰利品</span><audio controls src="reward-loot.ogg"></audio></section>
+    <section class="item"><span class="name">危險鎖鏈</span><audio controls src="event-danger-chain.ogg"></audio></section>
+    <section class="item"><span class="name">火焰事件</span><audio controls src="event-fire.ogg"></audio></section>
+    <section class="item"><span class="name">動作掠過</span><audio controls src="motion-swish.wav"></audio></section>
+    <section class="item"><span class="name">重型掠過</span><audio controls src="motion-heavy-swish.wav"></audio></section>
+  </main>
+</body>
+</html>

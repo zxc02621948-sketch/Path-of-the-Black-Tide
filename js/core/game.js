@@ -228,8 +228,14 @@ const Game = {
     this._placeNightRelics();
 
     Render.fullRender();
+    G.nightTransitionActive = true;
     Render.showNightTransition();
-    this._showNightIntroOnce();
+    const shouldShowIntro = !G.nightIntroShown;
+    setTimeout(() => {
+      G.nightTransitionActive = false;
+      this._showNightIntroOnce();
+      if (!shouldShowIntro) this._triggerPendingDarkMonsterChase?.();
+    }, 1250);
   },
 
   _applyNightEndErosion() {
@@ -360,6 +366,7 @@ const Game = {
       title: `發現聖物：${relic.name}`,
       descHtml: this._relicRewardCardHtml(relic, lore),
       typeText: false,
+      resultFx: 'event-discover',
       choices: [
         { label: '分配聖物', action: () => this._openRelicAssignTargetModal(relic, clearRelic) },
         {

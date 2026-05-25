@@ -79,7 +79,7 @@ const GameEventHandlers = {
     this._openModal({
       title: `${name}探索`,
       desc: `你們仔細搜索這處${name}，沒有找到值得停留的線索。`,
-      resultFx: 'event-clear',
+      resultFx: 'event-quiet',
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },

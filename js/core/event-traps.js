@@ -29,6 +29,7 @@ const GameEventTraps = {
       const damage = ev.failDamage || CONFIG.DEFAULT_TRAP_DAMAGE;
       if (victim) victim.hp = Math.max(0, victim.hp - this._reduceIncomingDamage(victim, damage));
       this._log(victim ? `${victim.name} 受到 ${damage} 點陷阱傷害。` : '陷阱觸發。', 'danger');
+      if (ev.failSfx) AudioManager?.playSfx?.(ev.failSfx, ev.failSfxVolume);
     } else {
       this._completeProgressEvent(ev);
     }
@@ -212,6 +213,8 @@ const GameEventTraps = {
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
       resultFx: 'event-hit',
+      resultSfx: ev.failSfx || '',
+      resultSfxVolume: ev.failSfxVolume,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
@@ -250,6 +253,8 @@ const GameEventTraps = {
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.forceDesc || ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
       resultFx: 'event-hit',
+      resultSfx: ev.failSfx || '',
+      resultSfxVolume: ev.failSfxVolume,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
@@ -274,9 +279,10 @@ const GameEventTraps = {
 
   _triggerFixedTrap(ev) {
     const effects = [];
+    let actionSpent = 0;
     if (ev.actionCost > 0) {
-      const spent = this._spendTrapAction(ev.actionCost, ev.name);
-      effects.push(spent > 0 ? `行動 -${spent}` : '今天已沒有剩餘行動可扣');
+      actionSpent = this._spendTrapAction(ev.actionCost, ev.name);
+      effects.push(actionSpent > 0 ? `行動 -${actionSpent}` : '今天已沒有剩餘行動可扣');
     }
     if (ev.partyDamage > 0) {
       const damaged = this._damageAliveSquad(ev.partyDamage);
@@ -292,12 +298,16 @@ const GameEventTraps = {
       }
     }
     this._completeProgressEvent(ev);
+    const hasHitResult = ev.partyDamage > 0 || ev.targetDamage > 0 || actionSpent > 0;
+    if (hasHitResult && ev.resultSfx) {
+      AudioManager?.playSfx?.(ev.resultSfx, ev.resultSfxVolume);
+    }
     const descText = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.fixedResultText || '陷阱立刻生效，沒有時間閃避。'}\n${effects.join('\n')}`;
     const choices = [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }];
     this._openModal({
       title: ev.name,
       desc: descText,
-      resultFx: (ev.partyDamage > 0 || ev.targetDamage > 0) ? 'event-hit' : 'event-clear',
+      resultFx: hasHitResult ? 'event-hit' : 'event-clear',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       typeText: !ev.eventImage,

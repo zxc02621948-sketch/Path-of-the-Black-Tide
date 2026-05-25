@@ -73,6 +73,62 @@ const CombatStatus = {
     };
   },
 
+  getEvasionChance(unit) {
+    if (!unit) return 0;
+    return Math.max(0, Math.min(50, Math.floor(unit._evasionChance || 0)));
+  },
+
+  setEvasionChance(unit, value) {
+    if (!unit) return 0;
+    unit._evasionChance = Math.max(0, Math.min(50, Math.floor(value || 0)));
+    return unit._evasionChance;
+  },
+
+  addEvasionChance(unit, value) {
+    if (!unit) return { before: 0, after: 0, added: 0 };
+    const before = this.getEvasionChance(unit);
+    const after = this.setEvasionChance(unit, before + Math.max(0, Math.floor(value || 0)));
+    return { before, after, added: Math.max(0, after - before) };
+  },
+
+  clearEvasionChance(unit) {
+    return this.setEvasionChance(unit, 0);
+  },
+
+  applyExplorerEvasion(unit, amount, logs = null, label = '傷害') {
+    let damage = Math.max(0, amount || 0);
+    if (!unit || unit.cls !== 'explorer' || damage <= 0) return damage;
+    const chance = this.getEvasionChance(unit);
+    if (chance <= 0) return damage;
+
+    const before = damage;
+    const evaded = Math.random() * 100 < chance;
+    if (evaded) {
+      damage = 0;
+      if (logs) logs.push(`閃避：${unit.name} 以 ${chance}% 閃避率避開本次${label}，閃避率歸 0。`);
+    } else {
+      const reduction = Math.min(damage, Math.floor(chance / 10));
+      damage = Math.max(0, damage - reduction);
+      if (logs) {
+        logs.push(reduction > 0
+          ? `閃避：${unit.name} 未能完全閃避（${chance}%），轉為減傷 -${reduction}，${label} ${before} → ${damage}，閃避率歸 0。`
+          : `閃避：${unit.name} 未能完全閃避（${chance}%），閃避率歸 0。`);
+      }
+    }
+    this.clearEvasionChance(unit);
+    return damage;
+  },
+
+  recordGamblerPainBlock(unit, beforeHp, afterHp, logs = null) {
+    if (!unit || unit.cls !== 'scholar') return 0;
+    const loss = Math.max(0, Math.floor((beforeHp || 0) - (afterHp || 0)));
+    if (loss <= 0) return 0;
+    const block = loss * 2;
+    unit._gamblerPainPendingBlock = Math.max(0, unit._gamblerPainPendingBlock || 0) + block;
+    if (logs) logs.push(`搏命者：${unit.name} 失去 ${loss} HP，下回合格檔 +${block}。`);
+    return block;
+  },
+
   applyWoundTakenBonus(target, amount, logs = null) {
     let damage = Math.max(0, amount || 0);
     if (!target || damage <= 0) return damage;

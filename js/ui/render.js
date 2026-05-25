@@ -11,6 +11,7 @@ const Render = {
     this._safeRender('log', () => this.renderLog());
     this._safeRender('resonances', () => this.renderResonances());
     this._safeRender('phase class', () => this.updatePhaseClass());
+    AudioManager?.sync?.();
   },
 
   _safeRender(name, fn, fallbackElementId = null) {
@@ -662,20 +663,20 @@ const Render = {
 
   _passiveDesc(cls) {
     const map = {
-      warrior:  '戰鬥骰最低 3',
-      explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中',
-      scholar:  '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空',
-      support:  '若輔助不是主戰者，主戰者本回合第一次攻擊傷害 +1；若主戰者本回合受到敵人攻擊，該次傷害 -1',
+      warrior:  '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面的格檔，最多 6',
+      explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
+      scholar:  '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空。戰鬥中實際損失 HP 後，下回合獲得損失 HP x2 的格檔',
+      support:  '我方攻擊回合結束時，若輔助存活，全隊回復 1 HP；若輔助是本回合主戰者，改為全隊回復 2 HP。觸發後輔助仇恨 +1',
     };
     return map[cls] || '';
   },
 
   _passiveShortDesc(cls) {
     const map = {
-      warrior:  '戰鬥骰最低 3',
-      explorer: '未命中後標記可疑弱點',
-      scholar:  '單數視為破綻；雙數疊反噬',
-      support:  '非主戰時支援攻防',
+      warrior:  '戰鬥保底；下回合格檔',
+      explorer: '標記可疑弱點；累積閃避率',
+      scholar:  '破綻反噬；受傷轉格檔',
+      support:  '全隊治療；提高仇恨',
     };
     return map[cls] || this._passiveDesc(cls);
   },
@@ -969,8 +970,10 @@ const Render = {
   showNightTransition() {
     const overlay = document.getElementById('night-overlay');
     if (!overlay) return;
-    overlay.style.opacity = '1';
-    setTimeout(() => { overlay.style.opacity = '0'; }, 2000);
+    overlay.classList.remove('night-overlay-active');
+    void overlay.offsetWidth;
+    overlay.classList.add('night-overlay-active');
+    setTimeout(() => overlay.classList.remove('night-overlay-active'), 2400);
   },
 
   // Section.

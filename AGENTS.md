@@ -36,7 +36,7 @@ This project contains a lot of Traditional Chinese player-facing text. Treat tex
 - Before changing code, first understand the relevant runtime path. For example, distinguish formal gameplay flow from dev-tool shortcuts before patching event, combat, or modal behavior.
 - If a request may conflict with existing logic, create side effects, or make a feature feel redundant, explain the concern and recommended options before editing.
 - Before starting implementation, briefly state which files or systems will be touched, why, and what behavior should change.
-- Do not automatically run checks after every small edit. If the user asks to defer checks, skip them unless the edit is high risk; in that case, explain the risk first.
+- Do not automatically run checks after small or routine edits. Run checks only for large changes, high-risk logic changes, final batch verification, or when the user explicitly asks. If a skipped check creates meaningful risk, mention it briefly.
 - Keep small visual or asset iterations lightweight. Make the focused change, update cache when needed, and wait for feedback before broad cleanup or verification.
 
 ## Work Modes And Search Scope
@@ -58,8 +58,8 @@ Rules:
 - Search only the directly relevant file or identifier.
 - Do not scan the whole project unless the identifier cannot be found locally.
 - Do not reread architecture files or unrelated modules.
-- Run only the checks for files actually edited, plus `scripts/check-mojibake.js` when text/data changed.
-- If the edit is asset-only plus a data path/cache update, prefer `node --check` for the edited JS file and defer broader checks unless risk increases.
+- Do not run checks by default. Make the focused edit, update cache when needed, and wait for feedback.
+- If the edit is high risk or the user asks for verification, run only the checks for files actually edited; add `scripts/check-mojibake.js` only when Traditional Chinese player-facing text or data changed.
 
 ### Batch Asset Mode
 
@@ -70,7 +70,7 @@ Rules:
 - The user may provide the monster/item name and already place the image in the target folder.
 - For each asset, only rename/move the file, add the data field, and update cache if needed.
 - Do not run the full check suite after every single image.
-- Run one final `scripts/check-mojibake.js` and relevant `node --check` commands after the batch.
+- Run one final `scripts/check-mojibake.js` and relevant `node --check` commands only when the batch is ready for verification or the user asks.
 - Keep filenames stable, lowercase where practical, and descriptive, for example `rot-crawler.png` or `banner-guardian-bg.png`.
 
 ### Feature Mode
@@ -82,7 +82,7 @@ Rules:
 - Start by reading the relevant local modules.
 - Expand search only when a shared rule, event path, or rendering contract needs confirmation.
 - Prefer existing patterns and helper APIs.
-- Run checks for every JS file edited and any required data/notes checks.
+- For feature work, do not check after every small intermediate edit. Run focused checks when the change is large, high risk, ready for handoff, or the user asks.
 
 ### Review Or Cleanup Mode
 
@@ -101,9 +101,9 @@ Rules:
 - Avoid PowerShell `Get-Content` for Traditional Chinese snippets; use `rg -n` or Node UTF-8 reads.
 - When in doubt, choose the narrower search first, then widen only if blocked.
 
-## Required Checks After Text/Data Edits
+## Check Policy For Large Or Risky Changes
 
-Run these after editing player-facing text, data files, or notes:
+Small edits should normally skip checks to keep iteration fast. For large changes, high-risk logic changes, final batch verification, or when the user asks, use the relevant subset of:
 
 ```powershell
 node scripts\check-mojibake.js
@@ -113,7 +113,7 @@ node --check js\data\resonances.js
 node --check js\ui\notes-render.js
 ```
 
-If a different JS file was edited, run `node --check` on that file too.
+If a different JS file was edited and verification is warranted, run `node --check` on that file too.
 
 ## Mojibake Warning Signs
 
