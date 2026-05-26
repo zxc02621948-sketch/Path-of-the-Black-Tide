@@ -1127,7 +1127,7 @@ const Render = {
   },
 
   // Section.
-  renderSquadSelect(container, selected, onToggle, libraryRelics = [], selectedLibraryRelicId = null, onLibraryToggle = null, selectedLibraryCarrierCls = null, onCarrierToggle = null) {
+  renderSquadSelect(container, selected, onToggle) {
     container.innerHTML = '';
 
     // Section.
@@ -1164,51 +1164,86 @@ const Render = {
       });
       container.appendChild(card);
     }
+  },
 
-    if (libraryRelics.length > 0 && onLibraryToggle) {
-      const section = document.createElement('div');
-      section.className = 'library-pick-section';
-      section.innerHTML = `
-        <h3>聖物庫</h3>
-        <p>選擇 1 件已收藏的聖物作為起始攜帶物。</p>
+  renderLibrarySelect(container, libraryRelics = [], selectedClasses = [], selectedLibraryRelicId = null, onLibraryToggle = null, selectedLibraryCarrierCls = null, onCarrierToggle = null) {
+    if (!container) return;
+    container.innerHTML = '';
+    const selectedRelic = libraryRelics.find(relic => relic.id === selectedLibraryRelicId) || null;
+
+    const layout = document.createElement('div');
+    layout.className = 'library-select-layout';
+
+    const relicPanel = document.createElement('section');
+    relicPanel.className = 'library-select-panel';
+    relicPanel.innerHTML = `
+      <div class="library-select-heading">
+        <h3>可用聖物</h3>
+        <p>選擇 1 件收藏作為起始攜帶物。再次點選同一件可取消。</p>
+      </div>
+    `;
+    const relicList = document.createElement('div');
+    relicList.className = 'library-select-relic-list';
+    for (const relic of libraryRelics) {
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = `library-select-relic-card${selectedLibraryRelicId === relic.id ? ' selected' : ''}`;
+      item.innerHTML = `
+        <span class="library-select-relic-name">${EquipmentIcon.label(relic, 'equipment-inline-icon relic-library-icon')}</span>
+        <span class="library-select-relic-desc">${relic.desc || ''}</span>
       `;
-
-      const list = document.createElement('div');
-      list.className = 'library-pick-list';
-      for (const relic of libraryRelics) {
-        const item = document.createElement('button');
-        item.type = 'button';
-        item.className = `library-pick-card${selectedLibraryRelicId === relic.id ? ' selected' : ''}`;
-        item.innerHTML = `
-          <span>${EquipmentIcon.label(relic, 'equipment-inline-icon relic-library-icon')}</span>
-          <small>${relic.desc}</small>
-        `;
-        item.addEventListener('click', () => onLibraryToggle(relic.id));
-        list.appendChild(item);
-      }
-      section.appendChild(list);
-
-      // 選擇起始聖物攜帶者
-      if (selectedLibraryRelicId && selected.length > 0 && onCarrierToggle) {
-        const carrierSection = document.createElement('div');
-        carrierSection.className = 'library-carrier-section';
-        carrierSection.innerHTML = `<p style="margin:10px 0 6px;color:var(--text-dim);font-size:.9em">選擇攜帶者</p>`;
-        const carrierList = document.createElement('div');
-        carrierList.className = 'library-pick-list';
-        for (const clsId of selected) {
-          const cls = CHARACTER_CLASSES[clsId];
-          const btn = document.createElement('button');
-          btn.type = 'button';
-          btn.className = `library-pick-card${selectedLibraryCarrierCls === clsId ? ' selected' : ''}`;
-          btn.innerHTML = `${this._classAvatarHtml(clsId, cls, 'library-carrier-avatar')}<span>${cls.name}</span>`;
-          btn.addEventListener('click', () => onCarrierToggle(clsId));
-          carrierList.appendChild(btn);
-        }
-        carrierSection.appendChild(carrierList);
-        section.appendChild(carrierSection);
-      }
-
-      container.appendChild(section);
+      item.addEventListener('click', () => onLibraryToggle?.(relic.id));
+      relicList.appendChild(item);
     }
+    relicPanel.appendChild(relicList);
+
+    const carrierPanel = document.createElement('section');
+    carrierPanel.className = 'library-select-panel carrier';
+    carrierPanel.innerHTML = `
+      <div class="library-select-heading">
+        <h3>攜帶者</h3>
+        <p>${selectedRelic ? `選擇誰攜帶「${selectedRelic.name}」。` : '先從左側選擇一件聖物。'}</p>
+      </div>
+    `;
+
+    if (selectedRelic) {
+      const selectedCard = document.createElement('div');
+      selectedCard.className = 'library-selected-relic';
+      selectedCard.innerHTML = `
+        <strong>${EquipmentIcon.label(selectedRelic, 'equipment-inline-icon relic-library-icon')}</strong>
+        <span>${selectedRelic.desc || ''}</span>
+      `;
+      carrierPanel.appendChild(selectedCard);
+    }
+
+    const carrierList = document.createElement('div');
+    carrierList.className = 'library-select-carrier-list';
+    if (!selectedRelic) {
+      carrierList.innerHTML = '<div class="library-select-empty">尚未選擇聖物。</div>';
+    } else if (selectedClasses.length === 0) {
+      carrierList.innerHTML = '<div class="library-select-empty">先在選角畫面選擇起始角色，再指定攜帶者。</div>';
+    } else {
+      for (const clsId of selectedClasses) {
+        const cls = CHARACTER_CLASSES[clsId];
+        if (!cls) continue;
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = `library-select-carrier-card${selectedLibraryCarrierCls === clsId ? ' selected' : ''}`;
+        btn.innerHTML = `
+          ${this._classAvatarHtml(clsId, cls, 'library-carrier-avatar')}
+          <span>
+            <strong>${cls.name}</strong>
+            <small>HP ${cls.maxHp}　攻擊 ${cls.attack}</small>
+          </span>
+        `;
+        btn.addEventListener('click', () => onCarrierToggle?.(clsId));
+        carrierList.appendChild(btn);
+      }
+    }
+    carrierPanel.appendChild(carrierList);
+
+    layout.appendChild(relicPanel);
+    layout.appendChild(carrierPanel);
+    container.appendChild(layout);
   },
 };

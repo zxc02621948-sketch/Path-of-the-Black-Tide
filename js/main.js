@@ -5,6 +5,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const gameScreen   = document.getElementById('game-screen');
   const gameoverScr  = document.getElementById('gameover-screen');
   const selectModal  = document.getElementById('squad-select-modal');
+  const libraryModal = document.getElementById('library-select-modal');
   const notesModal   = document.getElementById('notes-modal');
 
   // ─── 開始新局 ────────────────────────────────────────────
@@ -38,13 +39,9 @@ document.addEventListener('DOMContentLoaded', () => {
     Render.renderSquadSelect(
       container,
       selectedClasses,
-      toggleClass,
-      libraryRelics,
-      selectedLibraryRelicId,
-      toggleLibraryRelic,
-      selectedLibraryCarrierCls,
-      toggleLibraryCarrier
+      toggleClass
     );
+    renderLibrarySummary(libraryRelics);
 
     const confirmBtn = document.getElementById('btn-confirm-squad');
     // 若選了聖物庫聖物，必須同時指定攜帶者才能出發
@@ -57,6 +54,69 @@ document.addEventListener('DOMContentLoaded', () => {
     } else {
       confirmBtn.textContent = `出發（${selectedClasses.length} 人）`;
     }
+  }
+
+  function renderLibrarySummary(libraryRelics = getLibraryRelics()) {
+    const button = document.getElementById('btn-open-library-select');
+    const summary = document.getElementById('library-start-summary');
+    if (!button || !summary) return;
+    const hasLibrary = libraryRelics.length > 0;
+    button.hidden = !hasLibrary;
+    if (!hasLibrary) {
+      summary.classList.add('hidden');
+      summary.innerHTML = '';
+      return;
+    }
+    const selectedRelic = selectedLibraryRelicId
+      ? libraryRelics.find(relic => relic.id === selectedLibraryRelicId)
+      : null;
+    const carrier = selectedLibraryCarrierCls ? CHARACTER_CLASSES[selectedLibraryCarrierCls] : null;
+    if (!selectedRelic) {
+      summary.classList.add('hidden');
+      summary.innerHTML = '';
+      button.textContent = `開啟聖物庫（${libraryRelics.length}）`;
+      return;
+    }
+    summary.classList.remove('hidden');
+    summary.innerHTML = [
+      `<span>起始聖物：${EquipmentIcon.label(selectedRelic, 'equipment-inline-icon relic-library-icon')}</span>`,
+      carrier ? `<span>攜帶者：${carrier.name}</span>` : '<span class="warning">尚未指定攜帶者</span>',
+    ].join('');
+    button.textContent = '更換聖物庫選擇';
+  }
+
+  function openLibrarySelect() {
+    const libraryRelics = getLibraryRelics();
+    if (libraryRelics.length === 0) return;
+    libraryModal.classList.remove('hidden');
+    renderLibrarySelect();
+  }
+
+  function closeLibrarySelect() {
+    libraryModal.classList.add('hidden');
+    updateSelectUI();
+  }
+
+  function renderLibrarySelect() {
+    const container = document.getElementById('library-select-content');
+    const libraryRelics = getLibraryRelics();
+    if (selectedLibraryRelicId && !libraryRelics.some(relic => relic.id === selectedLibraryRelicId)) {
+      selectedLibraryRelicId = null;
+      selectedLibraryCarrierCls = null;
+    }
+    if (selectedLibraryCarrierCls && !selectedClasses.includes(selectedLibraryCarrierCls)) {
+      selectedLibraryCarrierCls = null;
+    }
+    Render.renderLibrarySelect(
+      container,
+      libraryRelics,
+      selectedClasses,
+      selectedLibraryRelicId,
+      toggleLibraryRelic,
+      selectedLibraryCarrierCls,
+      toggleLibraryCarrier
+    );
+    renderLibrarySummary(libraryRelics);
   }
 
   function toggleClass(clsId) {
@@ -72,12 +132,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function toggleLibraryRelic(relicId) {
     selectedLibraryRelicId = selectedLibraryRelicId === relicId ? null : relicId;
     if (!selectedLibraryRelicId) selectedLibraryCarrierCls = null;
-    updateSelectUI();
+    renderLibrarySelect();
   }
 
   function toggleLibraryCarrier(clsId) {
     selectedLibraryCarrierCls = selectedLibraryCarrierCls === clsId ? null : clsId;
-    updateSelectUI();
+    renderLibrarySelect();
   }
 
   function getLibraryRelics() {
@@ -102,6 +162,8 @@ document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('btn-cancel-squad').addEventListener('click', () => {
     selectModal.classList.add('hidden');
   });
+  document.getElementById('btn-open-library-select')?.addEventListener('click', openLibrarySelect);
+  document.getElementById('btn-close-library-select')?.addEventListener('click', closeLibrarySelect);
 
   // ─── 啟動遊戲 ────────────────────────────────────────────
   function startGame(classes, startingLibraryRelicId = null, startingLibraryCarrierCls = null) {

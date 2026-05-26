@@ -25,7 +25,7 @@
   <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
-<link rel="stylesheet" href="style.css?v=field-rest-green1">
+<link rel="stylesheet" href="style.css?v=mobile-event-modal1">
 </head>
 <body>
 <div id="app">
@@ -162,6 +162,8 @@
           選擇 2 人（最多可帶 3 人，另一名可在探索中救援）
         </p>
         <div id="squad-select"></div>
+        <div id="library-start-summary" class="library-start-summary hidden"></div>
+        <button id="btn-open-library-select" class="btn-secondary library-start-button" type="button">開啟聖物庫</button>
         <div class="squad-actions">
           <button id="btn-confirm-squad" class="btn-primary" disabled>確認出發</button>
           <button id="btn-cancel-squad" class="btn-secondary">返回</button>
@@ -169,6 +171,17 @@
       </div>
       <div class="squad-select-detail" id="squad-detail-right">
         <div class="char-detail-placeholder">選擇第二位角色後顯示</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 聖物庫 Modal ═══════════════ -->
+  <div id="library-select-modal" class="modal hidden">
+    <div class="modal-content library-select-modal-content">
+      <h2>聖物庫</h2>
+      <div id="library-select-content"></div>
+      <div class="library-select-actions">
+        <button id="btn-close-library-select" class="btn-secondary" type="button">返回選角</button>
       </div>
     </div>
   </div>
@@ -238,10 +251,10 @@
 <script src="js/ui/fx-player.js?v=fx-player-ambush1"></script>
 <script src="js/core/dev-tool.js?v=training-dummy-entry1"></script>
 <script src="js/ui/audio-manager.js?v=guardian-bgm-volume1"></script>
-<script src="js/ui/render.js?v=field-rest-green1"></script>
+<script src="js/ui/render.js?v=library-modal1"></script>
   <script src="js/ui/modal-render.js?v=guard-free-cd2-1"></script>
 <script src="js/ui/notes-render.js?v=field-rest1"></script>
 <script src="js/ui/tutorial-render.js?v=ruins-tile-final1"></script>
-<script src="js/main.js?v=field-rest1"></script>
+<script src="js/main.js?v=library-modal1"></script>
 </body>
 </html>
