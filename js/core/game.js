@@ -565,22 +565,34 @@ const Game = {
   },
 
   _replaceRelicWithLinkWarning(char, relic, clearRelic) {
-    if (this._hasStarHunterEye(char)) {
-      this._openModal({
-        title: '聖物共鳴將消失',
-        desc: `${char.name} 目前觸發「獵星之眼」。替換聖物後，如果不再同時持有已融合鷹眼羽飾與鷹眼透鏡，該共鳴效果會消失。\n\n確定要替換「${char.relic.name}」嗎？`,
-        choices: [
-          {
-            label: `確認替換為「${relic.name}」`,
-            danger: true,
-            action: () => this._commitRelicReplace(char, relic, clearRelic),
-          },
-          { label: '取消', action: () => this._closeModal() },
-        ],
-      });
+    this._confirmRelicReplacement(char, relic, () => this._commitRelicReplace(char, relic, clearRelic), {
+      onCancel: () => this._openRelicAssignTargetModal(relic, clearRelic),
+    });
+  },
+
+  _confirmRelicReplacement(char, relic, onConfirm, opts = {}) {
+    if (!char?.relic) {
+      if (typeof onConfirm === 'function') onConfirm();
       return;
     }
-    this._commitRelicReplace(char, relic, clearRelic);
+    const resonanceWarning = this._hasStarHunterEye(char)
+      ? '\n\n目前觸發「獵星之眼」。替換後如果不再同時持有已融合鷹眼羽飾與鷹眼透鏡，該共鳴效果會消失。'
+      : '';
+    this._openModal({
+      title: '確認替換聖物',
+      desc: `${char.name} 目前已攜帶「${char.relic.name}」。\n\n確定要替換成「${relic.name}」嗎？原本的聖物會掉落在原地。${resonanceWarning}`,
+      choices: [
+        {
+          label: `確認替換為「${relic.name}」`,
+          danger: true,
+          action: onConfirm,
+        },
+        {
+          label: '取消',
+          action: typeof opts.onCancel === 'function' ? opts.onCancel : () => this._closeModal(),
+        },
+      ],
+    });
   },
 
   _commitRelicReplace(char, relic, clearRelic) {

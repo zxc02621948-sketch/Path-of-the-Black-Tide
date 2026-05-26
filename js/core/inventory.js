@@ -278,16 +278,25 @@ const GameInventory = {
       return;
     }
     const relic = weightedRelicPick(pool);
-    const choices = this._aliveSquad().map(char => ({
-      label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
-      action: () => this._grantWishRelic(idx, char, relic),
-    }));
-    choices.push({ label: '返回', action: () => this._openWishChest(idx) });
-    this._openModal({
+    const reopenAssign = () => this._openModal({
       title: `遺物祈願：${relic.name}`,
       desc: `${relic.icon || '◆'} ${relic.name}\n${relic.desc}\n\n選擇一名隊友攜帶。`,
       choices,
     });
+    const choices = this._aliveSquad().map(char => ({
+      label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
+      action: () => {
+        if (char.relic) {
+          this._confirmRelicReplacement(char, relic, () => this._grantWishRelic(idx, char, relic), {
+            onCancel: reopenAssign,
+          });
+          return;
+        }
+        this._grantWishRelic(idx, char, relic);
+      },
+    }));
+    choices.push({ label: '返回', action: () => this._openWishChest(idx) });
+    reopenAssign();
   },
 
   _grantWishRelic(idx, char, relic) {

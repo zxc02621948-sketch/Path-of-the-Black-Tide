@@ -4,6 +4,7 @@ const GameCombatRetreat = {
     const combat = G.combat;
     const enemy = combat?.enemy;
     if (!combat || !enemy) return false;
+    if (enemy.canRetreat) return true;
     if (enemy.darkMonster || enemy.boss || enemy.rescueBoss || enemy.noRetreat || enemy.tier === 'strong') return false;
     if (combat.source === 'darkMonsterPassive' || combat.source === 'darkMonsterActive') return false;
     if (['rescue', 'treasure_mimic', 'dark_gift_mimic'].includes(combat.reward)) return false;
@@ -56,6 +57,7 @@ const GameCombatRetreat = {
     if (G.phase === 'over') return;
     for (const line of logs) this._log(line, 'danger');
     this._log('隊伍撤退，黑暗逼近。', 'danger');
+    this._clearSquadCombatCarryover();
     G.combat = null;
     G.combatMods = [];
     this._closeModal();

@@ -34,11 +34,11 @@ const CHARACTER_CLASSES = {
     id: 'support',
     name: '輔助',
     icon: '✚',
-    desc: '維持隊伍生存，在戰鬥中持續替全隊穩住傷勢。',
+    desc: '維持隊伍生存，在戰鬥中替傷勢最危急的隊友穩住局面。',
     maxHp: 18,
     attack: 2,
     passive: 'team_heal',
-    passiveDesc: '我方攻擊回合結束時，若輔助存活，全隊回復 1 HP；若輔助是本回合主戰者，改為全隊回復 2 HP。觸發後輔助仇恨 +1',
+    passiveDesc: '我方攻擊回合結束時，若輔助存活，治療目前 HP 百分比最低的一名存活隊友 1 HP；若輔助是主戰者，改為治療最低兩名隊友各 1 HP。觸發後輔助仇恨 +1',
   },
 };
 

@@ -3668,6 +3668,28 @@ html, body {
   text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 0 5px rgba(82, 196, 226, .35);
 }
 
+.combat-status-badge.intimidated {
+  color: #f7d3ff;
+}
+
+.combat-status-badge.intimidated span {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(206, 126, 255, .6);
+  border-radius: 50%;
+  color: #fdeaff;
+  background: rgba(83, 35, 108, .38);
+  box-shadow: 0 0 8px rgba(185, 92, 255, .28);
+  font-weight: 900;
+  line-height: 1;
+}
+
+.combat-status-badge.intimidated strong {
+  text-shadow: 0 1px 2px rgba(0, 0, 0, .9), 0 0 5px rgba(185, 92, 255, .35);
+}
+
 .combat-wound-badge,
 .combat-native-weakness-badge,
 .combat-temp-weakness-badge,
@@ -7290,6 +7312,51 @@ body::before {
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.06),
     0 0 14px rgba(201,145,47,.15);
+}
+
+#btn-field-rest {
+  color: #eaffdf;
+  border-color: rgba(91, 190, 103, .78);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(119, 228, 123, .22), transparent 54%),
+    linear-gradient(180deg, rgba(43, 118, 55, .98), rgba(17, 68, 35, .98));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.08),
+    0 0 12px rgba(84, 181, 88, .18);
+  font-weight: 700;
+}
+
+#btn-field-rest:hover:not(:disabled) {
+  color: #f6fff0;
+  border-color: rgba(134, 239, 137, .95);
+  background:
+    radial-gradient(circle at 50% 0%, rgba(153, 244, 141, .3), transparent 56%),
+    linear-gradient(180deg, rgba(54, 143, 66, .98), rgba(21, 83, 43, .98));
+  box-shadow:
+    inset 0 1px 0 rgba(255,255,255,.1),
+    0 0 18px rgba(95, 208, 99, .28);
+}
+
+#btn-field-rest:disabled {
+  filter: saturate(.72);
+}
+
+#btn-field-rest.field-rest-alert:not(:disabled) {
+  animation: field-rest-glow 1.05s ease-in-out infinite alternate;
+}
+
+@keyframes field-rest-glow {
+  from {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.08),
+      0 0 12px rgba(84, 181, 88, .26);
+  }
+  to {
+    box-shadow:
+      inset 0 1px 0 rgba(255,255,255,.12),
+      0 0 8px rgba(128, 230, 104, .42),
+      0 0 24px rgba(128, 230, 104, .34);
+  }
 }
 
 .choice-btn:hover:not(:disabled) {

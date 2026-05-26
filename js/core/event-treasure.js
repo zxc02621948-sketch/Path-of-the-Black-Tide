@@ -313,17 +313,28 @@ const GameEventTreasure = {
         label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
         detail: char.relic ? `目前效果：${char.relic.desc}` : '',
         action: () => {
-          const result = this._grantFateTableRelic(char, reward);
-          this._clearWeaponChest(cell);
-          this._openModal({
-            title: `獲得聖物：${reward.name}`,
-            desc: [
-              `${char.name} 獲得聖物「${reward.name}」。`,
-              result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
-              this._resonanceActivatedText(result?.newly || []),
-            ].filter(Boolean).join('\n'),
-            choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
-          });
+          const grant = () => {
+            const result = this._grantFateTableRelic(char, reward);
+            this._clearWeaponChest(cell);
+            this._openModal({
+              title: `獲得聖物：${reward.name}`,
+              desc: [
+                `${char.name} 獲得聖物「${reward.name}」。`,
+                result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+                this._resonanceActivatedText(result?.newly || []),
+              ].filter(Boolean).join('\n'),
+              choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+            });
+          };
+          if (char.relic) {
+            this._confirmRelicReplacement(char, reward, grant, { onCancel: () => this._openModal({
+              title: `獲得聖物：${reward.name}`,
+              desc: `${reward.icon} ${reward.name}\n${reward.desc}\n\n選擇要交給哪位角色。`,
+              choices,
+            }) });
+            return;
+          }
+          grant();
         },
       }));
       choices.push({
@@ -390,17 +401,26 @@ const GameEventTreasure = {
         label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
         detail: char.relic ? `目前效果：${char.relic.desc}` : '',
         action: () => {
-          const result = this._grantFateTableRelic(char, reward);
-          this._clearWeaponChest(cell);
-          this._openModal({
-            title: `獲得聖物：${reward.name}`,
-            desc: [
-              `${char.name} 獲得聖物「${reward.name}」。`,
-              result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
-              this._resonanceActivatedText(result?.newly || []),
-            ].filter(Boolean).join('\n'),
-            choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
-          });
+          const grant = () => {
+            const result = this._grantFateTableRelic(char, reward);
+            this._clearWeaponChest(cell);
+            this._openModal({
+              title: `獲得聖物：${reward.name}`,
+              desc: [
+                `${char.name} 獲得聖物「${reward.name}」。`,
+                result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+                this._resonanceActivatedText(result?.newly || []),
+              ].filter(Boolean).join('\n'),
+              choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+            });
+          };
+          if (char.relic) {
+            this._confirmRelicReplacement(char, reward, grant, {
+              onCancel: () => this._openDarkGiftRewardAssignModal(cell, reward, combatLog),
+            });
+            return;
+          }
+          grant();
         },
       }));
       choices.push({
@@ -1046,17 +1066,26 @@ const GameEventTreasure = {
       label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
       detail: char.relic ? `目前效果：${char.relic.desc}` : '',
       action: () => {
-        const result = this._grantFateTableRelic(char, relic);
-        G.fateTableRelicChoiceContext = null;
-        this._openModal({
-          title: `${title}：完成`,
-          desc: [
-            `${char.name} 獲得聖物「${relic.name}」。`,
-            result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
-            this._resonanceActivatedText(result?.newly || []),
-          ].filter(Boolean).join('\n'),
-          choices: [{ label: '繼續', action: onDone }],
-        });
+        const grant = () => {
+          const result = this._grantFateTableRelic(char, relic);
+          G.fateTableRelicChoiceContext = null;
+          this._openModal({
+            title: `${title}：完成`,
+            desc: [
+              `${char.name} 獲得聖物「${relic.name}」。`,
+              result?.replaced ? `原本的「${result.replaced.name}」掉落在原地。` : '',
+              this._resonanceActivatedText(result?.newly || []),
+            ].filter(Boolean).join('\n'),
+            choices: [{ label: '繼續', action: onDone }],
+          });
+        };
+        if (char.relic) {
+          this._confirmRelicReplacement(char, relic, grant, {
+            onCancel: () => this._openFateTableRelicAssignModal({ title, intro, relic, onDone }),
+          });
+          return;
+        }
+        grant();
       },
     }));
     choices.push({

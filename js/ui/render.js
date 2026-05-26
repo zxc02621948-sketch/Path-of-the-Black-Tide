@@ -102,6 +102,23 @@ const Render = {
     endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over');
     endDayBtn.textContent = '結束今天';
 
+    const fieldRestBtn = document.getElementById('btn-field-rest');
+    if (fieldRestBtn) {
+      const canFieldRest = typeof Game !== 'undefined' && Game._canFieldRest?.();
+      const shouldPromptFieldRest = canFieldRest && G.squad.some(char =>
+        !char.dead && char.maxHp > 0 && (char.hp / char.maxHp) <= 0.5
+      );
+      fieldRestBtn.disabled = !canFieldRest;
+      fieldRestBtn.classList.toggle('field-rest-alert', shouldPromptFieldRest);
+      fieldRestBtn.title = canFieldRest
+        ? '消耗 1 行動，全體存活角色恢復 2 HP'
+        : (G.phase !== 'day'
+          ? '只有白天可以原地休息'
+          : (actionsLeft <= 0
+            ? '行動力不足'
+            : '目前沒有人需要治療'));
+    }
+
     const devBtn = document.getElementById('btn-dev-tool');
     if (devBtn) {
       devBtn.disabled = G.phase === 'over';
@@ -666,7 +683,7 @@ const Render = {
       warrior:  '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面的格檔，最多 6',
       explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
       scholar:  '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空。戰鬥中實際損失 HP 後，下回合獲得損失 HP x2 的格檔',
-      support:  '我方攻擊回合結束時，若輔助存活，全隊回復 1 HP；若輔助是本回合主戰者，改為全隊回復 2 HP。觸發後輔助仇恨 +1',
+      support:  '我方攻擊回合結束時，若輔助存活，治療目前 HP 百分比最低的一名存活隊友 1 HP；若輔助是主戰者，改為治療最低兩名隊友各 1 HP。觸發後輔助仇恨 +1',
     };
     return map[cls] || '';
   },
@@ -676,7 +693,7 @@ const Render = {
       warrior:  '戰鬥保底；下回合格檔',
       explorer: '標記可疑弱點；累積閃避率',
       scholar:  '破綻反噬；受傷轉格檔',
-      support:  '全隊治療；提高仇恨',
+      support:  '救急治療；提高仇恨',
     };
     return map[cls] || this._passiveDesc(cls);
   },

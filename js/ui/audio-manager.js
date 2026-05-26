@@ -4,6 +4,7 @@ const AudioManager = {
     exploreNight: 'assets/audio/explore-night.mp3',
     battleNormal: 'assets/audio/battle-normal.mp3',
     battleGuardian: 'assets/audio/battle-guardian.mp3',
+    battleDarkAvatar: 'assets/audio/battle-dark-avatar.mp3',
     battleFinal: 'assets/audio/battle-final.mp3',
   },
   sfx: {
@@ -24,6 +25,7 @@ const AudioManager = {
   },
   volume: 0.46,
   trackVolumes: {
+    battleGuardian: 0.9,
     battleFinal: 0.98,
   },
   sfxVolume: 0.42,
@@ -73,6 +75,7 @@ const AudioManager = {
     const reward = G.combat?.reward || null;
     if (enemy) {
       if (enemy.finalBoss || reward === 'final_boss') return 'battleFinal';
+      if (enemy.darkMonster) return 'battleDarkAvatar';
       if (enemy.echoGuardian) return 'battleGuardian';
       return 'battleNormal';
     }

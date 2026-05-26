@@ -120,6 +120,10 @@ document.addEventListener('DOMContentLoaded', () => {
     Game.endDay();
   });
 
+  document.getElementById('btn-field-rest')?.addEventListener('click', () => {
+    Game.fieldRest();
+  });
+
   document.getElementById('turn-end-float')?.addEventListener('click', () => {
     Game.endDay();
   });

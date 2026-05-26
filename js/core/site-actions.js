@@ -1,5 +1,45 @@
 // Extracted from js/core/game.js. Keeps the original Game API while making this system easier to maintain.
 const GameSiteActions = {
+  _canFieldRest() {
+    if (G.modal || G.phase !== 'day' || G.actionsLeft <= 0 || G.phase === 'over') return false;
+    return this._aliveSquad().some(char => char.hp < char.maxHp);
+  },
+
+  fieldRest() {
+    if (!this._canFieldRest()) {
+      Render.renderTopBar();
+      return;
+    }
+    this._openModal({
+      title: '確認原地休息',
+      desc: '原地休息會消耗 1 行動，讓全體存活角色恢復 2 HP。\n\n倒下的角色不會被救起。確定要休息嗎？',
+      choices: [
+        {
+          label: '確認休息',
+          action: () => {
+            this._closeModal();
+            this._doFieldRest();
+          },
+        },
+        { label: '取消', action: () => { this._closeModal(); Render.fullRender(); } },
+      ],
+    });
+  },
+
+  _doFieldRest() {
+    if (!this._canFieldRest()) {
+      Render.fullRender();
+      return;
+    }
+    G.actionsLeft = Math.max(0, (G.actionsLeft || 0) - 1);
+    const healed = this._healAliveSquad(2, false);
+    this._log(healed.length > 0
+      ? `原地休息：${healed.join('、')} HP。`
+      : '原地休息：沒有人需要治療。',
+      healed.length > 0 ? 'reward' : 'dim');
+    Render.fullRender();
+  },
+
   _triggerAltar(cell) {
     this._recordTerrain('altar');
     const usedToday = cell.altarUsedDay === G.day;

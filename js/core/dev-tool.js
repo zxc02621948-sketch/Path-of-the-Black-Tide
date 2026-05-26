@@ -241,6 +241,7 @@ const GameDevTool = {
         { label: '中型怪物', action: () => this._devChooseEnemyCombatCategory('medium') },
         { label: '強型怪物', action: () => this._devChooseEnemyCombatCategory('strong') },
         { label: '頭目怪物', action: () => this._devChooseEnemyCombatCategory('boss') },
+        { label: '傷害測試木樁', action: () => this._devStartTrainingDummyCombat() },
         { label: '尾王測試', action: () => this._devChooseFinalBossCombat() },
         { label: '聖物守護者', action: () => this._devChooseEnemyCombatCategory('echo') },
         { label: '黑匣擬態', action: () => this._devChooseEnemyCombatCategory('dark_gift') },
@@ -302,6 +303,21 @@ const GameDevTool = {
       );
     }
     return [];
+  },
+
+  _devStartTrainingDummyCombat() {
+    const dummy = typeof getEnemyById === 'function'
+      ? getEnemyById('training_dummy')
+      : (typeof ENEMIES !== 'undefined' ? ENEMIES.find(enemy => enemy?.id === 'training_dummy') : null);
+    if (!dummy) {
+      this._openModal({
+        title: '測試工具：傷害測試木樁',
+        desc: '找不到測試木樁資料。',
+        choices: [{ label: '返回', action: () => this._devChooseEnemyCombat() }],
+      });
+      return;
+    }
+    this._devStartEnemyCombat({ ...dummy }, { source: 'devTest' });
   },
 
   _devChooseEnemyCombatStrength(enemy, category) {

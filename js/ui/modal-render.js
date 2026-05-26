@@ -401,10 +401,10 @@ const RenderModal = {
       const playerFollowHits = Math.max(0, cfg.combatAnims.playerFollowHits || 0, playerDamageEvents.length);
       const playerFollowStepMs = 380;
       const guardBlock = Math.max(0, cfg.combatAnims.guardBlock || 0);
-      const hasCombatAnim = playerFollowHits > 0 || healEvents.length > 0 || guardBlock > 0 || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
+      const hasCombatAnim = playerFollowHits > 0 || incomingDamageEvents.length > 0 || healEvents.length > 0 || guardBlock > 0 || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
       const hasEnemyAttack = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe);
       const enemyDiceWindup = hasEnemyAttack && cfg.enemyDice && cfg.enemyDice.animate !== false ? 760 : 0;
-      const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * playerFollowStepMs + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
+      const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * playerFollowStepMs + (incomingDamageEvents.length > 0 ? 520 : 0) + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
       if (playerDamageEvents.length > 0) {
         this._deferCombatResultText(descEl, delay + playerFollowHits * playerFollowStepMs + 120);
       }
@@ -432,7 +432,6 @@ const RenderModal = {
           selectableUnits.forEach(unit => unit.classList.remove('combat-anim-locked'));
           if (G.combat) G.combat.actionInProgress = false;
           this._positionCombatIntentArrow();
-          if (cfg.syncAudioAfterCombatAnims) AudioManager?.sync?.();
         }, lockMs);
       }
       this._preparePlayerDamageSequence(playerDamageEvents);
@@ -1376,9 +1375,12 @@ const RenderModal = {
       const hpClass = hpPct <= 25 ? 'critical' : hpPct <= 50 ? 'low' : '';
       const isActive = combat.attackerId === char.id;
       const isDown = char.hp <= 0;
-      const isFollowUpTarget = combat.followUpTargetId === char.id && !isDown;
+      const hasFollowUpAction = typeof combat.onFollowUpTarget === 'function';
+      const isFollowUpTarget = hasFollowUpAction && combat.followUpTargetId === char.id && !isDown;
+      const isFollowUpStatus = (combat.followUpStatusId || combat.followUpTargetId) === char.id && !isDown;
       const showPlayerDice = combat.playerDice && combat.attackerId === char.id;
-      const canClick = (selectable || itemTargeting || guardTargeting || isFollowUpTarget) && !isDown;
+      const isIntimidated = !!char.finalEyeIntimidated && !isDown;
+      const canClick = ((selectable && !isIntimidated) || itemTargeting || guardTargeting || isFollowUpTarget) && !isDown;
       const isIntentTarget = this._combatShouldShowIntentArrow(combat) && combat.intent?.targetId === char.id;
       const threat = char.threat || 0;
       const wagerFaces = Array.isArray(char.wagerDiceFaces) ? char.wagerDiceFaces : [];
@@ -1399,6 +1401,14 @@ const RenderModal = {
       const evasionBadgeHtml = evasionChance > 0 && !isDown
         ? this._combatAllyEvasionBadgeHtml(char, evasionChance)
         : '';
+      const intimidateHtml = isIntimidated ? `
+        <button type="button" class="combat-status-badge intimidated"
+          onclick="event.stopPropagation()"
+          title="開眼威懾：本回合無法主戰">
+          <span>懾</span>
+          <strong>封</strong>
+        </button>
+      ` : '';
       const pollutionFaces = Array.isArray(char.dicePollution?.faces) ? char.dicePollution.faces : [];
       const pollutionEmpowered = Math.max(0, char.dicePollution?.empowered || 0);
       const pollutionHtml = pollutionFaces.length > 0 && !isDown ? `
@@ -1454,13 +1464,13 @@ const RenderModal = {
         ? `onclick="Game.useCombatInventoryItemOnTarget('${char.id}')"`
         : isFollowUpTarget
         ? `onclick="Render.triggerCombatFollowUp('${char.id}')"`
-        : (selectable && !isDown ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
+        : (selectable && !isDown && !isIntimidated ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
       const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
       const weaponFamily = char.weapon?.family || char.weapon?.id || '';
       return `
-        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${isFollowUpTarget ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
+        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${isFollowUpStatus ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
           data-char-id="${char.id}" data-weapon-family="${weaponFamily}" ${clickAttr}>
-          ${isFollowUpTarget ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
+          ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           <div class="combat-unit-main">
             <span class="combat-sprite">${cls.icon}</span>
@@ -1469,6 +1479,7 @@ const RenderModal = {
             ${woundBadgeHtml}
             ${blockBadgeHtml}
             ${evasionBadgeHtml}
+            ${intimidateHtml}
             ${pollutionHtml}
             ${remorseHtml}
             ${backlashHtml}
@@ -1566,7 +1577,7 @@ const RenderModal = {
           <div class="combat-actions"></div>
           <div class="combat-vs">VS</div>
           <div class="combat-bottom-tools">
-            <button class="combat-guard-button${combat.canGuard ? '' : ' disabled'}" ${combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled'} title="${combat.canGuard ? '守勢：選一名角色，擲骰並獲得等同骰數的格檔' : `守勢冷卻：還需 ${combat.guardCooldown || 0} 次我方行動`}">格檔${combat.canGuard ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
+            <button class="combat-guard-button${combat.canGuard ? '' : ' disabled'}" ${combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled'} title="${combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`}">格檔${combat.canGuard ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
             <button class="combat-bag-button${combat.canUseBag ? '' : ' disabled'}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
           </div>
         </div>

@@ -101,7 +101,10 @@ const CombatRules = {
     if (wagerDice?.active && wagerDice.charId === attacker.id && Array.isArray(wagerDice.faces)) {
       const wagerHit = wagerDice.faces.includes(roll);
       if (wagerHit) {
-        const bonus = wagerDice.damageBonus || 4;
+        const baseBonus = wagerDice.damageBonus || 4;
+        const bonus = (rollResult.dodecaFateDice || rollResult.dodecaLuckyDice)
+          ? baseBonus + roll
+          : baseBonus;
         damage += bonus;
         logs.push(`賭命骰子：押中 ${roll}，本擊傷害 +${bonus}`);
       } else {
@@ -484,18 +487,18 @@ const CombatRules = {
     }
 
     if (luckyTempMultipleHits.length > 0 && damage > 0) {
-      const bonus = luckyTempMultipleHits.length * 8;
+      const bonus = luckyTempMultipleHits.length * 16;
       damage += bonus;
       logs.push(`十二面幸運骰：最終骰值 ${roll} 是破綻 ${luckyTempMultipleHits.join('、')} 的倍數，傷害 +${bonus}`);
     }
 
     if (rollResult.dodecaFateDice && (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit) && damage > 0) {
-      const multiplier = diceRaw === 12 && resonanceWeaknessHit ? 4 : 3;
+      const multiplier = diceRaw === 12 && resonanceWeaknessHit ? 5 : 4;
       const beforeResonance = damage;
       damage *= multiplier;
       logs.push(diceRaw === 12 && resonanceWeaknessHit
-        ? `十二面命運骰爆點：自然 12 且觸發共鳴弱點，最終傷害 ${beforeResonance} x4 = ${damage}`
-        : `十二面命運骰：命中原生弱點，最終傷害 ${beforeResonance} x3 = ${damage}`);
+        ? `十二面命運骰爆點：自然 12 且觸發共鳴弱點，最終傷害 ${beforeResonance} x5 = ${damage}`
+        : `十二面命運骰：命中原生弱點，最終傷害 ${beforeResonance} x4 = ${damage}`);
     }
 
     const fusedBlackIronCrown = enemy.darkMonster && enemy.darkMonsterActiveHunt && squad.some(c =>
@@ -964,7 +967,7 @@ const CombatRules = {
       }
       if (counterDmg > 0 || finalEyePierceDamage > 0) {
         counterDmg = CombatStatus.applyIncomingRiskBonuses(counterTarget, counterDmg, {
-          allowRemorse: !wagerDice?.active,
+          allowRemorse: true,
           allowBacklash: true,
           logs,
           damageLabel: '受擊傷害',
@@ -974,6 +977,10 @@ const CombatRules = {
         const beforeHp = counterTarget.hp;
         counterTarget.hp = Math.max(0, counterTarget.hp - totalCounterDamage);
         CombatStatus.recordGamblerPainBlock(counterTarget, beforeHp, counterTarget.hp, logs);
+        if (intent?.finalEye && this._finalEyeIntimidates(enemy) && beforeHp > counterTarget.hp) {
+          counterTarget.finalEyeIntimidatedUntilRound = Math.max(counterTarget.finalEyeIntimidatedUntilRound || 0, round + 1);
+          logs.push(`${enemy.name} 開眼威懾：${counterTarget.name} 下回合無法主戰。`);
+        }
         incomingDamageEvents.push({
           type: 'counter',
           targetId: counterTarget.id,
@@ -1092,6 +1099,12 @@ const CombatRules = {
       : null;
     const darkness = Math.max(0, Math.floor(Number.isFinite(enemy?.finalBossDarkness) ? enemy.finalBossDarkness : 0));
     return Math.max(0, this._finalBossTierValue(ability, darkness, 'blockPierceDamage', ability?.blockPierceDamage || 0));
+  },
+
+  _finalEyeIntimidates(enemy) {
+    if (!enemy?.finalBoss) return false;
+    const darkness = Math.max(0, Math.floor(Number.isFinite(enemy?.finalBossDarkness) ? enemy.finalBossDarkness : 0));
+    return darkness >= 15;
   },
 
   _finalBossDarknessTier(ability, darkness = 0) {

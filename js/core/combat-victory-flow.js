@@ -9,6 +9,7 @@ const GameCombatVictoryFlow = {
 
     if (source === 'darkMonsterPassive') {
       this._settleDarkMonsterPassiveVictory(darkMonsterId, darkMonsterRef);
+      this._clearSquadCombatCarryover();
       G.combat = null;
       this._openModal({
         title: '擊退黑暗化身',
@@ -25,6 +26,7 @@ const GameCombatVictoryFlow = {
     if (source === 'darkMonsterActive') {
       const underlyingCell = G.combat.underlyingCell || null;
       this._settleDarkMonsterActiveVictory(darkMonsterId, darkMonsterRef);
+      this._clearSquadCombatCarryover();
       G.combat = null;
       this._openModal({
         title: '主動討伐成功',
@@ -47,6 +49,7 @@ const GameCombatVictoryFlow = {
       cell.type = 'empty';
       cell.content = null;
     }
+    this._clearSquadCombatCarryover();
     G.combat = null;
 
     if (source !== 'devTest' && (combatReward === 'final_boss' || enemy.finalBoss)) {

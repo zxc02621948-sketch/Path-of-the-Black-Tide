@@ -27,7 +27,8 @@ const ENEMIES = [
     tier: 'weak',
     tierUpDays: 3,
     weakness: 3,
-    weaknessEffect: { type: 'stun', desc: '蠕蟲被震懾，本回合不攻擊' },
+    weaknessEffect: { type: 'stun', desc: '蠕蟲被震懾，下一次先攻中斷' },
+    abilities: [{ type: 'first_strike' }],
     nightOnly: false,
     lore: '邊境封鎖後第三年，首次出現在北方廢墟。沒有眼睛，靠震動感知獵物。',
     intents: [
@@ -35,10 +36,10 @@ const ENEMIES = [
       { type: 'dice_attack', weight: 2 },
     ],
     tiers: [
-      { name: '黑影蠕蟲', desc: '在廢墟縫隙中蠕動，移動迅速，無法格檔',             hp: 18, block: 0, attack: 3 },
-      { name: '暗蝕蠕蟲', desc: '被黑暗侵蝕後體型膨脹，速度未減',                   hp: 23, block: 0, attack: 4 },
-      { name: '深淵蠕蟲', desc: '幾乎與黑暗融為一體，偶爾才看得出輪廓',             hp: 29, block: 0, attack: 5 },
-      { name: '虛空蠕蟲', desc: '完全吸收了黑暗，每一次衝擊都帶著虛空的重量',       hp: 35, block: 0, attack: 5 },
+      { name: '黑影蠕蟲', desc: '在廢墟縫隙中蠕動，每回合選擇主戰者後會先攻，無法格檔', hp: 21, block: 0, attack: 3 },
+      { name: '暗蝕蠕蟲', desc: '被黑暗侵蝕後體型膨脹，每回合選擇主戰者後會先攻', hp: 26, block: 0, attack: 4 },
+      { name: '深淵蠕蟲', desc: '幾乎與黑暗融為一體，每回合選擇主戰者後會先攻',   hp: 32, block: 0, attack: 5 },
+      { name: '虛空蠕蟲', desc: '完全吸收了黑暗，每回合選擇主戰者後會先攻，每次衝擊都帶著虛空的重量', hp: 39, block: 0, attack: 5 },
     ],
   },
 
@@ -410,6 +411,7 @@ const ENEMIES = [
     nightOnly: false,
     boss: true,
     devOnly: true,
+    canRetreat: true,
     lore: '它沒有故事。它只是站在那裡，承受所有奇怪的測試。',
     intents: [
       { type: 'idle', weight: 1 },
