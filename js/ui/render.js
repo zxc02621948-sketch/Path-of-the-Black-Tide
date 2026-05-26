@@ -54,7 +54,7 @@ const Render = {
     }
     const turnEndFloat = document.getElementById('turn-end-float');
     if (turnEndFloat) {
-      turnEndFloat.classList.toggle('visible', actionsLeft <= 0 && !G.modal && G.phase !== 'over');
+      turnEndFloat.classList.toggle('visible', actionsLeft <= 0 && !G.modal && G.phase !== 'over' && !G.dayTransitionActive);
     }
     const darkness = Math.max(0, G.darkness || 0);
     const meterMax = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
@@ -97,10 +97,12 @@ const Render = {
     }
 
     const endDayBtn = document.getElementById('btn-end-day');
-    endDayBtn.disabled = G.phase === 'over' || G.actionsLeft > 0;
-    endDayBtn.title = G.actionsLeft > 0 ? '必須先用完今天的行動力' : '';
-    endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over');
-    endDayBtn.textContent = '結束今天';
+    endDayBtn.disabled = G.phase === 'over' || G.actionsLeft > 0 || G.dayTransitionActive;
+    endDayBtn.title = G.dayTransitionActive
+      ? '正在進入下一天'
+      : (G.actionsLeft > 0 ? '必須先用完今天的行動力' : '');
+    endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over' && !G.dayTransitionActive);
+    endDayBtn.textContent = G.dayTransitionActive ? '夜色流轉中' : '結束今天';
 
     const fieldRestBtn = document.getElementById('btn-field-rest');
     if (fieldRestBtn) {
@@ -991,6 +993,35 @@ const Render = {
     void overlay.offsetWidth;
     overlay.classList.add('night-overlay-active');
     setTimeout(() => overlay.classList.remove('night-overlay-active'), 2400);
+  },
+
+  showDayTransition(info = {}, onDone = null) {
+    const overlay = document.getElementById('day-transition-overlay');
+    const done = () => {
+      overlay?.classList.remove('active');
+      overlay?.setAttribute('aria-hidden', 'true');
+      if (typeof onDone === 'function') onDone();
+    };
+    if (!overlay) {
+      done();
+      return;
+    }
+    const phase = ['day', 'night', 'nightfall', 'dawn'].includes(info.phase) ? info.phase : 'day';
+    const kicker = info.kickerLabel || (phase === 'nightfall' ? '夜幕逼近' : (phase === 'dawn' ? '黎明將至' : '日終'));
+    overlay.className = `day-transition-overlay ${phase}`;
+    overlay.setAttribute('aria-hidden', 'false');
+    overlay.innerHTML = `
+      <div class="day-transition-panel">
+        <div class="day-transition-kicker">${kicker}</div>
+        <div class="day-transition-title">${info.endLabel || '今天結束'}</div>
+        <div class="day-transition-darkness">${info.darknessLabel || '黑暗增長'}</div>
+        <div class="day-transition-pulse" aria-hidden="true"></div>
+        <div class="day-transition-next">${info.nextLabel || '下一天'}</div>
+      </div>
+    `;
+    void overlay.offsetWidth;
+    overlay.classList.add('active');
+    setTimeout(done, 2450);
   },
 
   // Section.

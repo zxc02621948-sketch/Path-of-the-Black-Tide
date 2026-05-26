@@ -8,12 +8,19 @@ const GameCombatVictoryFlow = {
     this._applyKillHeal(attacker);
 
     if (source === 'darkMonsterPassive') {
-      this._settleDarkMonsterPassiveVictory(darkMonsterId, darkMonsterRef);
+      const darkResult = this._settleDarkMonsterPassiveVictory(darkMonsterId, darkMonsterRef);
       this._clearSquadCombatCarryover();
       G.combat = null;
       this._openModal({
-        title: '擊退黑暗化身',
-        desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n黑暗化身消失，黑暗 -1。`,
+        title: '黑暗暫退',
+        desc: [
+          `${enemy.name} 被擊敗。`,
+          finalHitDesc,
+          `你已戰勝了黑暗，黑暗 ${darkResult.before} → ${darkResult.after}（-1）。`,
+          '但這只是暫時的。霧散去以前，黑暗仍會再次聚攏。',
+          '主動出擊可有效延遲黑暗襲擊，並抑制黑暗增長。',
+        ].join('\n\n'),
+        resultFx: 'event-reward',
         combatLog: combatResult.logs,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
         combatAnims: this._combatResultAnims(attacker, combatResult, 250),
@@ -30,7 +37,13 @@ const GameCombatVictoryFlow = {
       G.combat = null;
       this._openModal({
         title: '主動討伐成功',
-        desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n黑暗 -3，其他黑暗化身追殺倒數延後 1 天。`,
+        desc: [
+          `${enemy.name} 被擊敗。`,
+          finalHitDesc,
+          '你們沒有等黑暗逼近，而是反過來撕開它的形體。',
+          '黑暗 -3，其他黑暗化身追殺倒數延後 1 天。',
+        ].join('\n\n'),
+        resultFx: 'event-reward',
         combatLog: combatResult.logs,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
         combatAnims: this._combatResultAnims(attacker, combatResult, 250),

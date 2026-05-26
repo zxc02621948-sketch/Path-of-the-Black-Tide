@@ -19,6 +19,7 @@ const Game = {
       darkMonsters: [],
       darknessMilestones: {},
       nightIntroShown: false,
+      dayTransitionActive: false,
       pendingSystemModals: [],
       fateGamblingTableTriggered: false,
       echoSites: [],
@@ -84,7 +85,7 @@ const Game = {
 
   // Section.
   handleCellClick(x, y) {
-    if (G.modal || G.phase === 'over' || G.mapMoveLocked) return;
+    if (G.modal || G.phase === 'over' || G.mapMoveLocked || G.dayTransitionActive) return;
     if (this._triggerPendingDarkMonsterChase()) return;
     this._refreshRestPoints();
 
@@ -171,12 +172,46 @@ const Game = {
   // Section.
   // Section.
   endDay() {
-    if (G.modal || G.phase === 'over') return;
+    if (G.modal || G.phase === 'over' || G.dayTransitionActive) return;
     if (G.actionsLeft > 0) {
       Render.renderTopBar();
       return;
     }
 
+    G.dayTransitionActive = true;
+    Render.renderTopBar();
+    const transition = this._dayTransitionInfo();
+    AudioManager?.playDayTransitionSfx?.(transition.phase);
+    if (typeof Render.showDayTransition === 'function') {
+      Render.showDayTransition(transition, () => this._completeEndDay());
+      return;
+    }
+    this._completeEndDay();
+  },
+
+  _dayTransitionInfo() {
+    const endingDay = G.day || 1;
+    const nextDay = endingDay + 1;
+    const darknessDelta = G.phase === 'night' ? 2 : 1;
+    const phase = G.phase === 'night'
+      ? 'night'
+      : (nextDay >= CONFIG.DAWN_DAY ? 'dawn' : (nextDay === CONFIG.NIGHT_START_DAY ? 'nightfall' : 'day'));
+    const nextLabel = nextDay >= CONFIG.DAWN_DAY
+      ? '黎明將至'
+      : (nextDay === CONFIG.NIGHT_START_DAY && G.phase === 'day' ? '黑夜降臨' : `第 ${nextDay} 天`);
+    return {
+      endingDay,
+      nextDay,
+      phase,
+      darknessDelta,
+      endLabel: `第 ${endingDay} 天結束`,
+      darknessLabel: `黑暗 +${darknessDelta}`,
+      nextLabel,
+    };
+  },
+
+  _completeEndDay() {
+    G.dayTransitionActive = false;
     if (this._applyNightEndErosion()) return;
 
     G.day++;

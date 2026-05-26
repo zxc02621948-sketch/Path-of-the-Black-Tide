@@ -5,6 +5,33 @@ const GameDarkMonsters = {
     const monster = this._nextPendingDarkMonster();
     if (!monster) return false;
 
+    this._openPendingDarkMonsterChaseModal(monster);
+    return true;
+  },
+
+  _openPendingDarkMonsterChaseModal(monster) {
+    const level = monster.level || 0;
+    this._log(`黑暗化身 Lv.${level} 追上了小隊。`, 'danger');
+    this._openModal({
+      title: '黑暗追上了你',
+      desc: [
+        `黑暗化身 Lv.${level} 已經追上了你。`,
+        '霧裡的腳步聲貼近背脊，四周沒有退路，也沒有能藏身的地方。',
+        '你們避無可避，無處可逃，只能被動迎戰。',
+      ].join('\n\n'),
+      resultFx: 'event-ambush',
+      eventSfx: 'darkMonsterGrowl',
+      eventSfxVolume: 0.62,
+      choices: [{
+        label: '迎戰黑暗化身',
+        danger: true,
+        action: () => this._startPassiveDarkMonsterCombat(monster),
+      }],
+    });
+  },
+
+  _startPassiveDarkMonsterCombat(monster) {
+    if (!monster || G.phase === 'over' || G.combat) return;
     monster.pendingChase = false;
     const enemy = this._darkMonsterEnemy(monster, { activeHunt: false });
     const cell = {
@@ -13,12 +40,13 @@ const GameDarkMonsters = {
       content: { enemy },
     };
     this._log(`黑暗化身 Lv.${monster.level || 0} 發動被動追殺。`, 'danger');
+    G.modal = null;
+    Render.hideModal();
     this._triggerCombat(cell, {
       source: 'darkMonsterPassive',
       darkMonsterId: monster.id,
       darkMonsterRef: monster,
     });
-    return true;
   },
 
   _triggerActiveDarkMonsterHuntAt(x, y) {

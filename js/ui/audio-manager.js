@@ -41,6 +41,8 @@ const AudioManager = {
   resumeTimes: {},
   lastHoverSfxAt: 0,
   preloadedSfx: {},
+  pageHidden: false,
+  toneContext: null,
 
   init() {
     if (this.ready) return;
@@ -50,6 +52,10 @@ const AudioManager = {
     document.addEventListener('keydown', unlock, { once: true });
     document.addEventListener('click', ev => this.handleDocumentClick(ev));
     document.addEventListener('pointerover', ev => this.handleDocumentHover(ev));
+    document.addEventListener('visibilitychange', () => this.handlePageVisibility(document.hidden));
+    window.addEventListener('pagehide', () => this.handlePageVisibility(true));
+    window.addEventListener('pageshow', () => this.handlePageVisibility(document.hidden));
+    this.handlePageVisibility(document.hidden);
   },
 
   unlock() {
@@ -65,7 +71,7 @@ const AudioManager = {
       return;
     }
     this.wantedId = nextId;
-    if (!this.unlocked) return;
+    if (!this.unlocked || this.pageHidden) return;
     this.play(nextId);
   },
 
@@ -84,7 +90,7 @@ const AudioManager = {
   },
 
   play(trackId) {
-    if (!trackId) return;
+    if (!trackId || this.pageHidden) return;
     if (this.currentId === trackId) {
       if (!this.currentAudio) {
         this.currentId = '';
@@ -127,7 +133,7 @@ const AudioManager = {
 
   resumeCurrent() {
     const audio = this.currentAudio;
-    if (!this.unlocked || !this.currentId) return;
+    if (!this.unlocked || !this.currentId || this.pageHidden) return;
     if (!audio) {
       const trackId = this.currentId;
       this.currentId = '';
@@ -167,12 +173,14 @@ const AudioManager = {
   },
 
   handleDocumentClick(ev) {
+    if (this.pageHidden) return;
     const button = ev.target?.closest?.('button');
     if (!button || button.disabled) return;
     this.playSfx('button');
   },
 
   handleDocumentHover(ev) {
+    if (this.pageHidden) return;
     const target = ev.target?.closest?.('button, [role="button"], .clickable, .choice-card, .combat-unit, .inventory-item');
     if (!target || target.disabled || target.getAttribute?.('aria-disabled') === 'true') return;
     if (ev.relatedTarget && target.contains(ev.relatedTarget)) return;
@@ -183,12 +191,43 @@ const AudioManager = {
   },
 
   playSfx(id, volume = this.sfxVolume) {
-    if (!this.unlocked) return;
+    if (!this.unlocked || this.pageHidden) return;
     const src = this.sfx[id];
     if (!src) return;
     const audio = this.preloadedSfx[id]?.cloneNode?.() || new Audio(src);
     audio.volume = volume;
     audio.play().catch(() => {});
+  },
+
+  playDayTransitionSfx(phase = 'day') {
+    if (!this.unlocked || this.pageHidden) return;
+    const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContextClass) return;
+    try {
+      if (!this.toneContext) this.toneContext = new AudioContextClass();
+      const ctx = this.toneContext;
+      const resumePromise = ctx.resume?.();
+      resumePromise?.catch?.(() => {});
+      const now = ctx.currentTime;
+      const gain = ctx.createGain();
+      const darkPhase = phase === 'night' || phase === 'nightfall';
+      const freqs = phase === 'dawn'
+        ? [196, 247, 330, 392]
+        : (darkPhase ? [165, 123, 82] : [196, 147, 220]);
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(darkPhase ? 0.09 : 0.06, now + 0.08);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.95);
+      gain.connect(ctx.destination);
+      freqs.forEach((freq, index) => {
+        const osc = ctx.createOscillator();
+        osc.type = darkPhase ? 'triangle' : 'sine';
+        osc.frequency.setValueAtTime(freq, now + index * 0.07);
+        osc.connect(gain);
+        osc.start(now + index * 0.07);
+        osc.stop(now + 1.05 + index * 0.03);
+      });
+      setTimeout(() => gain.disconnect(), 1300);
+    } catch (err) {}
   },
 
   preloadSfx(id = '') {
@@ -216,6 +255,26 @@ const AudioManager = {
     const audio = this.currentAudio;
     this.currentAudio = null;
     if (audio) this.fade(audio, audio.volume, 0, this.fadeMs, () => audio.pause());
+  },
+
+  handlePageVisibility(isHidden) {
+    const hidden = !!isHidden;
+    if (this.pageHidden === hidden) return;
+    this.pageHidden = hidden;
+    if (hidden) {
+      this.pauseForBackground();
+      return;
+    }
+    this.sync();
+  },
+
+  pauseForBackground() {
+    const audio = this.currentAudio;
+    if (!audio) return;
+    this.rememberTrackTime(this.currentId, audio);
+    try {
+      audio.pause();
+    } catch (err) {}
   },
 
   fade(audio, from, to, duration, done = null) {
