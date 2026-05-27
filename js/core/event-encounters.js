@@ -27,6 +27,7 @@ const GameEventEncounters = {
 
   _settleTerrainCombatSmallReward(ev, enemy, attacker, roll, rollResult, combatLog = [], combatAnims = null) {
     let rewardDesc = '';
+    let rewardDescHtml = '';
     const hasReward = Math.random() < (CONFIG.CAVE_ENEMY_WIN_REWARD_CHANCE || 0.25);
 
     if (hasReward && Math.random() < 0.5) {
@@ -39,14 +40,18 @@ const GameEventEncounters = {
       const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
       this._log(`${ev.name} 勝利後發現道具「${equip.name}」。`, 'reward');
       rewardDesc = `\n\n戰鬥後找到道具：${equip.icon} ${equip.name}${countText}\n${equip.desc}`;
+      rewardDescHtml = `<br><br>戰鬥後找到道具：${this._equipmentRewardLabelHtml(equip, countText)}<br>${this._modalTextHtml(equip.desc)}`;
     } else if (hasReward) {
       rewardDesc = this._revealNearbyFromEvent(1);
+      rewardDescHtml = this._modalTextHtml(rewardDesc);
       this._log(`${ev.name} 勝利後揭露附近區域。`, 'reward');
     }
 
     this._openModal({
       title: '戰鬥勝利',
       desc: `${enemy.name} 被擊敗。${rewardDesc}`,
+      descHtml: `${this._modalTextHtml(`${enemy.name} 被擊敗。`)}${rewardDescHtml}`,
+      typeText: false,
       combatLog,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
       combatAnims,
@@ -153,11 +158,15 @@ const GameEventEncounters = {
       const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
       this._log(`${ev.name}：獲得道具「${equip.name}」。`, 'reward');
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n獲得道具：${equip.icon} ${equip.name}${countText}\n${equip.desc}${eventInfo}`;
+      const preDescHtml = `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>獲得道具：${this._equipmentRewardLabelHtml(equip, countText)}<br>${this._modalTextHtml(equip.desc)}${this._modalTextHtml(eventInfo)}`;
       this._openModal({
         title: ev.name,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       desc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : `${preDesc}${progress.text}`,
+      descHtml: progress.dice ? undefined : `${preDescHtml}${this._modalTextHtml(progress.text)}`,
+      preDescHtml: progress.dice ? `${preDescHtml}<br><br>正在進行淨化判定。` : undefined,
+      typeText: !progress.dice ? false : undefined,
       preDesc: progress.dice ? `${preDesc}\n\n正在進行淨化判定。` : undefined,
       resultDesc: progress.dice ? `${preDesc}${progress.text}` : undefined,
       resultAppend: progress.dice ? progress.text : undefined,
@@ -168,7 +177,8 @@ const GameEventEncounters = {
       const gear = randomGear(G.day);
       const progress = this._resolveProgressEventForModal(ev, null);
       const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}${eventInfo}${progress.text}`;
-      this._openSupplyGearRewardModal(ev, gear, desc);
+      const descHtml = `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>發現角色裝備：${this._equipmentRewardLabelHtml(gear, '', 'equipment-inline-icon gear-reward-inline-icon')}<br>${this._modalTextHtml(gear.desc)}${this._modalTextHtml(eventInfo)}${this._modalTextHtml(progress.text)}`;
+      this._openSupplyGearRewardModal(ev, gear, desc, null, descHtml);
     } else if (ev.itemOnly) {
       const progress = this._resolveProgressEventForModal(ev, null);
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n沒有找到可帶走的道具。${eventInfo}`;
@@ -240,9 +250,12 @@ const GameEventEncounters = {
       const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
       this._log(`${ev.name}：獲得道具「${equip.name}」。`, 'reward');
       const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n獲得道具：${equip.icon} ${equip.name}${countText}\n${equip.desc}${eventInfo}`;
+      const descHtml = `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>獲得道具：${this._equipmentRewardLabelHtml(equip, countText)}<br>${this._modalTextHtml(equip.desc)}${this._modalTextHtml(eventInfo)}`;
       this._openModal({
         title: ev.name,
         desc,
+        descHtml,
+        typeText: false,
         eventImage: ev.eventImage || '',
         eventImageAlt: ev.name || '',
         choices: this._manualProgressChoices(ev, desc),
@@ -253,7 +266,8 @@ const GameEventEncounters = {
     if (rewardType === 'gear') {
       const gear = randomGear(G.day);
       const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}${eventInfo}`;
-      this._openSupplyGearRewardModal(ev, gear, desc, nextDesc => this._manualProgressChoices(ev, nextDesc));
+      const descHtml = `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>發現角色裝備：${this._equipmentRewardLabelHtml(gear, '', 'equipment-inline-icon gear-reward-inline-icon')}<br>${this._modalTextHtml(gear.desc)}${this._modalTextHtml(eventInfo)}`;
+      this._openSupplyGearRewardModal(ev, gear, desc, nextDesc => this._manualProgressChoices(ev, nextDesc), descHtml);
       return;
     }
 
@@ -308,7 +322,95 @@ const GameEventEncounters = {
     return 'heal';
   },
 
-  _openSupplyGearRewardModal(ev, gear, desc, nextChoices = null) {
+  _triggerForestForage(ev) {
+    const hasAction = (G.actionsLeft || 0) > 0;
+    const desc = `${this._eventDiceText(ev)}${ev.desc || ''}${hasAction ? '' : '\n\n今天已沒有餘裕深入採集。'}`;
+    const choices = [];
+    if (hasAction) {
+      choices.push({
+        label: '深入採集（行動 -1）',
+        action: () => this._resolveForestForageDeep(ev),
+      });
+    }
+    choices.push({
+      label: '快速摘取',
+      action: () => this._resolveForestForageQuick(ev),
+    });
+    choices.push({
+      label: '離開',
+      action: () => {
+        this._closeModal();
+        Render.fullRender();
+      },
+    });
+    this._openModal({
+      title: ev.name,
+      desc,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
+      choices,
+    });
+  },
+
+  _resolveForestForageDeep(ev) {
+    if ((G.actionsLeft || 0) <= 0) {
+      this._resolveForestForageQuick(ev);
+      return;
+    }
+    G.actionsLeft = Math.max(0, G.actionsLeft - 1);
+
+    const healed = [];
+    for (const char of this._aliveSquad()) {
+      const before = char.hp;
+      char.hp = Math.min(char.maxHp, char.hp + 1);
+      if (char.hp > before) healed.push(`${char.name} +${char.hp - before}`);
+    }
+    const healText = healed.length > 0
+      ? `全體存活角色恢復生命：${healed.join('、')}。`
+      : '草藥被小心收起，但目前沒有人需要治療。';
+
+    const equip = randomEquipment(G.day);
+    const addResult = this._addInventoryItem(equip);
+    if (!addResult.added) {
+      this._log(`${ev.name}：深入採集，行動 -1。`, 'reward');
+      this._openInventoryFullModal(ev, equip, '');
+      return;
+    }
+
+    const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
+    this._log(`${ev.name}：深入採集，行動 -1，獲得道具「${equip.name}」。`, 'reward');
+    this._openModal({
+      title: ev.name,
+      descHtml: `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>你們花時間沿著濕滑坡地採集。<br>行動 -1。<br>${this._modalTextHtml(healText)}<br><br>獲得道具：${this._equipmentRewardLabelHtml(equip, countText)}<br>${this._modalTextHtml(equip.desc)}`,
+      typeText: false,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _resolveForestForageQuick(ev) {
+    const target = this._aliveSquad()
+      .sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
+    let healText = '你們快速摘取幾片可用的草葉，沒有多花時間停留。';
+    if (target) {
+      const before = target.hp;
+      target.hp = Math.min(target.maxHp, target.hp + 1);
+      healText = target.hp > before
+        ? `${target.name} 恢復 ${target.hp - before} HP。`
+        : `${target.name} 狀態尚穩，草藥暫時派不上用場。`;
+    }
+    this._log(`${ev.name}：${healText}`, 'reward');
+    this._openModal({
+      title: ev.name,
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${healText}`,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _openSupplyGearRewardModal(ev, gear, desc, nextChoices = null, descHtml = '') {
     const choices = this._aliveSquad().map(char => ({
       label: `${char.name}${char.gear ? `（替換 ${char.gear.name}）` : ''}`,
       action: () => {
@@ -353,6 +455,8 @@ const GameEventEncounters = {
     this._openModal({
       title: ev.name,
       desc,
+      descHtml: descHtml || undefined,
+      typeText: descHtml ? false : undefined,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices,
@@ -433,12 +537,14 @@ const GameEventEncounters = {
       }
       const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
       this._log(`${ev.name}：獲得道具「${equip.name}」。`, 'reward');
+      const resultHtml = `大成功：你們獲得 ${this._equipmentRewardLabelHtml(equip, countText)}。<br>${this._modalTextHtml(equip.desc)}`;
       this._openModal({
         title: ev.name,
         desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n正在進行淨化判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
         preDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n正在進行淨化判定。4-5 成功降低黑暗 1；6 大成功降低黑暗 2，或有機率獲得道具。`,
         resultDesc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n大成功：你們獲得 ${equip.icon} ${equip.name}${countText}。\n${equip.desc}`,
         resultAppend: `大成功：你們獲得 ${equip.icon} ${equip.name}${countText}。\n${equip.desc}`,
+        resultAppendHtml: resultHtml,
         eventImage: ev.eventImage || '',
         eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: '淨化骰', value: roll, raw: roll, animate: !!rollResult.animate },
@@ -510,12 +616,14 @@ const GameEventEncounters = {
         return;
       }
       this._log(`${ev.name} 翻找成功：獲得道具「${equip.name}」。`, 'reward');
+      const rewardHtml = `擲出 ${Dice.face(roll)}（${roll}），成功獲得 ${this._equipmentRewardLabelHtml(equip)}。<br>${this._modalTextHtml(equip.desc)}`;
       this._openModal({
         title: ev.name,
         desc: `${modeText}\n\n正在翻找營地。`,
         preDesc: `${modeText}\n\n正在翻找營地。`,
         resultDesc: `${modeText}\n\n擲出 ${Dice.face(roll)}（${roll}），成功獲得 ${equip.icon} ${equip.name}。\n${equip.desc}`,
         resultAppend: `擲出 ${Dice.face(roll)}（${roll}），成功獲得 ${equip.icon} ${equip.name}。\n${equip.desc}`,
+        resultAppendHtml: rewardHtml,
         eventImage: ev.eventImage || '',
         eventImageAlt: ev.name || '',
         dice: { type: 'neutral', label: '翻找骰', value: roll, raw: roll, animate: true },

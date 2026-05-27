@@ -149,6 +149,20 @@ const EnemyAbilities = {
     return enemy.abilityState.shellCharge;
   },
 
+  _applyShellRegen(enemy, ability = {}, logs = []) {
+    this._ensureState(enemy);
+    if (enemy.abilityState.shellRegenBroken || enemy.blockBroken) return 0;
+    const values = Array.isArray(ability.blockByStage) ? ability.blockByStage : [];
+    const stage = Math.max(0, Math.floor(enemy.tierStageIndex || 0));
+    const targetBlock = Math.max(0, values[stage] ?? values[values.length - 1] ?? ability.block ?? enemy.block ?? 0);
+    const current = CombatStatus.getBlock(enemy);
+    const gain = Math.max(0, targetBlock - current);
+    if (gain <= 0) return 0;
+    CombatStatus.raiseBlock(enemy, gain);
+    logs.push(`${enemy.name} 甲殼再生：格檔 +${gain}。`);
+    return gain;
+  },
+
   _dicePollutionState(char) {
     if (!char.dicePollution) char.dicePollution = { faces: [], empowered: 0 };
     if (!Array.isArray(char.dicePollution.faces)) char.dicePollution.faces = [];
@@ -295,6 +309,31 @@ const EnemyAbilities = {
   },
 
   handlers: {
+    first_strike: {
+      beforeEnemyAction(ability, { enemy, intent, result, logs }) {
+        const state = enemy.abilityState || (enemy.abilityState = {});
+        if (intent?.type === 'worm_coil') {
+          const block = Math.max(0, ability.coilBlock ?? 2);
+          const bonus = Math.max(0, ability.coilDamageBonus ?? 1);
+          if (block > 0) CombatStatus.raiseBlock(enemy, block);
+          state.firstStrikeCoilDamageBonus = Math.max(0, state.firstStrikeCoilDamageBonus || 0) + bonus;
+          result.enemyAttackFlow = false;
+          result.counterDmg = 0;
+          result.aoeCounter = 0;
+          result.enemyBlockGain = Math.max(0, result.enemyBlockGain || 0) + block;
+          result.firstStrikeSummary = `${enemy.name} 蜷縮蓄勢，獲得 ${block} 格檔，下一次先攻傷害 +${bonus}。`;
+          logs.push(`${enemy.name} 蜷縮蓄勢：格檔 +${block}，下一次先攻傷害 +${bonus}。`);
+          return;
+        }
+
+        const charge = Math.max(0, state.firstStrikeCoilDamageBonus || 0);
+        if (charge <= 0 || result.counterDmg <= 0) return;
+        result.counterDmg += charge;
+        state.firstStrikeCoilDamageBonus = 0;
+        logs.push(`${enemy.name} 釋放蓄勢：本次先攻傷害 +${charge}。`);
+      },
+    },
+
     execution_countdown: {
       onCombatStart(ability, { enemy, logs }) {
         const state = EnemyAbilities._executionCountdownState(enemy, ability);
@@ -467,17 +506,45 @@ const EnemyAbilities = {
       },
     },
 
+    shell_regen: {
+      onCombatStart(ability, { enemy, logs }) {
+        EnemyAbilities._applyShellRegen(enemy, ability, logs);
+      },
+
+      onRoundStart(ability, { enemy, logs }) {
+        EnemyAbilities._applyShellRegen(enemy, ability, logs);
+      },
+
+      afterPlayerAttack(ability, { enemy, result, logs }) {
+        if (!result?.nativeWeaknessBreakHit) return;
+        enemy.abilityState.shellRegenBroken = true;
+        const beforeBlock = CombatStatus.getBlock(enemy);
+        if (beforeBlock > 0) CombatStatus.clearBlock(enemy);
+        logs.push(`${enemy.name} 原生弱點被命中，甲殼破裂：格檔清除，本場不再再生硬殼。`);
+      },
+
+      beforeEnemyAction(ability, { enemy, result, logs }) {
+        if (result.counterDmg <= 0 || !result.counterTarget) return;
+        if (CombatStatus.getBlock(result.counterTarget) <= 0) return;
+        const bonus = Math.max(0, ability.blockTargetDamageBonus || 0);
+        if (bonus <= 0) return;
+        result.counterDmg += bonus;
+        logs.push(`${enemy.name} 咬住防線破口：目標有格檔，本次傷害 +${bonus}。`);
+      },
+    },
+
     poison_dust: {
       beforeEnemyAction(ability, { enemy, intent, result, logs }) {
         if (intent?.type !== 'aoe') return;
-        const roll = Math.ceil(Math.random() * 6);
+        const roll = Math.ceil(Math.random() * 3);
         const bonus = Math.max(0, enemy.attack || 0);
         const reduction = enemy.abilityState?.poisonWeakened
           ? Math.max(0, ability.weakenReduction || 1)
           : 0;
-        const beforeReduction = Math.ceil(roll / 2) + bonus;
+        const beforeReduction = roll + bonus;
         const damage = Math.max(1, beforeReduction - reduction);
         result.enemyDiceRoll = roll;
+        result.enemyDiceSides = 3;
         result.aoeCounter = damage;
         result.enemyAttackFlow = true;
         logs.push(`${enemy.name} 毒粉骰 ${roll}：全體傷害 ${damage}${reduction > 0 ? `（毒粉潰散 -${reduction}）` : ''}。`);

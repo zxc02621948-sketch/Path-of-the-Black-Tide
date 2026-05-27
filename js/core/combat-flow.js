@@ -52,6 +52,7 @@ const GameCombatFlow = {
       starHunterEyeRound: 0,
       starHunterEyeLockRound: 0,
       starHunterEyeLockOwnerId: null,
+      darkMonsterNativeWeaknessBreak: false,
       combatLogsThisAttack: [],
       bagOpen: false,
       pendingInventoryItemIndex: null,
@@ -66,9 +67,9 @@ const GameCombatFlow = {
 
     G.combatMods = [...G.combatMods];
     this._showCombatModal();
-    if (G.combat.enemy.darkMonster) {
-      setTimeout(() => AudioManager?.playSfx?.('darkMonsterGrowl', 0.62), 120);
-    }
+    const spawnSfx = G.combat.enemy.spawnSfx || (G.combat.enemy.darkMonster ? 'darkMonsterGrowl' : '');
+    const spawnSfxVolume = G.combat.enemy.spawnSfx ? (G.combat.enemy.spawnSfxVolume ?? 0.5) : 0.62;
+    if (spawnSfx) setTimeout(() => AudioManager?.playSfx?.(spawnSfx, spawnSfxVolume), 120);
   },
 
   _resolveCombatEnemyForCurrentDay(enemy, cell = null, opts = {}) {
@@ -263,6 +264,9 @@ const GameCombatFlow = {
     if (preCombatLogs.length > 0) {
       combatResult.logs.unshift(...preCombatLogs);
     }
+    if (G.combat?.source === 'darkMonsterActive' && combatResult.nativeWeaknessBreakHit) {
+      G.combat.darkMonsterNativeWeaknessBreak = true;
+    }
     EnemyAbilities.afterPlayerAttack(combatResult, {
       attacker,
       enemy,
@@ -399,7 +403,7 @@ const GameCombatFlow = {
           sides: 6,
         }
         : (combatResult.enemyDiceRoll
-          ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: 6 }
+          ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: combatResult.enemyDiceSides || 6 }
           : null));
     const combatAnims = this._combatResultAnims(attacker, combatResult, 120);
     this._openModal({
@@ -972,6 +976,7 @@ const GameCombatFlow = {
       aoeCounter: 0,
       aoeDamageByChar: null,
       enemyDiceRoll: null,
+      enemyDiceSides: 6,
       enemyAttackFlow: false,
       enemyDead: true,
     };
@@ -1055,13 +1060,31 @@ const GameCombatFlow = {
     let counterDmg = 0;
     let aoeCounter = 0;
     let enemyDiceRoll = null;
+    let enemyDiceSides = 6;
     let enemyAttackFlow = ['attack', 'block_attack', 'dice_attack', 'aoe'].includes(intent?.type);
     if (enemyAttackFlow) {
-      if (intent?.type === 'attack' || intent?.type === 'block_attack') counterDmg = enemy.attack;
+      if (intent?.type === 'attack' || intent?.type === 'block_attack') {
+        const damageDie = CombatRules._enemyAttackDamageDie(enemy);
+        counterDmg = Math.max(0, enemy.attack || 0) + damageDie.roll;
+        if (damageDie.roll > 0) {
+          enemyDiceRoll = damageDie.roll;
+          enemyDiceSides = damageDie.sides;
+          logs.push(`${enemy.name} 傷害骰 ${damageDie.roll}：攻擊傷害 ${counterDmg}。`);
+        }
+      }
       else if (intent?.type === 'dice_attack') {
-        enemyDiceRoll = Math.ceil(Math.random() * 6);
-        counterDmg = enemyDiceRoll;
-        logs.push(`${enemy.name} 擲骰攻擊：${counterDmg}`);
+        const damageDie = CombatRules._enemyAttackDamageDie(enemy);
+        if (damageDie.roll > 0) {
+          enemyDiceRoll = damageDie.roll;
+          enemyDiceSides = damageDie.sides;
+          counterDmg = Math.max(0, enemy.attack || 0) + damageDie.roll;
+          logs.push(`${enemy.name} 擲骰攻擊：基礎 ${Math.max(0, enemy.attack || 0)} + 傷害骰 ${damageDie.roll} = ${counterDmg}。`);
+        } else {
+          enemyDiceRoll = Math.ceil(Math.random() * 6);
+          enemyDiceSides = 6;
+          counterDmg = enemyDiceRoll;
+          logs.push(`${enemy.name} 擲骰攻擊：${counterDmg}`);
+        }
       } else if (intent?.type === 'aoe') {
         aoeCounter = Math.max(1, enemy.attack - 2);
       }
@@ -1076,7 +1099,9 @@ const GameCombatFlow = {
     const enemyActionResult = {
       counterDmg,
       aoeCounter,
+      enemyBlockGain,
       enemyDiceRoll,
+      enemyDiceSides,
       enemyAttackFlow,
       counterTarget,
       counterTargetId: counterTarget?.id || null,
@@ -1100,7 +1125,9 @@ const GameCombatFlow = {
 
     counterDmg = Math.max(0, enemyActionResult.counterDmg || 0);
     aoeCounter = Math.max(0, enemyActionResult.aoeCounter || 0);
+    enemyBlockGain = Math.max(0, enemyActionResult.enemyBlockGain || 0);
     enemyDiceRoll = enemyActionResult.enemyDiceRoll;
+    enemyDiceSides = enemyActionResult.enemyDiceSides || enemyDiceSides;
     enemyAttackFlow = !!enemyActionResult.enemyAttackFlow;
     const aoeDamageByChar = enemyActionResult.aoeDamageByChar || null;
 
@@ -1220,8 +1247,10 @@ const GameCombatFlow = {
     combatResult.aoeCounter = aoeCounter;
     combatResult.aoeDamageByChar = aoeDamageByChar;
     combatResult.enemyDiceRoll = enemyDiceRoll;
+    combatResult.enemyDiceSides = enemyDiceSides;
     combatResult.gazeRoll = enemyActionResult.gazeRoll || null;
     combatResult.gazeSummary = enemyActionResult.gazeSummary || null;
+    combatResult.firstStrikeSummary = enemyActionResult.firstStrikeSummary || null;
     combatResult.fateRoll = enemyActionResult.fateRoll || null;
     combatResult.fateSummary = enemyActionResult.fateSummary || null;
     combatResult.bannerSummary = enemyActionResult.bannerSummary || null;
@@ -1344,7 +1373,7 @@ const GameCombatFlow = {
                 sides: 6,
               }
               : (combatResult.enemyDiceRoll
-                ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: 6 }
+                ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: combatResult.enemyDiceSides || 6 }
                 : null)),
           choices: this._combatActionChoices(),
         });
@@ -1356,6 +1385,7 @@ const GameCombatFlow = {
       : (Array.isArray(combatResult.playerDamageEvents)
         ? combatResult.playerDamageEvents
         : (Array.isArray(combatResult.rapierDamageEvents) ? combatResult.rapierDamageEvents : []));
+    const enemy = G.combat?.enemy || null;
     return {
       playerAttacker: attacker?.id || null,
       playerFollowHits: Math.max(combatResult.rapierFollowHits || 0, playerDamageEvents.length),
@@ -1370,6 +1400,10 @@ const GameCombatFlow = {
         : (combatResult.counterDmg > 0 ? (attacker?.id || null) : null),
       aoe: combatResult.aoeCounter > 0,
       enemyBlock: combatResult.enemyBlockGain > 0,
+      enemyAttackTrail: enemy?.attackTrail || '',
+      enemyAttackTrailFamily: enemy?.attackTrailFamily || '',
+      enemyAttackSfx: enemy?.attackSfx || '',
+      enemyAttackSfxVolume: enemy?.attackSfxVolume,
       delay,
     };
   },
@@ -1467,6 +1501,7 @@ const GameCombatFlow = {
       aoeCounter: 0,
       aoeDamageByChar: null,
       enemyDiceRoll: null,
+      enemyDiceSides: 6,
       enemyAttackFlow: false,
       intent: G.combat.intent,
     };
@@ -1495,6 +1530,7 @@ const GameCombatFlow = {
       summaryLines.push(`${enemy.name} 本次先攻沒有造成傷害。`);
     }
     if (combatResult.gazeSummary) summaryLines.push(combatResult.gazeSummary);
+    if (combatResult.firstStrikeSummary) summaryLines.push(combatResult.firstStrikeSummary);
     if (combatResult.fateSummary) summaryLines.push(combatResult.fateSummary);
     if (combatResult.bannerSummary) summaryLines.push(combatResult.bannerSummary);
 
@@ -1515,7 +1551,7 @@ const GameCombatFlow = {
       },
       combatAnims: this._combatResultAnims(attacker, combatResult, 120),
       enemyDice: combatResult.enemyDiceRoll
-        ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: 6 }
+        ? { type: 'danger', label: `${enemy.name} 的攻擊骰`, value: combatResult.enemyDiceRoll, sides: combatResult.enemyDiceSides || 6 }
         : null,
       choices: [],
     });
@@ -2253,7 +2289,8 @@ const GameCombatFlow = {
   },
 
   _buildCombatScene(enemy, attacker, status) {
-    const intent = G.combat?.intent || enemy._victoryIntent || null;
+    const inCombat = !!G.combat;
+    const intent = inCombat ? G.combat.intent : null;
     const activeBanners = this._activeCombatBanners();
     const attackerId = attacker?.id || G.combat?.attackerId || null;
     return {
@@ -2267,8 +2304,15 @@ const GameCombatFlow = {
         iconFlipX: !!enemy.iconFlipX,
         iconScale: enemy.iconScale || null,
         iconSoftEdge: !!enemy.iconSoftEdge,
+        defeated: !inCombat && !!attacker,
         cardBgImage: enemy.cardBgImage || null,
         hideIconInCombat: !!enemy.hideIconInCombat,
+        deathSfx: enemy.deathSfx || '',
+        deathSfxVolume: enemy.deathSfxVolume,
+        attackTrail: enemy.attackTrail || '',
+        attackTrailFamily: enemy.attackTrailFamily || '',
+        attackSfx: enemy.attackSfx || '',
+        attackSfxVolume: enemy.attackSfxVolume,
         desc: enemy.desc || '',
         hp: enemy.hp, maxHp: enemy.maxHp || enemy.hp,
         block: CombatStatus.getBlock(enemy),
@@ -2303,6 +2347,7 @@ const GameCombatFlow = {
             executed: !!enemy.abilityState.executionCountdown.executed,
           }
           : null,
+        damageDieSides: ['weak', 'medium'].includes(enemy.tier) ? 3 : 0,
         weaknessDesc: enemy.weaknessEffect?.desc || '',
       },
       squad: G.squad.map(c => ({
@@ -2348,6 +2393,9 @@ const GameCombatFlow = {
       : { damageBonus: 0 };
     const attackBonus = painBonus + (bannerInfo.damageBonus || 0);
     const baseAttack = Math.max(0, enemy.attack || 0);
+    const weakDamageDie = ['weak', 'medium'].includes(enemy?.tier);
+    const damageText = (damage) => weakDamageDie ? `${damage}+骰` : `${damage}`;
+    const damageTitleText = (damage) => weakDamageDie ? `${damage}+骰（三面骰）` : `${damage}`;
     const target = {
       targetId: intent.targetId || null,
       targetName: intent.targetName || null,
@@ -2367,48 +2415,52 @@ const GameCombatFlow = {
           type,
           ...target,
           icon: 'assets/icons/intent-attack-single.png',
-          text: `攻${baseAttack}+半骰${eyeDamageText}`,
+          text: `${baseAttack}+半骰${eyeDamageText}`,
           title: `黑夜開眼：單體攻擊造成 ${baseAttack}+半個骰數${eyeDamageText} 傷害${splashText}${blackLightText}${intimidateText}`,
         };
       }
       const damage = baseAttack + attackBonus;
       const polluteText = intent.polluteTarget ? '，並污染目標 1 個骰面' : '';
+      const damageLabel = damageText(damage);
+      const titleDamageLabel = damageTitleText(damage);
       return {
         type,
         ...target,
         icon: 'assets/icons/intent-attack-single.png',
-        text: `攻${damage}`,
-        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${damage} 傷害${polluteText}` : `單體攻擊，造成 ${damage} 傷害${polluteText}`,
+        text: damageLabel,
+        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${titleDamageLabel} 傷害${polluteText}` : `單體攻擊，造成 ${titleDamageLabel} 傷害${polluteText}`,
       };
     }
     if (type === 'block_attack') {
       const damage = baseAttack + attackBonus;
+      const damageLabel = damageText(damage);
+      const titleDamageLabel = damageTitleText(damage);
       if (block <= 0) {
         return {
           type,
           ...target,
           icon: 'assets/icons/intent-attack-single.png',
-          text: `攻${damage}`,
-          title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${damage} 傷害` : `單體攻擊，造成 ${damage} 傷害`,
+          text: damageLabel,
+          title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${titleDamageLabel} 傷害` : `單體攻擊，造成 ${titleDamageLabel} 傷害`,
         };
       }
       return {
         type,
         ...target,
         icon: 'assets/icons/intent-block-attack.png',
-        text: `攻${damage}/防${block}`,
-        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${damage} 傷害；行動後格檔 +${block}` : `單體攻擊，造成 ${damage} 傷害；行動後格檔 +${block}`,
+        text: `${damageLabel}/防${block}`,
+        title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${titleDamageLabel} 傷害；行動後格檔 +${block}` : `單體攻擊，造成 ${titleDamageLabel} 傷害；行動後格檔 +${block}`,
       };
     }
     if (type === 'aoe' && intent.polluteRandom) {
       const damage = Math.max(1, baseAttack - 2) + attackBonus;
-      return {
-        type,
-        ...target,
-        icon: 'assets/icons/intent-attack-all.png',
-        text: `攻${damage}`,
-        title: `全體攻擊，對全隊造成 ${damage} 傷害，並污染 1 名隊友的骰面`,
-      };
+        return {
+          type,
+          ...target,
+          icon: 'assets/icons/intent-attack-all.png',
+          text: `全${damage}`,
+          title: `全體攻擊，對全隊造成 ${damage} 傷害，並污染 1 名隊友的骰面`,
+        };
     }
     if (type === 'aoe') {
       const poisonDust = Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'poison_dust');
@@ -2419,8 +2471,8 @@ const GameCombatFlow = {
           type,
           ...target,
           icon: 'assets/icons/intent-attack-all.png',
-          text: `半骰數${bonusText}`,
-          title: `全體毒粉，造成骰面折半${bonusText}傷害${weakenedText}，最低 1`,
+          text: `骰${bonusText}`,
+          title: `全體毒粉，造成 骰（三面骰）${bonusText} 傷害${weakenedText}，最低 1`,
         };
       }
       const damage = Math.max(1, baseAttack - 2) + attackBonus;
@@ -2451,6 +2503,19 @@ const GameCombatFlow = {
       };
     }
     if (type === 'dice_attack') {
+      if (weakDamageDie) {
+        const fixedDamage = baseAttack + attackBonus;
+        const fixedText = fixedDamage > 0 ? `${fixedDamage}+` : '';
+        const weakLabel = `${fixedText}骰`;
+        const weakTitle = `${fixedText}骰（三面骰）`;
+        return {
+          type,
+          ...target,
+          icon: 'assets/icons/intent-attack-single.png',
+          text: weakLabel,
+          title: intent.targetName ? `攻擊 ${intent.targetName}，造成 ${weakTitle} 傷害` : `單體擲骰攻擊，造成 ${weakTitle} 傷害`,
+        };
+      }
       const bonusText = attackBonus > 0 ? `+${attackBonus}` : '';
       return {
         type,
@@ -2458,6 +2523,18 @@ const GameCombatFlow = {
         icon: 'assets/icons/intent-attack-single.png',
         text: `骰數${bonusText}`,
         title: intent.targetName ? `攻擊 ${intent.targetName}，造成骰數${bonusText}傷害` : `單體擲骰攻擊，造成骰數${bonusText}傷害`,
+      };
+    }
+    if (type === 'worm_coil') {
+      const ability = Array.isArray(enemy.abilities) ? enemy.abilities.find(item => item?.type === 'first_strike') : null;
+      const coilBlock = Math.max(0, ability?.coilBlock ?? 2);
+      const coilBonus = Math.max(0, ability?.coilDamageBonus ?? 1);
+      return {
+        type,
+        ...target,
+        icon: 'assets/icons/block-intent-icon-red.png',
+        text: `防${coilBlock}/蓄+${coilBonus}`,
+        title: `蜷縮蓄勢：本回合不攻擊，格檔 +${coilBlock}，下一次先攻傷害 +${coilBonus}`,
       };
     }
     if ((type === 'block' || type === 'banner_switch') && block > 0) {

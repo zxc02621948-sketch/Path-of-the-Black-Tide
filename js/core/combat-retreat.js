@@ -17,15 +17,18 @@ const GameCombatRetreat = {
     if (!enemy || !intent) return '撤退（黑暗 +1）';
     if (intent.type === 'attack' || intent.type === 'block_attack') {
       const target = intent.targetName || '目標';
-      return `撤退（黑暗 +1，${target} 承受 ${enemy.attack || 0} 傷）`;
+      const damageText = this._retreatIntentDamageText(enemy);
+      return `撤退（黑暗 +1，${target} 承受 ${damageText} 傷）`;
     }
     if (intent.type === 'dice_attack') {
       const target = intent.targetName || '目標';
-      return `撤退（黑暗 +1，${target} 承受 1d6 傷）`;
+      const damageText = this._retreatIntentDiceText(enemy);
+      return `撤退（黑暗 +1，${target} 承受 ${damageText} 傷）`;
     }
     if (intent.type === 'aoe') {
       return `撤退（黑暗 +1，全隊各 ${Math.max(1, (enemy.attack || 0) - 2)} 傷）`;
     }
+    if (intent.type === 'worm_coil') return '撤退（黑暗 +1，不受傷）';
     if (intent.type === 'block') return '撤退（黑暗 +1，不受傷）';
     return '撤退（黑暗 +1，承受意圖）';
   },
@@ -37,12 +40,14 @@ const GameCombatRetreat = {
     if (!enemy || !intent) return lines.join('\n');
     if (intent.type === 'attack' || intent.type === 'block_attack') {
       const target = intent.targetName || '目標';
-      lines.push(`${target} 會承受 ${enemy.attack || 0} 點傷害。`);
+      lines.push(`${target} 會承受 ${this._retreatIntentDamageText(enemy)} 點傷害。`);
     } else if (intent.type === 'dice_attack') {
       const target = intent.targetName || '目標';
-      lines.push(`${target} 會承受骰數傷害。`);
+      lines.push(`${target} 會承受 ${this._retreatIntentDiceText(enemy)} 傷害。`);
     } else if (intent.type === 'aoe') {
       lines.push(`全隊各承受 ${Math.max(1, (enemy.attack || 0) - 2)} 點傷害。`);
+    } else if (intent.type === 'worm_coil') {
+      lines.push('敵人正在蜷縮蓄勢，撤退不會受到傷害。');
     } else if (intent.type === 'block' || intent.type === 'banner_switch') {
       lines.push('敵人正在防禦，撤退不會受到傷害。');
     } else {
@@ -74,14 +79,18 @@ const GameCombatRetreat = {
     if (intent.type === 'attack' || intent.type === 'block_attack') {
       const target = this._retreatIntentTarget(intent) || this._aliveSquad()[0];
       if (target) {
-        const damage = this._applyRetreatDamage(target, enemy.attack || 0);
+        const die = CombatRules._enemyAttackDamageDie(enemy);
+        const rawDamage = Math.max(0, enemy.attack || 0) + die.roll;
+        const damage = this._applyRetreatDamage(target, rawDamage);
         logs.push(`${enemy.name} 趁撤退攻擊 ${target.name}，造成 ${damage} 傷害。`);
       }
     } else if (intent.type === 'dice_attack') {
       const target = this._retreatIntentTarget(intent) || this._aliveSquad()[0];
       if (target) {
-        const roll = Math.ceil(Math.random() * 6);
-        const damage = this._applyRetreatDamage(target, roll);
+        const die = CombatRules._enemyAttackDamageDie(enemy);
+        const roll = die.roll > 0 ? die.roll : Math.ceil(Math.random() * 6);
+        const rawDamage = die.roll > 0 ? Math.max(0, enemy.attack || 0) + roll : roll;
+        const damage = this._applyRetreatDamage(target, rawDamage);
         logs.push(`${enemy.name} 趁撤退擲骰攻擊 ${target.name}：${roll}，造成 ${damage} 傷害。`);
       }
     } else if (intent.type === 'aoe') {
@@ -92,9 +101,22 @@ const GameCombatRetreat = {
       }
     } else if (intent.type === 'block') {
       logs.push(`${enemy.name} 採取防禦，隊伍趁隙撤離。`);
+    } else if (intent.type === 'worm_coil') {
+      logs.push(`${enemy.name} 蜷縮蓄勢，隊伍趁隙撤離。`);
     }
     this._clearWagerDicePenaltyAfterEnemyFlow(logs);
     return logs;
+  },
+
+  _retreatIntentDamageText(enemy) {
+    const atk = Math.max(0, enemy?.attack || 0);
+    return ['weak', 'medium'].includes(enemy?.tier) ? `${atk}+骰（三面骰）` : `${atk}`;
+  },
+
+  _retreatIntentDiceText(enemy) {
+    if (!['weak', 'medium'].includes(enemy?.tier)) return '1d6';
+    const atk = Math.max(0, enemy?.attack || 0);
+    return `${atk > 0 ? `${atk}+` : ''}骰（三面骰）`;
   },
 
   _retreatIntentTarget(intent) {

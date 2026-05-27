@@ -525,24 +525,20 @@ html, body {
     var(--c-rest);
 }
 #game-screen.night-mode .map-cell.type-rest:not(.cleared) {
-  border-color: rgba(255, 153, 66, .92);
+  border-color: rgba(116, 168, 255, .68);
   background:
-    radial-gradient(circle at 50% 46%, rgba(255, 153, 66, .54), rgba(43, 13, 8, .80) 60%, rgba(8, 5, 4, .62) 100%),
-    url("assets/terrain/rest-tile.png") center / 122% 122% no-repeat,
+    radial-gradient(circle at 50% 48%, rgba(102, 158, 255, .28), rgba(8, 16, 38, .44) 68%),
+    linear-gradient(180deg, rgba(42, 70, 132, .18), rgba(7, 8, 24, .34)),
+    url("assets/terrain/rest-tile.png") center / 116% 116% no-repeat,
     var(--c-rest);
   box-shadow:
-    inset 0 0 18px rgba(255, 190, 95, .26),
-    0 0 16px rgba(255, 112, 40, .46);
-}
-#game-screen.night-mode .map-cell.type-rest:not(.cleared) .cell-icon {
-  color: #ffd27c;
-  font-size: 1.18em;
-  filter: drop-shadow(0 0 7px rgba(255, 128, 48, .8));
+    inset 0 0 16px rgba(122, 178, 255, .18),
+    0 0 12px rgba(84, 132, 255, .3);
 }
 #game-screen.night-mode .map-cell.type-rest:not(.cleared) .cell-label {
-  color: #ffdca0;
+  color: #b9d6ff;
   font-weight: 800;
-  text-shadow: 0 0 7px rgba(255, 128, 48, .55);
+  text-shadow: 0 0 8px rgba(84, 132, 255, .52);
 }
 .map-cell.type-rest.cleared {
   background:
@@ -550,7 +546,11 @@ html, body {
     url("assets/terrain/rest-tile-used.png") center / 116% 116% no-repeat,
     var(--c-rest);
 }
-.map-cell.type-enemy  { background: var(--c-enemy); }
+.map-cell.type-enemy  {
+  background:
+    radial-gradient(circle at 50% 48%, rgba(190, 92, 84, .58) 0 30%, rgba(116, 46, 46, .32) 52%, rgba(36, 10, 12, .12) 72%, transparent 100%),
+    #151111;
+}
 .map-cell.type-relic  { background: var(--c-relic); }
 
 /* 玩家位置 */
@@ -587,8 +587,49 @@ html, body {
   height: min(92%, 44px);
   object-fit: contain;
   filter:
+    drop-shadow(0 0 5px rgba(201, 145, 47, .62))
+    drop-shadow(0 2px 5px rgba(0, 0, 0, .62));
+}
+.cell-icon-img.dark-gift-map-icon {
+  filter:
     drop-shadow(0 0 5px rgba(145, 66, 255, .72))
     drop-shadow(0 2px 5px rgba(0, 0, 0, .62));
+}
+.cell-icon-img.treasure-chest-map-icon {
+  width: min(96%, 46px);
+  height: min(96%, 46px);
+}
+.cell-icon-img.treasure-chest-weapon {
+  filter:
+    saturate(1.12)
+    brightness(1.08)
+    drop-shadow(0 0 6px rgba(238, 184, 72, .72))
+    drop-shadow(0 2px 5px rgba(0, 0, 0, .62));
+}
+.cell-icon-img.treasure-chest-broken {
+  filter:
+    saturate(.72)
+    sepia(.28)
+    hue-rotate(-10deg)
+    brightness(.78)
+    drop-shadow(0 0 5px rgba(118, 54, 31, .68))
+    drop-shadow(0 2px 5px rgba(0, 0, 0, .7));
+}
+.cell-icon-img.enemy-map-icon {
+  width: min(98%, 47px);
+  height: min(98%, 47px);
+}
+.cell-icon-img.enemy-map-cage_warden {
+  filter:
+    drop-shadow(0 0 6px rgba(232, 185, 70, .78))
+    drop-shadow(0 2px 6px rgba(0, 0, 0, .72));
+}
+.cell-icon-img.battle-map-icon {
+  width: min(94%, 45px);
+  height: min(94%, 45px);
+  filter:
+    drop-shadow(0 0 6px rgba(213, 55, 32, .7))
+    drop-shadow(0 2px 6px rgba(0, 0, 0, .72));
 }
 .cell-label { font-size: .66em; color: var(--text-dim); pointer-events: none; }
 .cell-drop-badge {
@@ -664,7 +705,7 @@ html, body {
     inset 0 0 54px rgba(0, 0, 0, .92),
     0 0 30px rgba(31, 48, 112, .24);
 }
-#game-screen.night-mode .map-cell:not(.fog)::after {
+#game-screen.night-mode .map-cell.type-empty:not(.fog):not(.has-player)::after {
   content: "";
   position: absolute;
   inset: 0;
@@ -681,15 +722,9 @@ html, body {
     radial-gradient(circle at 50% 44%, rgba(64, 73, 122, .16), transparent 48%),
     rgba(3, 5, 18, .28);
 }
-#game-screen.night-mode .map-cell:not(.fog) {
+#game-screen.night-mode .map-cell.type-empty:not(.fog):not(.has-player) {
   border-color: rgba(84, 105, 170, .16);
   box-shadow: inset 0 0 16px rgba(0, 0, 0, .64);
-}
-#game-screen.night-mode .cell-icon,
-#game-screen.night-mode .cell-label,
-#game-screen.night-mode .cell-q-badge {
-  color: #7f8aaa;
-  text-shadow: 0 0 8px rgba(10, 16, 46, .8);
 }
 #game-screen.night-mode .map-cell.has-player .cell-icon,
 #game-screen.night-mode .map-cell.has-player .cell-label {
@@ -821,6 +856,17 @@ html, body {
   flex: 0 0 auto;
   vertical-align: -0.35em;
   filter: drop-shadow(0 1px 2px rgba(0,0,0,.55));
+}
+.equipment-reward-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-bright);
+  font-weight: 700;
+}
+.equipment-reward-count {
+  color: var(--accent);
+  margin-left: 2px;
 }
 .card-item-desc {
   color: var(--text-dim);
@@ -2686,6 +2732,82 @@ html, body {
   mask-image: radial-gradient(ellipse at center, #000 56%, rgba(0, 0, 0, .72) 69%, transparent 84%);
 }
 
+.combat-enemy-card.defeated .combat-enemy-sprite {
+  filter: grayscale(1) saturate(.12) brightness(.72) contrast(1.08);
+  opacity: .76;
+}
+
+.combat-enemy-card.defeated .combat-enemy-img {
+  filter:
+    grayscale(1)
+    saturate(.12)
+    brightness(.72)
+    contrast(1.08)
+    drop-shadow(0 0 12px rgba(0, 0, 0, .72));
+}
+
+.combat-blood-splatter {
+  position: absolute;
+  pointer-events: none;
+  z-index: 6;
+  background-image: url("assets/effects/blood-splatter-sheet.png");
+  background-repeat: no-repeat;
+  background-size: 300% 300%;
+  background-position: var(--blood-pos-x, 50%) var(--blood-pos-y, 50%);
+  filter:
+    saturate(1.22)
+    contrast(1.08)
+    drop-shadow(0 1px 4px rgba(0, 0, 0, .45));
+  transform:
+    translate(-50%, -50%)
+    rotate(var(--blood-rot, 0deg))
+    scale(var(--blood-scale, 1))
+    scaleX(var(--blood-flip, 1));
+  transform-origin: center;
+}
+
+.combat-enemy-figure .combat-blood-splatter.enemy {
+  left: 50%;
+  top: 50%;
+  width: 138px;
+  height: 138px;
+  opacity: 0;
+}
+
+.combat-enemy-card.defeated .combat-blood-splatter.enemy {
+  opacity: .92;
+  animation: blood-splatter-pop .34s ease-out both;
+}
+
+.combat-unit > .combat-blood-splatter.ally {
+  left: 50%;
+  top: 44%;
+  width: min(152px, 92%);
+  aspect-ratio: 1;
+  opacity: .86;
+  z-index: 4;
+  animation: blood-splatter-pop .34s ease-out both;
+}
+
+@keyframes blood-splatter-pop {
+  from {
+    opacity: 0;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--blood-rot, 0deg))
+      scale(calc(var(--blood-scale, 1) * .72))
+      scaleX(var(--blood-flip, 1));
+  }
+  to {
+    opacity: .9;
+    transform:
+      translate(-50%, -50%)
+      rotate(var(--blood-rot, 0deg))
+      scale(var(--blood-scale, 1))
+      scaleX(var(--blood-flip, 1));
+  }
+}
+
 .combat-enemy-status-icons {
   position: absolute;
   right: 0;
@@ -3204,6 +3326,18 @@ html, body {
     radial-gradient(circle at 50% 0%, rgba(128, 202, 250, .25), transparent 60%),
     linear-gradient(180deg, rgba(30, 52, 68, .96), rgba(10, 18, 24, .98));
 }
+
+.combat-guard-button.active {
+  border-color: rgba(136, 218, 255, .92);
+  color: #f3fbff;
+  background:
+    radial-gradient(circle at 50% 0%, rgba(146, 220, 255, .28), transparent 60%),
+    linear-gradient(180deg, rgba(35, 91, 122, .92), rgba(17, 42, 72, .96));
+  box-shadow:
+    inset 0 0 18px rgba(104, 198, 255, .24),
+    0 0 18px rgba(87, 164, 255, .34);
+}
+
 .combat-guard-button:disabled,
 .combat-guard-button.disabled {
   opacity: .46;
@@ -3422,7 +3556,13 @@ html, body {
 }
 
 .combat-unit.down {
+  opacity: 1;
+}
+
+.combat-unit.down .combat-character-art,
+.combat-unit.down > :not(.combat-character-art):not(.combat-blood-splatter) {
   opacity: .45;
+  filter: grayscale(.62) brightness(.72);
 }
 
 .combat-unit.empty-slot {
@@ -3878,6 +4018,22 @@ html, body {
     0 0 14px rgba(255, 72, 54, .34);
   justify-self: center;
   white-space: nowrap;
+}
+
+.combat-enemy-damage-die-panel {
+  position: absolute;
+  left: 36px;
+  top: 5px;
+  z-index: 9;
+  color: #ffd4c5;
+  font-size: .86em;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, .98),
+    0 0 7px rgba(255, 96, 64, .46);
 }
 
 .combat-enemy-stance-divider {
@@ -4943,6 +5099,90 @@ html, body {
   display: none;
 }
 
+.combat-attack-trail.trail-shell-impact {
+  width: 250px;
+  height: 184px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-shell-impact::before {
+  left: 50%;
+  top: 50%;
+  width: 250px;
+  height: 184px;
+  border-radius: 0;
+  background: url("assets/effects/rot-crawler-shell-impact-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.16) contrast(1.1)
+    drop-shadow(0 0 10px rgba(255, 245, 226, .62))
+    drop-shadow(0 0 18px rgba(198, 42, 30, .34));
+  mix-blend-mode: screen;
+  animation:
+    shell-impact-pop .62s cubic-bezier(.12, .72, .2, 1) forwards,
+    shell-impact-frames .62s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-shell-impact::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-jaw-bite {
+  width: 250px;
+  height: 118px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-jaw-bite::before {
+  left: 50%;
+  top: 50%;
+  width: 250px;
+  height: 118px;
+  border-radius: 0;
+  background: url("assets/effects/enemy-jaw-bite-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.12) contrast(1.08)
+    drop-shadow(0 0 9px rgba(255, 248, 232, .58))
+    drop-shadow(0 0 16px rgba(154, 20, 22, .3));
+  mix-blend-mode: screen;
+  animation:
+    jaw-bite-pop .58s cubic-bezier(.12, .72, .2, 1) forwards,
+    jaw-bite-frames .58s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-jaw-bite::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-poison-cloud {
+  width: 300px;
+  height: 140px;
+  transform: translate(-50%, -50%);
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-poison-cloud::before {
+  left: 50%;
+  top: 50%;
+  width: 300px;
+  height: 140px;
+  border-radius: 0;
+  background: url("assets/effects/plague-moth-poison-cloud-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.12) saturate(1.16) contrast(1.06)
+    drop-shadow(0 0 10px rgba(212, 255, 18, .48))
+    drop-shadow(0 0 18px rgba(95, 205, 35, .32));
+  mix-blend-mode: screen;
+  animation:
+    poison-cloud-bloom .66s ease-out forwards,
+    poison-cloud-frames .66s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-poison-cloud::after {
+  display: none;
+}
+
 .combat-attack-trail.trail-strike::before {
   width: 112px;
   height: 112px;
@@ -5213,6 +5453,60 @@ html, body {
 }
 
 @keyframes star-breaker-frames {
+  0%   { background-position: 0 0; }
+  14%  { background-position: 33.333% 0; }
+  28%  { background-position: 66.666% 0; }
+  42%  { background-position: 100% 0; }
+  58%  { background-position: 0 100%; }
+  74%  { background-position: 33.333% 100%; }
+  90%,
+  100% { background-position: 66.666% 100%; }
+}
+
+@keyframes shell-impact-pop {
+  0%   { opacity: 0; transform: translate(-62%, -46%) rotate(-4deg) scale(.44); }
+  12%  { opacity: 1; }
+  56%  { opacity: .95; transform: translate(-50%, -50%) rotate(-4deg) scale(.96); }
+  100% { opacity: 0; transform: translate(-45%, -55%) rotate(-4deg) scale(1.08); }
+}
+
+@keyframes shell-impact-frames {
+  0%   { background-position: 0 0; }
+  14%  { background-position: 33.333% 0; }
+  28%  { background-position: 66.666% 0; }
+  42%  { background-position: 100% 0; }
+  58%  { background-position: 0 100%; }
+  74%  { background-position: 33.333% 100%; }
+  90%,
+  100% { background-position: 66.666% 100%; }
+}
+
+@keyframes jaw-bite-pop {
+  0%   { opacity: 0; transform: translate(-50%, -54%) scale(.62); }
+  12%  { opacity: .95; }
+  46%  { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -48%) scale(1.04); }
+}
+
+@keyframes jaw-bite-frames {
+  0%   { background-position: 0 0; }
+  14%  { background-position: 33.333% 0; }
+  28%  { background-position: 66.666% 0; }
+  42%  { background-position: 100% 0; }
+  58%  { background-position: 0 100%; }
+  74%  { background-position: 33.333% 100%; }
+  90%,
+  100% { background-position: 66.666% 100%; }
+}
+
+@keyframes poison-cloud-bloom {
+  0%   { opacity: 0; transform: translate(-56%, -50%) scale(.42); }
+  12%  { opacity: .88; }
+  54%  { opacity: .9; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-45%, -50%) scale(1.06); }
+}
+
+@keyframes poison-cloud-frames {
   0%   { background-position: 0 0; }
   14%  { background-position: 33.333% 0; }
   28%  { background-position: 66.666% 0; }
@@ -7394,9 +7688,19 @@ html, body {
   color: #b8a5ff;
 }
 
+.day-transition-overlay.heavy-darkness .day-transition-darkness {
+  color: #ff5a6d;
+}
+
 .day-transition-overlay.night .day-transition-pulse,
 .day-transition-overlay.nightfall .day-transition-pulse {
   background: linear-gradient(90deg, transparent, rgba(184, 165, 255, .76), rgba(64, 22, 35, .84), transparent);
+}
+
+.day-transition-overlay.heavy-darkness .day-transition-pulse {
+  height: 2px;
+  background: linear-gradient(90deg, transparent, rgba(255, 82, 103, .9), rgba(92, 20, 42, .92), rgba(255, 82, 103, .72), transparent);
+  box-shadow: 0 0 24px rgba(255, 54, 76, .48), 0 0 42px rgba(92, 20, 42, .34);
 }
 
 .day-transition-overlay.dawn .day-transition-darkness {
@@ -7425,6 +7729,10 @@ html, body {
 
 .day-transition-overlay.active .day-transition-darkness {
   animation: day-transition-darkness-pop 1.7s ease-in-out .62s forwards;
+}
+
+.day-transition-overlay.active.heavy-darkness .day-transition-darkness {
+  animation: day-transition-darkness-heavy 1.7s ease-in-out .62s forwards;
 }
 
 .day-transition-overlay.active .day-transition-pulse {
@@ -7482,6 +7790,17 @@ html, body {
   20%  { opacity: 1; transform: translateY(0) scale(1.06); text-shadow: 0 0 18px rgba(224, 160, 32, .62), 0 2px 12px rgba(0, 0, 0, .72); }
   38%  { opacity: 1; transform: translateY(0) scale(1); }
   78%  { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-6px) scale(1.01); }
+}
+
+@keyframes day-transition-darkness-heavy {
+  0%   { opacity: 0; transform: translateY(10px) scale(.94); text-shadow: 0 2px 12px rgba(0, 0, 0, .72); }
+  16%  { opacity: 1; transform: translate(-2px, 0) scale(1.12); text-shadow: 0 0 22px rgba(255, 54, 76, .78), 0 2px 12px rgba(0, 0, 0, .82); }
+  22%  { transform: translate(3px, -1px) scale(1.1); }
+  28%  { transform: translate(-3px, 1px) scale(1.08); }
+  34%  { transform: translate(2px, 0) scale(1.04); }
+  42%  { opacity: 1; transform: translate(0, 0) scale(1); }
+  78%  { opacity: 1; transform: translate(0, 0) scale(1); }
   100% { opacity: 0; transform: translateY(-6px) scale(1.01); }
 }
 
@@ -7674,40 +7993,109 @@ body::before {
 }
 
 #darkness-display {
-  min-width: 170px;
+  min-width: 180px;
   font-size: .9em;
-  color: #c7b08a;
+  color: #d9cff5;
+  text-shadow: 0 0 12px rgba(142, 102, 255, .22);
+}
+
+#darkness-label {
+  font-family: var(--font-serif);
+  font-weight: 700;
+  letter-spacing: .08em;
+}
+
+#light-charges-display {
+  display: none;
+}
+
+#darkness-num {
+  display: inline-block;
+  margin-left: 8px;
+  color: #f0eaff;
+  font-size: .92em;
+  font-weight: 700;
+  letter-spacing: .02em;
+  text-shadow:
+    0 0 10px rgba(181, 151, 255, .36),
+    0 0 18px rgba(95, 54, 205, .24);
 }
 
 .darkness-bar {
-  margin-top: 4px;
-  height: 8px;
-  border: 1px solid rgba(201,145,47,.28);
+  position: relative;
+  margin-top: 7px;
+  height: 10px;
+  border: 1px solid rgba(142, 102, 255, .36);
   border-radius: 999px;
-  background: #140b0b;
+  background:
+    radial-gradient(circle at 18% 50%, rgba(96, 63, 174, .28), transparent 34%),
+    linear-gradient(180deg, rgba(7, 5, 14, .96), rgba(18, 10, 32, .98));
   overflow: hidden;
+  box-shadow:
+    inset 0 1px 1px rgba(255, 255, 255, .05),
+    inset 0 0 10px rgba(0, 0, 0, .78),
+    0 0 16px rgba(86, 52, 172, .18);
+}
+
+.darkness-bar::after {
+  content: "";
+  position: absolute;
+  inset: 1px;
+  border-radius: inherit;
+  background: linear-gradient(90deg, transparent, rgba(203, 185, 255, .18), transparent);
+  opacity: .58;
+  pointer-events: none;
 }
 
 #darkness-bar-fill {
+  position: relative;
   width: 0%;
   height: 100%;
-  background: linear-gradient(90deg, #6a1717, #b23535);
-  box-shadow: 0 0 10px rgba(178,53,53,.35);
-  transition: width .2s ease;
+  border-radius: inherit;
+  background:
+    linear-gradient(90deg, #31205f 0%, #6f43cc 46%, #b78cff 100%);
+  box-shadow:
+    0 0 10px rgba(151, 102, 255, .48),
+    0 0 22px rgba(94, 52, 182, .34);
+  transition: width .26s ease;
+  overflow: hidden;
+}
+
+#darkness-bar-fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  width: 160%;
+  background:
+    linear-gradient(105deg, transparent 0%, rgba(255, 255, 255, .22) 18%, transparent 34%),
+    repeating-linear-gradient(90deg, rgba(255, 255, 255, .08) 0 1px, transparent 1px 14px);
+  mix-blend-mode: screen;
+  opacity: .66;
+  animation: darkness-flow 2.4s linear infinite;
 }
 
 #darkness-display.alert #darkness-bar-fill {
-  background: linear-gradient(90deg, #7b1717, #d5523f);
+  background: linear-gradient(90deg, #3d236b 0%, #8a4ff0 45%, #df8dff 100%);
+  box-shadow:
+    0 0 14px rgba(177, 112, 255, .58),
+    0 0 30px rgba(118, 56, 214, .42);
 }
 
 #darkness-display.critical #darkness-bar-fill {
-  background: linear-gradient(90deg, #8e1111, #f2684b);
-  box-shadow: 0 0 14px rgba(242,104,75,.55);
+  background: linear-gradient(90deg, #4b174f 0%, #a348ff 42%, #ff63c8 100%);
+  box-shadow:
+    0 0 16px rgba(255, 99, 200, .62),
+    0 0 36px rgba(147, 54, 255, .46);
 }
 
 #darkness-display.light #darkness-bar-fill {
   background: linear-gradient(90deg, #4f83b7, #cfe8ff);
   box-shadow: 0 0 10px rgba(117,174,224,.35);
+}
+
+@keyframes darkness-flow {
+  0%   { transform: translateX(-46%); }
+  100% { transform: translateX(12%); }
 }
 
 .btn-primary,
@@ -8095,17 +8483,33 @@ body::before {
 }
 
 .dark-monster.timer-red {
-  --monster-breathe-scale: 1.12;
-  --monster-breathe-speed: 1.25s;
+  --monster-breathe-scale: 1.2;
+  --monster-breathe-speed: .92s;
   --monster-glow-a: rgba(255, 80, 96, .96);
   --monster-glow-b: rgba(255, 80, 96, .6);
+  animation: darkMonsterAlert var(--monster-breathe-speed) ease-in-out infinite;
+}
+
+.dark-monster.timer-red .dark-monster-icon img {
+  filter: saturate(1.6) hue-rotate(-8deg) brightness(1.12);
+}
+
+.dark-monster.timer-red .dark-monster-level,
+.dark-monster.timer-danger .dark-monster-level {
+  background: rgba(178, 22, 43, .86);
+  box-shadow: 0 0 8px rgba(255, 54, 76, .72);
 }
 
 .dark-monster.timer-danger {
-  --monster-breathe-scale: 1.17;
-  --monster-breathe-speed: .82s;
+  --monster-breathe-scale: 1.28;
+  --monster-breathe-speed: .58s;
   --monster-glow-a: rgba(255, 54, 76, 1);
   --monster-glow-b: rgba(255, 54, 76, .72);
+  animation: darkMonsterAlert var(--monster-breathe-speed) ease-in-out infinite;
+}
+
+.dark-monster.timer-danger .dark-monster-icon img {
+  filter: saturate(1.9) hue-rotate(-12deg) brightness(1.25) contrast(1.08);
 }
 
 @keyframes darkMonsterBreathe {
@@ -8122,6 +8526,32 @@ body::before {
       brightness(1.18)
       drop-shadow(0 0 6px var(--monster-glow-a))
       drop-shadow(0 0 15px var(--monster-glow-b));
+  }
+}
+
+@keyframes darkMonsterAlert {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    filter:
+      brightness(1.05)
+      drop-shadow(0 0 5px var(--monster-glow-a))
+      drop-shadow(0 0 12px var(--monster-glow-b));
+  }
+  18% {
+    transform: translate(-1px, 0) scale(var(--monster-breathe-scale));
+  }
+  32% {
+    transform: translate(1px, -1px) scale(calc(var(--monster-breathe-scale) + .03));
+    filter:
+      brightness(1.32)
+      drop-shadow(0 0 8px var(--monster-glow-a))
+      drop-shadow(0 0 20px var(--monster-glow-b));
+  }
+  48% {
+    transform: translate(-1px, 1px) scale(var(--monster-breathe-scale));
+  }
+  64% {
+    transform: translate(1px, 0) scale(1.06);
   }
 }
 
@@ -9209,6 +9639,12 @@ body::before {
     top: 5px;
     left: 5px;
     z-index: 30;
+  }
+
+  .combat-enemy-damage-die-panel {
+    top: 15px;
+    left: 42px;
+    z-index: 31;
   }
 
   .combat-center {

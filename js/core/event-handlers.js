@@ -94,6 +94,7 @@ const GameEventHandlers = {
     switch (ev.type) {
       case 'rescue':     this._triggerRescue(ev);              break;
       case 'supply':     this._triggerSupply(ev);              break;
+      case 'forest_forage': this._triggerForestForage(ev);      break;
       case 'trap':       this._triggerTrap(ev);                break;
       case 'note':       this._triggerNote(ev);                break;
       case 'combat':     this._triggerTerrainCombat(cell, ev); break;

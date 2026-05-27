@@ -174,27 +174,37 @@ const GameDarkMonsters = {
         monster !== monsterRef && monster?.id !== monsterId
       );
     }
-    G.darkness = Math.max(0, before - 1);
+    G.darkness = before;
     const removed = Array.isArray(G.darkMonsters) && G.darkMonsters.length < beforeCount;
-    this._log(`被動追殺勝利：黑暗 ${before} → ${G.darkness}。`, 'reward');
-    Render.fullRender();
-    return { before, after: G.darkness, removed };
+    this._log(`被動追殺勝利：黑暗維持 ${before}。`, 'reward');
+    return { before, after: G.darkness, reduction: 0, removed };
   },
 
-  _settleDarkMonsterActiveVictory(monsterId, monsterRef = null) {
+  _settleDarkMonsterActiveVictory(monsterId, monsterRef = null, opts = {}) {
+    const before = Math.max(0, Number(G.darkness) || 0);
+    const nativeBonus = opts.nativeWeaknessBreak ? 1 : 0;
+    const reduction = 2 + nativeBonus;
+    const beforeCount = Array.isArray(G.darkMonsters) ? G.darkMonsters.length : 0;
     if (!Array.isArray(G.darkMonsters)) G.darkMonsters = [];
     G.darkMonsters = G.darkMonsters.filter(monster =>
       monster !== monsterRef && monster?.id !== monsterId
     );
-    G.darkness = Math.max(0, (Number(G.darkness) || 0) - 3);
+    G.darkness = Math.max(0, before - reduction);
     for (const monster of G.darkMonsters) {
       monster.chaseTimer = (monster.chaseTimer || 0) + 1;
       if (monster.pendingChase === true && monster.chaseTimer > 0) {
         monster.pendingChase = false;
       }
     }
-    this._log('主動討伐勝利：黑暗 -3，其他黑暗化身追殺倒數 +1。', 'reward');
-    Render.fullRender();
+    const bonusText = nativeBonus > 0 ? '，原生弱點擊破額外 -1' : '';
+    this._log(`主動討伐勝利：黑暗 ${before} → ${G.darkness}（-${reduction}${bonusText}），其他黑暗化身追殺倒數 +1。`, 'reward');
+    return {
+      before,
+      after: G.darkness,
+      reduction,
+      nativeBonus,
+      removed: Array.isArray(G.darkMonsters) && G.darkMonsters.length < beforeCount,
+    };
   },
 
   _maybeSpawnDailyDarkMonster() {
@@ -239,6 +249,7 @@ const GameDarkMonsters = {
     cell.content = { enemy: { ...enemy }, uniqueStrong: true };
     G.spawnedUniqueEnemies.push(enemyId);
     this._log(`黑暗 ${G.darkness}：深污腐骰宿主在遠處現身。`, 'danger');
+    if (enemy.spawnSfx) AudioManager?.playSfx?.(enemy.spawnSfx, enemy.spawnSfxVolume ?? 0.62);
     return true;
   },
 

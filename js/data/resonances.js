@@ -59,9 +59,9 @@ const RESONANCES = [
     squadEffect: { type: 'none', desc: '此共鳴必須由同一角色同時持有兩件聖物才會啟動。' },
     bodyEffect: {
       type: 'rapier_resonance',
-      guaranteedFollowUps: 1,
+      guaranteedFollowUps: 0,
       followDamageStep: 1,
-      desc: '沉鐵劍鞘不再觸發重劍，改為強化刺劍：每回合第 1 次刺劍連擊必定成功，且不降低後續連擊機率；本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
+      desc: '沉鐵劍鞘不再觸發重劍，改為強化刺劍：本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
     },
     lore: '劍鞘壓住重量，只留下銀針般連續刺入的節奏。',
   },

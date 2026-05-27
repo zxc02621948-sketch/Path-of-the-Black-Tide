@@ -17,11 +17,22 @@ const AudioManager = {
     silverBeePinCut: 'assets/audio/sfx/silver-bee-pin-cut.mp3',
     ironScabbardSlice: 'assets/audio/sfx/iron-scabbard-slice.mp3',
     darkMonsterGrowl: 'assets/audio/sfx/dark-monster-growl.mp3',
+    shadowWormSpawnGrowl: 'assets/audio/sfx/shadow-worm-spawn-growl.wav',
+    rotCrawlerSpawnHiss: 'assets/audio/sfx/rot-crawler-spawn-hiss.wav',
+    diceCorruptorSpawn: 'assets/audio/sfx/dice-corruptor-spawn.wav',
+    plagueMothSpawn: 'assets/audio/sfx/plague-moth-spawn.wav',
+    mimicSpawnGrowl: 'assets/audio/sfx/mimic-spawn-growl.wav',
+    mimicDeathCrateBreak: 'assets/audio/sfx/mimic-death-crate-break.mp3',
+    rotKnightSpawnRoar: 'assets/audio/sfx/rot-knight-spawn-roar.wav',
+    shadowHunterSpawnRoar: 'assets/audio/sfx/shadow-hunter-spawn-roar.wav',
     forestDarkGrowth: 'assets/audio/sfx/forest-dark-growth.wav',
     ruinsEnemy: 'assets/audio/sfx/ruins-enemy.wav',
     caveEyes: 'assets/audio/sfx/cave-eyes.wav',
-    caveRazorStoneInjury: 'assets/audio/sfx/cave-razor-stone-injury-tight.wav',
-    forestSnareTrapFail: 'assets/audio/sfx/forest-snare-trap-fail-tight.wav',
+    eventInjury1: 'assets/audio/sfx/event-injury-3yell5.wav?v=trim1',
+    eventInjury2: 'assets/audio/sfx/event-injury-3yell3.wav?v=trim1',
+    eventInjury3: 'assets/audio/sfx/event-injury-3yell4.wav?v=trim1',
+    eventInjury4: 'assets/audio/sfx/event-injury-1yell7.wav?v=trim1',
+    eventInjury5: 'assets/audio/sfx/event-injury-1yell6.wav?v=trim1',
   },
   volume: 0.46,
   trackVolumes: {
@@ -197,6 +208,17 @@ const AudioManager = {
     const audio = this.preloadedSfx[id]?.cloneNode?.() || new Audio(src);
     audio.volume = volume;
     audio.play().catch(() => {});
+  },
+
+  playRandomSfx(ids = [], volume = this.sfxVolume) {
+    const pool = Array.isArray(ids) ? ids.filter(id => this.sfx[id]) : [];
+    if (!pool.length) return;
+    const id = pool[Math.floor(Math.random() * pool.length)];
+    this.playSfx(id, volume);
+  },
+
+  playEventInjurySfx(volume = 0.5) {
+    this.playRandomSfx(['eventInjury1', 'eventInjury2', 'eventInjury3', 'eventInjury4', 'eventInjury5'], volume);
   },
 
   playDayTransitionSfx(phase = 'day') {

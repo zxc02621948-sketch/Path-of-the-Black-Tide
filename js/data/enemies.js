@@ -7,11 +7,12 @@
 // 角色攻擊力：戰士 5 / 搏命者 4 / 探索者 3 / 輔助 2
 //
 // 意圖類型：
-//   attack       → 攻擊主戰者（傷害 = enemy.attack）
+//   attack       → 攻擊主戰者（弱/中型傷害 = enemy.attack + 三面骰）
 //   block        → 格檔（值 = enemy.block），本回合不攻擊
-//   block_attack → 格檔 + 攻擊主戰者
+//   block_attack → 格檔 + 攻擊主戰者（弱/中型傷害 = enemy.attack + 三面骰）
 //   aoe          → 全體攻擊（傷害 = max(1, enemy.attack - 2)）
-//   dice_attack  → 擲 1d6 決定攻擊力
+//   dice_attack  → 弱/中型擲三面骰，加上 enemy.attack；強敵維持 1d6
+//   worm_coil    → 蠕蟲蜷縮蓄勢，不攻擊，格檔並強化下一次攻擊
 //   idle         → 不攻擊
 
 const ENEMIES = [
@@ -24,22 +25,28 @@ const ENEMIES = [
     iconImage: 'assets/enemies/shadow-worm.png',
     iconFlipX: true,
     iconScale: 'large',
+    spawnSfx: 'shadowWormSpawnGrowl',
+    spawnSfxVolume: 0.5,
     tier: 'weak',
     tierUpDays: 3,
     weakness: 3,
     weaknessEffect: { type: 'stun', desc: '蠕蟲被震懾，下一次先攻中斷' },
-    abilities: [{ type: 'first_strike' }],
+    abilities: [{ type: 'first_strike', coilBlock: 2, coilDamageBonus: 1 }],
+    attackTrail: 'jaw_bite',
+    attackSfx: 'shadowWormSpawnGrowl',
+    attackSfxVolume: 0.32,
     nightOnly: false,
     lore: '邊境封鎖後第三年，首次出現在北方廢墟。沒有眼睛，靠震動感知獵物。',
     intents: [
       { type: 'attack',      weight: 2 },
       { type: 'dice_attack', weight: 2 },
+      { type: 'worm_coil',   weight: 1 },
     ],
     tiers: [
       { name: '黑影蠕蟲', desc: '在廢墟縫隙中蠕動，每回合選擇主戰者後會先攻，無法格檔', hp: 21, block: 0, attack: 3 },
-      { name: '暗蝕蠕蟲', desc: '被黑暗侵蝕後體型膨脹，每回合選擇主戰者後會先攻', hp: 26, block: 0, attack: 4 },
-      { name: '深淵蠕蟲', desc: '幾乎與黑暗融為一體，每回合選擇主戰者後會先攻',   hp: 32, block: 0, attack: 5 },
-      { name: '虛空蠕蟲', desc: '完全吸收了黑暗，每回合選擇主戰者後會先攻，每次衝擊都帶著虛空的重量', hp: 39, block: 0, attack: 5 },
+      { name: '暗蝕蠕蟲', desc: '被黑暗侵蝕後體型膨脹，每回合選擇主戰者後會先攻', hp: 26, block: 0, attack: 3 },
+      { name: '深淵蠕蟲', desc: '幾乎與黑暗融為一體，每回合選擇主戰者後會先攻',   hp: 32, block: 0, attack: 4 },
+      { name: '虛空蠕蟲', desc: '完全吸收了黑暗，每回合選擇主戰者後會先攻，每次衝擊都帶著虛空的重量', hp: 39, block: 0, attack: 4 },
     ],
   },
 
@@ -48,23 +55,26 @@ const ENEMIES = [
     icon: '🦂',
     iconImage: 'assets/enemies/rot-crawler.png',
     iconScale: 'large',
+    spawnSfx: 'rotCrawlerSpawnHiss',
+    spawnSfxVolume: 0.52,
     tier: 'weak',
     tierUpDays: 3,
     weakness: 5,
-    weaknessEffect: { type: 'block_break', desc: '甲殼破裂，暫時無法格檔，直到我方下一回合結束' },
-    abilities: [{ type: 'shell_charge', maxStacks: 3, bonusPerStack: 1 }],
+    weaknessEffect: { type: 'block_break', desc: '甲殼破裂，清除格檔，本場不再再生硬殼' },
+    abilities: [{ type: 'shell_regen', blockByStage: [3, 3, 4, 4], blockTargetDamageBonus: 2 }],
+    attackTrail: 'shell_impact',
+    attackSfx: 'rotCrawlerSpawnHiss',
+    attackSfxVolume: 0.34,
     nightOnly: false,
     lore: '舊日的甲蟲被黑暗腐化，外殼變得堅硬，但弱點是那條連結頭部與軀幹的縫隙。',
     intents: [
-      { type: 'block',       weight: 3 },
-      { type: 'block_attack',weight: 1 },
       { type: 'attack',      weight: 1 },
     ],
     tiers: [
       { name: '腐骨爬蟲', desc: '甲殼厚重，常以格檔抵擋攻擊後再發起攻擊',           hp: 20, block: 3, attack: 2 },
-      { name: '腐甲爬蟲', desc: '甲殼已被黑暗強化，格檔值更高',                     hp: 25, block: 4, attack: 3 },
-      { name: '黑鐵爬蟲', desc: '幾乎無法正面擊穿，弱點縫隙是唯一機會',             hp: 31, block: 5, attack: 4 },
-      { name: '深淵爬蟲', desc: '外殼已完全黑化，格檔幾乎無懈可擊',                 hp: 37, block: 6, attack: 4 },
+      { name: '腐甲爬蟲', desc: '甲殼已被黑暗強化，攻擊有格檔的目標時更加兇狠',     hp: 25, block: 3, attack: 3 },
+      { name: '黑鐵爬蟲', desc: '幾乎無法正面擊穿，弱點縫隙是唯一機會',             hp: 31, block: 4, attack: 4 },
+      { name: '深淵爬蟲', desc: '外殼已完全黑化，會追著防線薄弱處啃咬',             hp: 37, block: 4, attack: 4 },
     ],
   },
 
@@ -73,11 +83,16 @@ const ENEMIES = [
     icon: '🦋',
     iconImage: 'assets/enemies/plague-moth.png',
     iconScale: 'large',
+    spawnSfx: 'plagueMothSpawn',
+    spawnSfxVolume: 0.5,
     tier: 'weak',
     tierUpDays: 3,
     weakness: 2,
     weaknessEffect: { type: 'poison_weaken', desc: '毒粉潰散，本場戰鬥毒粉傷害 -1' },
     abilities: [{ type: 'poison_dust', weakenReduction: 1 }],
+    attackTrail: 'poison_cloud',
+    attackSfx: 'plagueMothSpawn',
+    attackSfxVolume: 0.32,
     nightOnly: false,
     lore: '翅膀上的鱗粉有輕微毒性，大量聚集時會讓人產生幻覺。',
     intents: [
@@ -99,11 +114,17 @@ const ENEMIES = [
     iconImage: 'assets/enemies/rot-knight.png',
     iconFlipX: true,
     iconScale: 'large',
+    spawnSfx: 'rotKnightSpawnRoar',
+    spawnSfxVolume: 0.58,
     tier: 'medium',
     tierUpDays: 6,
     weakness: 4,
     weaknessEffect: { type: 'block_break', desc: '盔甲破碎，暫時無法格檔，直到我方下一回合結束' },
     abilities: [{ type: 'block_thorns' }],
+    attackTrail: 'slash',
+    attackTrailFamily: 'sword',
+    attackSfx: 'swordWoosh',
+    attackSfxVolume: 0.44,
     nightOnly: false,
     lore: '有人說它們曾經是守衛，是黑夜將它們留下，讓它們繼續站崗。',
     intents: [
@@ -125,11 +146,17 @@ const ENEMIES = [
     iconFlipX: true,
     iconScale: 'large',
     iconSoftEdge: true,
+    spawnSfx: 'shadowHunterSpawnRoar',
+    spawnSfxVolume: 0.58,
     tier: 'medium',
     tierUpDays: 6,
     weakness: 1,
     weaknessEffect: { type: 'expose', duration: 2, desc: '獵人被揭露，追獵與低血增傷暫時失效 2 回合' },
     abilities: [{ type: 'blood_hunt', lowHpThreshold: 0.5, damageBonus: 1 }],
+    attackTrail: 'slash',
+    attackTrailFamily: 'dagger',
+    attackSfx: 'daggerWoosh',
+    attackSfxVolume: 0.42,
     nightOnly: false,
     lore: '迷霧獵人的弱點是速度——它移動太快，快到偶爾會自己撞上障礙。',
     intents: [
@@ -152,6 +179,8 @@ const ENEMIES = [
     icon: '☣️',
     cardBgImage: 'assets/enemies/dice-corruptor-bg.png',
     hideIconInCombat: true,
+    spawnSfx: 'diceCorruptorSpawn',
+    spawnSfxVolume: 0.64,
     tier: 'strong',
     unique: true,
     noRetreat: true,
@@ -174,6 +203,7 @@ const ENEMIES = [
     name: '囚籠看守',
     icon: '🗝️',
     cardBgImage: 'assets/enemies/cage-warden.png',
+    mapIconImage: 'assets/ui/cage-warden-map.png',
     hideIconInCombat: true,
     desc: '拖著鏽鐵鑰匙的看守，身後傳來被囚者的低聲呼救。若拖得太久，牠會處刑牢中的倖存者。',
     hp: 36,
@@ -218,6 +248,13 @@ const ENEMIES = [
     icon: '▣',
     cardBgImage: 'assets/enemies/treasure-mimic.png',
     hideIconInCombat: true,
+    spawnSfx: 'mimicSpawnGrowl',
+    spawnSfxVolume: 0.56,
+    deathSfx: 'mimicDeathCrateBreak',
+    deathSfxVolume: 0.58,
+    attackTrail: 'jaw_bite',
+    attackSfx: 'mimicSpawnGrowl',
+    attackSfxVolume: 0.34,
     desc: '破損寶箱裡蜷伏的怪物，硬殼裡卡著尚能使用的裝備。',
     hp: 34,
     block: 5,
@@ -242,6 +279,13 @@ const ENEMIES = [
     icon: '◈',
     cardBgImage: 'assets/enemies/dark-gift-mimic.png',
     hideIconInCombat: true,
+    spawnSfx: 'mimicSpawnGrowl',
+    spawnSfxVolume: 0.56,
+    deathSfx: 'mimicDeathCrateBreak',
+    deathSfxVolume: 0.58,
+    attackTrail: 'jaw_bite',
+    attackSfx: 'mimicSpawnGrowl',
+    attackSfxVolume: 0.34,
     desc: '黑暗贈禮寶箱裡蜷伏的怪物。它的鎖孔每次遭遇都會換一個原生弱點，若以天然骰面命中原生弱點，箱體會直接開啟。',
     hp: 42,
     block: 6,
@@ -450,12 +494,16 @@ function intentLabel(intent, enemy) {
   const blk = enemy.block || 0;
   const atk = enemy.attack || 0;
   const aoe = Math.max(1, atk - 2);
+  const weakDie = ['weak', 'medium'].includes(enemy?.tier);
+  const attackText = weakDie ? `${atk}+骰` : `${atk}`;
+  const diceText = weakDie ? `${atk > 0 ? `${atk}+` : ''}骰 傷害（三面骰）` : '骰數傷害';
   switch (intent.type) {
-    case 'attack':       return `⚔️ 攻擊主戰者　${atk} 傷`;
+    case 'attack':       return `⚔️ 攻擊主戰者　${attackText} 傷`;
     case 'block':        return `🛡️ 格檔　+${blk}`;
-    case 'block_attack': return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${atk} 傷`;
+    case 'block_attack': return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${attackText} 傷`;
     case 'aoe':          return `🌊 全體攻擊　各 ${aoe} 傷`;
-    case 'dice_attack':  return `🎲 擲骰攻擊　骰數傷害`;
+    case 'dice_attack':  return `🎲 擲骰攻擊　${diceText}`;
+    case 'worm_coil':    return '🛡️ 蜷縮蓄勢　格檔 +2，下次攻擊 +1';
     case 'pollute':      return '☣️ 污染 1 名隊友的骰面';
     case 'idle':         return '… 不攻擊';
     default:             return '❓ 未知意圖';

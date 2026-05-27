@@ -58,7 +58,12 @@ const RenderModal = {
       (cfg.enemyDice && cfg.enemyDice.animate !== false)
     );
     const hasDeferredResult = shouldAnimateDice && !cfg.descHtml
-      && (typeof cfg.resultDesc === 'string' || typeof cfg.resultAppend === 'string');
+      && (
+        typeof cfg.resultDesc === 'string' ||
+        typeof cfg.resultAppend === 'string' ||
+        typeof cfg.resultAppendHtml === 'string' ||
+        typeof cfg.preDescHtml === 'string'
+      );
     if (activeResultFx && !hasDeferredResult) {
       contentEl.classList.add(activeResultFx);
       this._playModalResultFx(contentEl, activeResultFx);
@@ -73,7 +78,11 @@ const RenderModal = {
       descEl.innerHTML = '';
       const introEl = document.createElement('div');
       introEl.className = 'modal-desc-intro';
-      introEl.textContent = cfg.preDesc || cfg.desc || '';
+      if (cfg.preDescHtml) {
+        introEl.innerHTML = cfg.preDescHtml;
+      } else {
+        introEl.textContent = cfg.preDesc || cfg.desc || '';
+      }
       const resultEl = document.createElement('div');
       resultEl.className = 'modal-desc-result';
       resultEl.hidden = true;
@@ -88,6 +97,16 @@ const RenderModal = {
         descEl.dataset.resultAppend = cfg.resultAppend;
       } else {
         delete descEl.dataset.resultAppend;
+      }
+      if (typeof cfg.resultAppendHtml === 'string') {
+        descEl.dataset.resultAppendHtml = cfg.resultAppendHtml;
+      } else {
+        delete descEl.dataset.resultAppendHtml;
+      }
+      if (typeof cfg.preDescHtml === 'string') {
+        descEl.dataset.preDescHtml = cfg.preDescHtml;
+      } else {
+        delete descEl.dataset.preDescHtml;
       }
       if (cfg.resultTitle) {
         descEl.dataset.resultTitle = cfg.resultTitle;
@@ -118,6 +137,8 @@ const RenderModal = {
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
       delete descEl.dataset.resultAppend;
+      delete descEl.dataset.resultAppendHtml;
+      delete descEl.dataset.preDescHtml;
       delete descEl.dataset.resultTitle;
       delete descEl.dataset.resultBackdrop;
       delete descEl.dataset.resultSfx;
@@ -405,6 +426,12 @@ const RenderModal = {
       const hasEnemyAttack = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe);
       const enemyDiceWindup = hasEnemyAttack && cfg.enemyDice && cfg.enemyDice.animate !== false ? 760 : 0;
       const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * playerFollowStepMs + (incomingDamageEvents.length > 0 ? 520 : 0) + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
+      if (cfg.combat?.enemy?.defeated) {
+        const defeatDelay = playerDamageEvents.length > 0
+          ? delay + playerFollowHits * playerFollowStepMs + 120
+          : delay + 240;
+        this._scheduleCombatEnemyDefeatState(combatSceneEl, defeatDelay, cfg.combat.enemy);
+      }
       if (playerDamageEvents.length > 0) {
         this._deferCombatResultText(descEl, delay + playerFollowHits * playerFollowStepMs + 120);
       }
@@ -438,7 +465,44 @@ const RenderModal = {
       this._prepareHealSequence(healEvents);
       this._prepareIncomingDamageSequence(incomingDamageEvents);
       setTimeout(() => this._triggerCounterAnims({ ...cfg.combatAnims, enemyDice: cfg.enemyDice || null, playerFollowStepMs }), delay);
+    } else if (cfg.combat?.enemy?.defeated) {
+      this._scheduleCombatEnemyDefeatState(combatSceneEl, 0, cfg.combat.enemy);
     }
+  },
+
+  _scheduleCombatEnemyDefeatState(sceneEl, delayMs = 0, enemy = null) {
+    const apply = () => {
+      const enemyCard = sceneEl?.querySelector?.('.combat-enemy-card.pending-defeated');
+      if (!enemyCard?.isConnected) return;
+      enemyCard.classList.remove('pending-defeated');
+      enemyCard.classList.add('defeated');
+      if (enemy?.deathSfx) AudioManager?.playSfx?.(enemy.deathSfx, enemy.deathSfxVolume ?? 0.55);
+    };
+    const delay = Math.max(0, Number(delayMs) || 0);
+    if (delay <= 0) {
+      requestAnimationFrame(apply);
+      return;
+    }
+    setTimeout(apply, delay);
+  },
+
+  _combatBloodSplatterHtml(seed = '', variant = 'enemy') {
+    const text = String(seed || variant);
+    let hash = 2166136261;
+    for (let i = 0; i < text.length; i++) {
+      hash ^= text.charCodeAt(i);
+      hash = Math.imul(hash, 16777619);
+    }
+    hash >>>= 0;
+    const positions = ['0%', '50%', '100%'];
+    const col = hash % 3;
+    const row = Math.floor(hash / 3) % 3;
+    const rotation = (Math.floor(hash / 9) % 43) - 21;
+    const scale = variant === 'ally'
+      ? 0.9 + ((Math.floor(hash / 387) % 13) / 100)
+      : 1.04 + ((Math.floor(hash / 387) % 18) / 100);
+    const flip = hash % 2 === 0 ? 1 : -1;
+    return `<span class="combat-blood-splatter ${variant}" aria-hidden="true" style="--blood-pos-x:${positions[col]};--blood-pos-y:${positions[row]};--blood-rot:${rotation}deg;--blood-scale:${scale.toFixed(2)};--blood-flip:${flip};"></span>`;
   },
 
   _ensureCombatLogDelegation() {
@@ -740,7 +804,10 @@ const RenderModal = {
       const resultDesc = descEl.dataset.resultDesc;
       const preDesc = descEl.dataset.preDesc || '';
       const hasExplicitAppend = 'resultAppend' in descEl.dataset;
+      const hasExplicitAppendHtml = 'resultAppendHtml' in descEl.dataset;
       const resultAppend = descEl.dataset.resultAppend;
+      const resultAppendHtml = descEl.dataset.resultAppendHtml;
+      const preDescHtml = descEl.dataset.preDescHtml;
       const resultTitle = descEl.dataset.resultTitle;
       const resultBackdrop = descEl.dataset.resultBackdrop;
       const resultFx = descEl.dataset.resultFx;
@@ -749,6 +816,8 @@ const RenderModal = {
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
       delete descEl.dataset.resultAppend;
+      delete descEl.dataset.resultAppendHtml;
+      delete descEl.dataset.preDescHtml;
       delete descEl.dataset.resultTitle;
       delete descEl.dataset.resultBackdrop;
       delete descEl.dataset.resultFx;
@@ -783,7 +852,11 @@ const RenderModal = {
         descEl.appendChild(resultEl);
       }
       if (introEl) {
-        introEl.textContent = preDesc || introEl.textContent;
+        if (preDescHtml) {
+          introEl.innerHTML = preDescHtml;
+        } else {
+          introEl.textContent = preDesc || introEl.textContent;
+        }
         introEl.classList.remove('typing');
       }
       resultEl.textContent = '';
@@ -803,6 +876,16 @@ const RenderModal = {
         : this._resultAppendText(preDesc, resultDesc);
       const cleanResultText = String(resultText || '').replace(/^\n+/, '');
       const separator = !introEl && currentText && cleanResultText ? '\n\n' : '';
+      if (hasExplicitAppendHtml) {
+        resultEl.innerHTML = `${!introEl && currentText ? '<br><br>' : ''}${resultAppendHtml || ''}`;
+        if (choicesEl) {
+          [...choicesEl.querySelectorAll('button')].forEach(btn => { btn.disabled = false; });
+          choicesEl.classList.remove('result-waiting');
+          choicesEl.style.visibility = '';
+          choicesEl.style.pointerEvents = '';
+        }
+        return;
+      }
       this._typeModalText(resultEl, `${separator}${cleanResultText}`, () => {
         if (choicesEl) {
           choicesEl.style.visibility = '';
@@ -829,6 +912,15 @@ const RenderModal = {
 
   _playModalResultSfx(id, volume) {
     if (!id) return;
+    if (id === 'eventInjury') {
+      const playInjury = () => AudioManager?.playEventInjurySfx?.(volume);
+      if (typeof requestAnimationFrame === 'function') {
+        requestAnimationFrame(playInjury);
+      } else {
+        playInjury();
+      }
+      return;
+    }
     const play = () => AudioManager?.playSfx?.(id, volume);
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(play);
@@ -1108,7 +1200,7 @@ const RenderModal = {
   },
 
   _showCombatAttackTrail(targetEl, trail = '', opts = {}) {
-    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(trail)) return;
+    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'shell_impact', 'jaw_bite', 'poison_cloud'].includes(trail)) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     if (!sceneEl || !sourceRect) return;
@@ -1116,13 +1208,16 @@ const RenderModal = {
     const sceneRect = sceneEl.getBoundingClientRect();
     const sourceX = sourceRect.left + sourceRect.width / 2;
     const sourceY = sourceRect.top + sourceRect.height / 2;
-    const sourceWeaponFamily = opts.sourceEl?.dataset?.weaponFamily || '';
+    const sourceWeaponFamily = opts.weaponFamily || opts.sourceEl?.dataset?.weaponFamily || '';
     const swordSlash = trail === 'slash' && sourceWeaponFamily === 'sword';
     const daggerSlash = trail === 'slash' && sourceWeaponFamily === 'dagger';
     const ironScabbard = trail === 'iron_scabbard';
     const starHunterEye = trail === 'star_hunter_eye';
     const starBreaker = trail === 'star_breaker';
-    const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker;
+    const shellImpact = trail === 'shell_impact';
+    const jawBite = trail === 'jaw_bite';
+    const poisonCloud = trail === 'poison_cloud';
+    const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker || shellImpact || jawBite || poisonCloud;
     const enemyFigureRect = fixedTargetTrail && opts.side === 'enemy'
       ? targetEl.querySelector('.combat-enemy-figure')?.getBoundingClientRect?.()
       : null;
@@ -1165,6 +1260,9 @@ const RenderModal = {
       iron_scabbard: 940,
       star_hunter_eye: 720,
       star_breaker: 820,
+      shell_impact: 760,
+      jaw_bite: 760,
+      poison_cloud: 820,
     };
     FxPlayer.removeAfter(fx, durationByTrail[trail] || 620);
   },
@@ -1186,7 +1284,7 @@ const RenderModal = {
     });
   },
 
-  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], healEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, counterTarget, aoe, enemyBlock, enemyDice = null }) {
+  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], healEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, counterTarget, aoe, enemyBlock, enemyDice = null, enemyAttackTrail = '', enemyAttackTrailFamily = '', enemyAttackSfx = '', enemyAttackSfxVolume = null }) {
     this._preloadCombatDamageDigits();
     const enemyCard = document.querySelector('.combat-enemy-card');
     const combatScene = enemyCard?.closest('.combat-scene') || document.querySelector('.combat-scene');
@@ -1294,7 +1392,9 @@ const RenderModal = {
     // Section.
     setTimeout(() => {
       if (aoe) {
-        combatScene?.querySelectorAll('.combat-unit.ally').forEach(el => {
+        if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, enemyAttackSfxVolume ?? 0.42);
+        combatScene?.querySelectorAll('.combat-unit.ally:not(.empty-slot)').forEach(el => {
+          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily });
           FxPlayer.restartClass(el, 'anim-hit', 420);
         });
         for (const event of incomingEvents) {
@@ -1307,6 +1407,8 @@ const RenderModal = {
       } else if (counterTarget) {
         const el = findAllyUnit(counterTarget);
         if (el) {
+          if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, enemyAttackSfxVolume ?? 0.42);
+          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily });
           el.classList.add('anim-hit');
           const event = incomingEvents.find(item => item?.targetId === counterTarget);
           if (event) this._pulseCombatImpact(combatScene, event.damage);
@@ -1472,6 +1574,7 @@ const RenderModal = {
           data-char-id="${char.id}" data-weapon-family="${weaponFamily}" ${clickAttr}>
           ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
+          ${isDown ? this._combatBloodSplatterHtml(char.id || char.name, 'ally') : ''}
           <div class="combat-unit-main">
             <span class="combat-sprite">${cls.icon}</span>
             <span class="combat-name">${char.name}</span>
@@ -1536,12 +1639,14 @@ const RenderModal = {
     const enemyCardIdClass = combat.enemy.id
       ? ` enemy-${String(combat.enemy.id).replace(/[^a-z0-9_-]/gi, '-')}`
       : '';
+    const enemyDefeatedClass = combat.enemy.defeated ? ' pending-defeated' : '';
 
     return `
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}"${enemyCardBgStyle}>
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}"${enemyCardBgStyle}>
         ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
+        ${this._combatEnemyDamageDiePanelHtml(combat.enemy)}
         <div class="combat-side-label" aria-hidden="true"></div>
         <div class="combat-enemy-figure">
           <div class="combat-enemy-stance-column">
@@ -1556,6 +1661,7 @@ const RenderModal = {
             ${combat.enemy.hideIconInCombat ? '' : this._enemyIconHtml(combat.enemy)}
           </button>
           ${this._combatEnemyStatusIconsHtml(combat.enemy)}
+          ${combat.enemy.defeated ? this._combatBloodSplatterHtml(combat.enemy.id || combat.enemy.name, 'enemy') : ''}
         </div>
         <div class="combat-enemy-name">${combat.enemy.name}</div>
         <div class="combat-hp-row">
@@ -1577,12 +1683,11 @@ const RenderModal = {
           <div class="combat-actions"></div>
           <div class="combat-vs">VS</div>
           <div class="combat-bottom-tools">
-            <button class="combat-guard-button${combat.canGuard ? '' : ' disabled'}" ${combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled'} title="${combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`}">格檔${combat.canGuard ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
+            <button class="combat-guard-button${guardTargeting ? ' active' : ''}${combat.canGuard || guardTargeting ? '' : ' disabled'}" ${guardTargeting ? 'onclick="Game.cancelCombatGuardTargeting()"' : (combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled')} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
             <button class="combat-bag-button${combat.canUseBag ? '' : ' disabled'}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
           </div>
         </div>
         ${itemTargeting ? `<button class="btn-tiny combat-cancel-item" onclick="Game.cancelCombatItemTargeting()">取消道具</button>` : ''}
-        ${guardTargeting ? `<button class="btn-tiny combat-cancel-item" onclick="Game.cancelCombatGuardTargeting()">取消格檔</button>` : ''}
       </div>
       <div class="combat-squad-card">
         <div class="combat-side-label">小隊</div>
@@ -1831,6 +1936,13 @@ const RenderModal = {
   _combatEnemyAttackPanelHtml(enemy) {
     const attack = Number(enemy?.attack || 0);
     return `<div class="combat-enemy-attack-panel" title="敵人基礎攻擊力">攻 ${attack}</div>`;
+  },
+
+  _combatEnemyDamageDiePanelHtml(enemy) {
+    const sides = Math.max(0, Number(enemy?.damageDieSides || 0));
+    if (sides <= 0) return '';
+    const label = sides === 3 ? '三面骰' : `${sides} 面骰`;
+    return `<div class="combat-enemy-damage-die-panel" title="敵方傷害骰">${label}</div>`;
   },
 
   _combatEnemyBlockPanelHtml(enemy) {

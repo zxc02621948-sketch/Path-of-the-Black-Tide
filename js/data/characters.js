@@ -8,7 +8,7 @@ const CHARACTER_CLASSES = {
     maxHp: 26,
     attack: 5,
     passive: 'combat_floor',
-    passiveDesc: '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面的格檔，最多 6',
+    passiveDesc: '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面一半（向上取整）的格檔，最多 4',
   },
   explorer: {
     id: 'explorer',

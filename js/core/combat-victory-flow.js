@@ -2,53 +2,62 @@
 const GameCombatVictoryFlow = {
   _handleCombatVictory({ attacker, enemy, cell, reward, source, darkMonsterId, darkMonsterRef, combatResult, roll, rollResult }) {
     this._endWagerDiceAttackFlow();
+    const resolvedSource = source === 'darkMonsterActive' || source === 'darkMonsterPassive'
+      ? source
+      : (enemy?.darkMonster
+      ? (enemy.darkMonsterActiveHunt ? 'darkMonsterActive' : 'darkMonsterPassive')
+      : source);
+    const resolvedDarkMonsterId = darkMonsterId || G.combat?.darkMonsterId || null;
+    const resolvedDarkMonsterRef = darkMonsterRef || G.combat?.darkMonsterRef || null;
     enemy._victoryIntent = G.combat?.intent || null;
     this._log(`${attacker.name} 擊敗 ${enemy.name}。`, 'reward');
     const finalHitDesc = this._combatFinalHitDesc(attacker, enemy, combatResult);
     this._applyKillHeal(attacker);
 
-    if (source === 'darkMonsterPassive') {
-      const darkResult = this._settleDarkMonsterPassiveVictory(darkMonsterId, darkMonsterRef);
+    if (resolvedSource === 'darkMonsterPassive') {
+      const darkResult = this._settleDarkMonsterPassiveVictory(resolvedDarkMonsterId, resolvedDarkMonsterRef);
+      const enemyName = enemy.name;
       this._clearSquadCombatCarryover();
       G.combat = null;
       this._openModal({
-        title: '黑暗暫退',
+        title: `${enemy.name} 被擊敗`,
         desc: [
           `${enemy.name} 被擊敗。`,
           finalHitDesc,
-          `你已戰勝了黑暗，黑暗 ${darkResult.before} → ${darkResult.after}（-1）。`,
-          '但這只是暫時的。霧散去以前，黑暗仍會再次聚攏。',
-          '主動出擊可有效延遲黑暗襲擊，並抑制黑暗增長。',
         ].join('\n\n'),
-        resultFx: 'event-reward',
         combatLog: combatResult.logs,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
         combatAnims: this._combatResultAnims(attacker, combatResult, 250),
         dice: this._combatVictoryDice(attacker, roll, rollResult),
-        choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+        choices: [{ label: '繼續', action: () => this._openPassiveDarkMonsterVictoryEvent(enemyName, darkResult) }],
       });
       return true;
     }
 
-    if (source === 'darkMonsterActive') {
+    if (resolvedSource === 'darkMonsterActive') {
       const underlyingCell = G.combat.underlyingCell || null;
-      this._settleDarkMonsterActiveVictory(darkMonsterId, darkMonsterRef);
+      const nativeWeaknessBreak = !!G.combat.darkMonsterNativeWeaknessBreak;
+      const darkResult = this._settleDarkMonsterActiveVictory(resolvedDarkMonsterId, resolvedDarkMonsterRef, { nativeWeaknessBreak });
+      const weaknessRewardLine = darkResult.nativeBonus > 0
+        ? '本場命中並擊破原生弱點，額外壓制黑暗 -1。'
+        : '若主動討伐時命中並擊破原生弱點，可額外壓制黑暗 -1。';
+      const enemyName = enemy.name;
       this._clearSquadCombatCarryover();
       G.combat = null;
       this._openModal({
-        title: '主動討伐成功',
+        title: `${enemy.name} 被擊敗`,
         desc: [
           `${enemy.name} 被擊敗。`,
           finalHitDesc,
-          '你們沒有等黑暗逼近，而是反過來撕開它的形體。',
-          '黑暗 -3，其他黑暗化身追殺倒數延後 1 天。',
         ].join('\n\n'),
-        resultFx: 'event-reward',
         combatLog: combatResult.logs,
         combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
         combatAnims: this._combatResultAnims(attacker, combatResult, 250),
         dice: this._combatVictoryDice(attacker, roll, rollResult),
-        choices: [{ label: '繼續', action: () => this._continueAfterActiveDarkMonsterVictory(underlyingCell) }],
+        choices: [{
+          label: '繼續',
+          action: () => this._openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, underlyingCell),
+        }],
       });
       return true;
     }
@@ -125,7 +134,7 @@ const GameCombatVictoryFlow = {
     }
 
     if (enemy.tier === 'strong') {
-      this._settleStrongEnemyVictory(enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, source, combatResult);
+      this._settleStrongEnemyVictory(enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, resolvedSource, combatResult);
       return true;
     }
 
@@ -145,6 +154,35 @@ const GameCombatVictoryFlow = {
       dodecaFateDice: rollResult.dodecaFateDice,
       dodecaLuckyDice: rollResult.dodecaLuckyDice,
     };
+  },
+
+  _openPassiveDarkMonsterVictoryEvent(enemyName, darkResult) {
+    this._openModal({
+      title: '黑暗暫退',
+      desc: [
+        `${enemyName} 的形體在霧中崩散。`,
+        `你已擊退追殺而來的黑暗化身，但黑暗沒有因此退去（${darkResult.before} → ${darkResult.after}）。`,
+        '這只是暫時的。霧散去以前，黑暗仍會再次聚攏。',
+        '只有主動出擊才能有效延遲黑暗襲擊，並抑制黑暗增長。',
+      ].join('\n\n'),
+      resultFx: 'event-quiet',
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, underlyingCell) {
+    this._openModal({
+      title: '主動討伐成功',
+      desc: [
+        `${enemyName} 的黑霧被你們撕開，殘影向後退入更深的夜色。`,
+        '你們沒有等黑暗逼近，而是反過來撕開它的形體。',
+        `黑暗 ${darkResult.before} → ${darkResult.after}（-${darkResult.reduction}）。`,
+        weaknessRewardLine,
+        '其他黑暗化身追殺倒數延後 1 天。',
+      ].join('\n\n'),
+      resultFx: 'event-quiet',
+      choices: [{ label: '繼續', action: () => this._continueAfterActiveDarkMonsterVictory(underlyingCell) }],
+    });
   },
 
   _applyKillHeal(attacker) {
@@ -209,24 +247,17 @@ const GameCombatVictoryFlow = {
       if (!Array.isArray(G.defeatedUniqueEnemies)) G.defeatedUniqueEnemies = [];
       if (!G.defeatedUniqueEnemies.includes(enemy.id)) G.defeatedUniqueEnemies.push(enemy.id);
     }
+    const combatAnims = this._combatResultAnims(attacker, combatResult, 250);
     this._openModal({
       title: '強敵戰利品',
       desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n牠的污染殘骸中留下 1 個祈願寶箱。`,
       combatLog: logs,
       combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
-      combatAnims: this._combatResultAnims(attacker, combatResult, 250),
+      combatAnims,
       dice: this._combatVictoryDice(attacker, roll, rollResult),
-      choices: [{
-        label: '收下祈願寶箱',
-        action: () => {
-          const added = this._awardWishChest(`${enemy.name} 戰利品`);
-          if (added) {
-            this._closeModal();
-            Render.fullRender();
-          }
-        },
-      }],
+      choices: [],
     });
+    setTimeout(() => this._openWishChestLootModal(`${enemy.name} 戰利品`, logs), this._combatAnimWaitMs(combatAnims));
   },
 
   _settleStandardCombatVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatReward, combatResult = null, terrainEvent = null) {

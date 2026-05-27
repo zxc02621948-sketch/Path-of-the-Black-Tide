@@ -197,6 +197,7 @@ const CombatRules = {
     const eagleFeatherNativeHit = !!eagleFeatherNativeCandidate && allowFinalNativeWeakness && !realWeaknessHit && weapon?.effect?.type === 'bow_followup';
     const nativeWeaknessFace = suspiciousFlawSource || (activeNativeWeaknesses.includes(roll) ? roll : diceRaw);
     const weaknessHit = realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit || tempWeaknessHit || gamblerTempWeaknessHit || scholarOddFlawHit;
+    const nativeWeaknessBreakHit = allowNativeWeaknessEffect && (realWeaknessHit || resonanceWeaknessHit);
     let starBreakerFixedDamage = 0;
     let starHunterEyeLockTriggered = false;
 
@@ -715,7 +716,7 @@ const CombatRules = {
       for (let i = 1; i <= maxFollowUps && enemy.hp > 0; i++) {
         const guaranteedUsed = Math.max(0, attacker._rapierGuaranteedFollowUpsUsed || 0);
         const guaranteed = guaranteedUsed < guaranteedFollowUps;
-        const chance = guaranteed ? 100 : Math.max(minChance, 100 - chanceAttempts * chanceStep);
+        const chance = guaranteed ? 100 : Math.max(minChance, 100 - (chanceAttempts + 1) * chanceStep);
         const success = guaranteed || chance >= 100 || Math.random() * 100 < chance;
         if (!success) {
           logs.push(`${rapierRelic.name}：第 ${i} 次連擊機率 ${chance}%，連擊停止。`);
@@ -883,15 +884,33 @@ const CombatRules = {
     let counterDmg = 0;
     let aoeCounter = 0;
     let enemyDiceRoll = null;
+    let enemyDiceSides = 6;
     const incomingDamageEvents = [];
     let enemyAttackFlow = !suppressEnemyAction && !stunned && !enemyDead &&
       ['attack', 'block_attack', 'dice_attack', 'aoe'].includes(intent?.type);
     if (enemyAttackFlow) {
-      if (intent?.type === 'attack' || intent?.type === 'block_attack') counterDmg = enemy.attack;
+      if (intent?.type === 'attack' || intent?.type === 'block_attack') {
+        const damageDie = this._enemyAttackDamageDie(enemy);
+        counterDmg = Math.max(0, enemy.attack || 0) + damageDie.roll;
+        if (damageDie.roll > 0) {
+          enemyDiceRoll = damageDie.roll;
+          enemyDiceSides = damageDie.sides;
+          logs.push(`${enemy.name} 傷害骰 ${damageDie.roll}：攻擊傷害 ${counterDmg}。`);
+        }
+      }
       else if (intent?.type === 'dice_attack') {
-        enemyDiceRoll = Math.ceil(Math.random() * 6);
-        counterDmg = enemyDiceRoll;
-        logs.push(`${enemy.name} 擲骰攻擊：${counterDmg}`);
+        const damageDie = this._enemyAttackDamageDie(enemy);
+        if (damageDie.roll > 0) {
+          enemyDiceRoll = damageDie.roll;
+          enemyDiceSides = damageDie.sides;
+          counterDmg = Math.max(0, enemy.attack || 0) + damageDie.roll;
+          logs.push(`${enemy.name} 擲骰攻擊：基礎 ${Math.max(0, enemy.attack || 0)} + 傷害骰 ${damageDie.roll} = ${counterDmg}。`);
+        } else {
+          enemyDiceRoll = Math.ceil(Math.random() * 6);
+          enemyDiceSides = 6;
+          counterDmg = enemyDiceRoll;
+          logs.push(`${enemy.name} 擲骰攻擊：${counterDmg}`);
+        }
       } else if (intent?.type === 'aoe') {
         aoeCounter = Math.max(1, enemy.attack - 2);
       }
@@ -903,7 +922,9 @@ const CombatRules = {
     const enemyActionResult = {
       counterDmg,
       aoeCounter,
+      enemyBlockGain,
       enemyDiceRoll,
+      enemyDiceSides,
       enemyAttackFlow,
       counterTarget,
       counterTargetId: counterTarget?.id || null,
@@ -927,7 +948,9 @@ const CombatRules = {
     }
     counterDmg = Math.max(0, enemyActionResult.counterDmg || 0);
     aoeCounter = Math.max(0, enemyActionResult.aoeCounter || 0);
+    enemyBlockGain = Math.max(0, enemyActionResult.enemyBlockGain || 0);
     enemyDiceRoll = enemyActionResult.enemyDiceRoll;
+    enemyDiceSides = enemyActionResult.enemyDiceSides || enemyDiceSides;
     enemyAttackFlow = !!enemyActionResult.enemyAttackFlow;
     const aoeDamageByChar = enemyActionResult.aoeDamageByChar || null;
     if (enemyAttackFlow && (counterDmg > 0 || aoeCounter > 0)) {
@@ -1027,8 +1050,10 @@ const CombatRules = {
       aoeCounter,
       aoeDamageByChar,
       enemyDiceRoll,
+      enemyDiceSides,
       gazeRoll: enemyActionResult.gazeRoll || null,
       gazeSummary: enemyActionResult.gazeSummary || null,
+      firstStrikeSummary: enemyActionResult.firstStrikeSummary || null,
       fateRoll: enemyActionResult.fateRoll || null,
       fateSummary: enemyActionResult.fateSummary || null,
       bannerSummary: enemyActionResult.bannerSummary || null,
@@ -1039,6 +1064,7 @@ const CombatRules = {
       incomingDamageEvents,
       weaknessHit,
       realWeaknessHit,
+      nativeWeaknessBreakHit,
       eagleFeatherNativeHit,
       resonanceWeaknessHit,
       starHunterEyeLockTriggered,
@@ -1090,7 +1116,15 @@ const CombatRules = {
 
   _warriorGuardBlock(attacker, roll) {
     if (attacker?.cls !== 'warrior') return 0;
-    return Math.max(0, Math.min(6, Math.floor(roll || 0)));
+    return Math.max(0, Math.min(4, Math.ceil((roll || 0) / 2)));
+  },
+
+  _enemyAttackDamageDie(enemy) {
+    if (!['weak', 'medium'].includes(enemy?.tier)) return { roll: 0, sides: 0 };
+    return {
+      roll: Math.ceil(Math.random() * 3),
+      sides: 3,
+    };
   },
 
   _finalEyeBlockPierceDamage(enemy) {

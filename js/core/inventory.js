@@ -143,7 +143,8 @@ const GameInventory = {
 
     this._openModal({
       title: '背包已滿',
-      desc: `${ev?.name || '獲得道具'}\n\n背包已滿，無法直接放入 ${item.icon} ${item.name}。\n${item.desc}\n\n可丟棄背包內一格道具，或放棄新道具。`,
+      descHtml: `${this._modalTextHtml(ev?.name || '獲得道具')}<br><br>背包已滿，無法直接放入 ${this._equipmentRewardLabelHtml(item)}。<br>${this._modalTextHtml(item.desc)}<br><br>可丟棄背包內一格道具，或放棄新道具。`,
+      typeText: false,
       choices,
     });
   },
@@ -180,6 +181,39 @@ const GameInventory = {
     }
     this._log(`${sourceName}：獲得道具「${item.name}」。`, 'reward');
     return true;
+  },
+
+  _openWishChestLootModal(sourceName = '強敵戰利品', combatLog = []) {
+    const item = getEquipById('wish_chest');
+    if (!item) return false;
+    const addResult = this._addInventoryItem(item);
+    if (!addResult.added) {
+      this._openInventoryFullModal({ name: sourceName }, item, '');
+      return false;
+    }
+    const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
+    this._log(`${sourceName}：獲得道具「${item.name}」。`, 'reward');
+    this._openModal({
+      title: `獲得道具：${item.name}`,
+      descHtml: `${this._equipmentRewardLabelHtml(item, countText, 'equipment-inline-icon item-reward-icon')}<br>${this._modalTextHtml(item.desc)}<br><br>已放入背包。`,
+      typeText: false,
+      resultFx: 'event-reward',
+      combatLog,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+    return true;
+  },
+
+  _equipmentRewardLabelHtml(item, countText = '', className = 'equipment-inline-icon item-reward-icon') {
+    const label = typeof EquipmentIcon !== 'undefined'
+      ? EquipmentIcon.label(item, className)
+      : `${this._escapeHtmlLocal(item?.icon || '◆')} ${this._escapeHtmlLocal(item?.name || '')}`;
+    const count = countText ? `<span class="equipment-reward-count">${this._escapeHtmlLocal(countText)}</span>` : '';
+    return `<span class="equipment-reward-label">${label}${count}</span>`;
+  },
+
+  _modalTextHtml(text = '') {
+    return this._escapeHtmlLocal(text).replace(/\n/g, '<br>');
   },
 
   _openWishChest(itemIndex = null) {

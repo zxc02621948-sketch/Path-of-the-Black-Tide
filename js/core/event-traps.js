@@ -29,7 +29,7 @@ const GameEventTraps = {
       const damage = ev.failDamage || CONFIG.DEFAULT_TRAP_DAMAGE;
       if (victim) victim.hp = Math.max(0, victim.hp - this._reduceIncomingDamage(victim, damage));
       this._log(victim ? `${victim.name} 受到 ${damage} 點陷阱傷害。` : '陷阱觸發。', 'danger');
-      if (ev.failSfx) AudioManager?.playSfx?.(ev.failSfx, ev.failSfxVolume);
+      AudioManager?.playEventInjurySfx?.();
     } else {
       this._completeProgressEvent(ev);
     }
@@ -154,10 +154,13 @@ const GameEventTraps = {
   },
 
   _triggerChoiceTrap(cell, ev) {
+    const failDarknessText = ev.failDarknessChange > 0 ? `，黑暗 +${ev.failDarknessChange}` : '';
     const choices = [
-      { label: `${ev.choiceTrapLabel || '小心解除'}（探索骰門檻 ${ev.successMin || 3}，失敗隨機隊員 -${ev.failDamage || 2} HP）`, action: () => this._rollChoiceTrapWithAnimation(cell, ev) },
-      { label: `${ev.forceTrapLabel || '硬闖'}（全隊 -${ev.forceDamage || 1} HP，直接通過）`, danger: true, action: () => this._forceChoiceTrap(cell, ev) },
+      { label: `${ev.choiceTrapLabel || '小心解除'}（探索骰門檻 ${ev.successMin || 3}，失敗隨機隊員 -${ev.failDamage || 2} HP${failDarknessText}）`, action: () => this._rollChoiceTrapWithAnimation(cell, ev) },
     ];
+    if (!ev.noForceTrap) {
+      choices.push({ label: `${ev.forceTrapLabel || '硬闖'}（全隊 -${ev.forceDamage || 1} HP，直接通過）`, danger: true, action: () => this._forceChoiceTrap(cell, ev) });
+    }
     if (ev.detourActionCost > 0) {
       choices.push({
         label: `${ev.detourTrapLabel || '繞路'}（行動 -${ev.detourActionCost}，不受傷）`,
@@ -166,7 +169,7 @@ const GameEventTraps = {
     }
     this._openModal({
       title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇解除方式。小心處理需要探索骰；硬闖會讓全隊受傷但直接通過${ev.detourActionCost > 0 ? '；繞路會消耗剩餘行動但避免傷害' : ''}。`,
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n選擇解除方式。小心處理需要探索骰${ev.noForceTrap ? '' : '；硬闖會讓全隊受傷但直接通過'}${ev.detourActionCost > 0 ? '；繞路會消耗剩餘行動但避免傷害' : ''}。`,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices,
@@ -204,8 +207,33 @@ const GameEventTraps = {
     const damage = this._reduceIncomingDamage(victim, ev.failDamage || 2);
     victim.hp = Math.max(0, victim.hp - damage);
     this._log(`${victim.name} 受到 ${damage} 點陷阱傷害。`, 'danger');
+    let darknessText = '';
+    if (ev.failDarknessChange > 0) {
+      const beforeDarkness = Math.max(0, G.darkness || 0);
+      this._applyDarkness(ev.failDarknessChange, ev.name);
+      darknessText = `黑暗 +${ev.failDarknessChange}（${beforeDarkness} → ${G.darkness}）。`;
+    }
     const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
-    const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），解除失敗。${victim.name} 受到 ${damage} 傷害。`;
+    const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），解除失敗。${victim.name} 受到 ${damage} 傷害。${darknessText ? `\n${darknessText}` : ''}`;
+    const choices = [
+      {
+        label: '再次小心解除',
+        action: () => { if (this._checkLose()) return; this._rollChoiceTrapWithAnimation(cell, ev); },
+      },
+    ];
+    if (!ev.noForceTrap) {
+      choices.push({
+        label: '改為硬闖',
+        danger: true,
+        action: () => { if (this._checkLose()) return; this._forceChoiceTrap(cell, ev); },
+      });
+    }
+    if (ev.detourActionCost > 0) {
+      choices.push({
+        label: ev.detourTrapLabel || '改為繞路',
+        action: () => { if (this._checkLose()) return; this._detourChoiceTrap(cell, ev); },
+      });
+    }
     this._openModal({
       title: ev.name,
       desc: preDesc,
@@ -213,22 +241,11 @@ const GameEventTraps = {
       resultDesc: `${preDesc}\n\n${resultText}`,
       resultAppend: resultText,
       resultFx: 'event-hit',
-      resultSfx: ev.failSfx || '',
-      resultSfxVolume: ev.failSfxVolume,
+      resultSfx: 'eventInjury',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       dice: { type: 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: !!rollResult.animate, charCls: rollResult.charCls },
-      choices: [
-        {
-          label: '再次小心解除',
-          action: () => { if (this._checkLose()) return; this._rollChoiceTrapWithAnimation(cell, ev); },
-        },
-        {
-          label: '改為硬闖',
-          danger: true,
-          action: () => { if (this._checkLose()) return; this._forceChoiceTrap(cell, ev); },
-        },
-      ],
+      choices,
     });
   },
 
@@ -253,8 +270,7 @@ const GameEventTraps = {
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.forceDesc || ev.desc || ''}\n\n你們選擇硬闖，直接通過。\n${damaged.join('、')} HP。`,
       resultFx: 'event-hit',
-      resultSfx: ev.failSfx || '',
-      resultSfxVolume: ev.failSfxVolume,
+      resultSfx: 'eventInjury',
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices: [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
@@ -299,8 +315,8 @@ const GameEventTraps = {
     }
     this._completeProgressEvent(ev);
     const hasHitResult = ev.partyDamage > 0 || ev.targetDamage > 0 || actionSpent > 0;
-    if (hasHitResult && ev.resultSfx) {
-      AudioManager?.playSfx?.(ev.resultSfx, ev.resultSfxVolume);
+    if (hasHitResult) {
+      AudioManager?.playEventInjurySfx?.();
     }
     const descText = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${ev.fixedResultText || '陷阱立刻生效，沒有時間閃避。'}\n${effects.join('\n')}`;
     const choices = [{ label: '繼續', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }];

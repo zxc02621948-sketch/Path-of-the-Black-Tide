@@ -101,6 +101,11 @@ const GameCombatThreat = {
     const atk = enemy?.attack || 0;
     const blk = enemy?.block || 0;
     const totalBonus = painBonus + bannerDamageBonus;
+    const weakDamageDie = ['weak', 'medium'].includes(enemy?.tier);
+    const attackText = weakDamageDie ? `${atk + totalBonus}+骰（三面骰）` : `${atk + totalBonus}`;
+    const diceText = weakDamageDie
+      ? `${atk + totalBonus > 0 ? `${atk + totalBonus}+` : ''}骰（三面骰）`
+      : `1d6 +${totalBonus}`;
     const bonusParts = [];
     if (painBonus > 0) bonusParts.push(`痛痕 +${painBonus}`);
     if (bannerDamageBonus > 0) bonusParts.push(`戰吼旗 +${bannerDamageBonus}`);
@@ -108,13 +113,13 @@ const GameCombatThreat = {
     const bonusText = bonusParts.length > 0 ? `（${bonusParts.join('，')}）` : '';
     switch (intent?.type) {
       case 'attack':
-        return `⚔️ 攻擊主戰者　${atk + totalBonus} 傷${bonusText}`;
+        return `⚔️ 攻擊主戰者　${attackText} 傷${bonusText}`;
       case 'block_attack':
-        return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${atk + totalBonus} 傷${bonusText}`;
+        return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${attackText} 傷${bonusText}`;
       case 'aoe':
         return `🌊 全體攻擊　各 ${Math.max(1, atk - 2) + totalBonus} 傷${bonusText}`;
       case 'dice_attack':
-        return `🎲 擲骰攻擊　1d6 +${totalBonus} 傷${bonusText}`;
+        return `🎲 擲骰攻擊　${diceText} 傷${bonusText}`;
       default:
         return null;
     }

@@ -40,11 +40,11 @@ const EQUIPMENT = [
     name: '皮革補片',
     icon: '🧩',
     iconImage: 'assets/items/leather-patch.png',
-    desc: '本場戰鬥受到的傷害 -1。',
+    desc: '下一次敵方攻擊傷害 -2。',
     useType: 'combat_mod',
     useInCombat: true,
     useOutOfCombat: false,
-    effect: { type: 'damage_reduce', value: 1 },
+    effect: { type: 'damage_reduce', value: 2 },
   },
   {
     id: 'bone_dice',

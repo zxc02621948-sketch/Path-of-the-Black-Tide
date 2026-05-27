@@ -58,11 +58,6 @@ const Render = {
     }
     const darkness = Math.max(0, G.darkness || 0);
     const meterMax = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
-    const darkMonsters = Array.isArray(G.darkMonsters) ? G.darkMonsters : [];
-    const criticalDarkMonsters = darkMonsters.filter(monster =>
-      monster?.pendingChase === true || (monster?.chaseTimer || 0) <= 1
-    ).length;
-    const light = 0;
     const darknessLabel = document.getElementById('darkness-label');
     const darknessNum = document.getElementById('darkness-num');
     const darknessFill = document.getElementById('darkness-bar-fill');
@@ -70,13 +65,7 @@ const Render = {
     const lightChargesDisplay = document.getElementById('light-charges-display');
     if (darknessLabel) darknessLabel.textContent = '黑暗';
     if (darknessNum) darknessNum.textContent = `${darkness} / ${meterMax}`;
-    if (lightChargesDisplay) {
-      lightChargesDisplay.textContent = G.phase === 'night' && (G.lightCharges || 0) > 0
-        ? `光明護火 ${G.lightCharges}`
-        : '';
-    }
-    if (darknessLabel) darknessLabel.textContent = '\u9ed1\u6697';
-    if (lightChargesDisplay) lightChargesDisplay.textContent = `黑暗化身 ${darkMonsters.length}｜危急 ${criticalDarkMonsters}`;
+    if (lightChargesDisplay) lightChargesDisplay.textContent = '';
     if (darknessFill) darknessFill.style.width = `${Math.min(100, (darkness / meterMax) * 100)}%`;
     if (darknessDisplay) {
       darknessDisplay.classList.toggle('light', false);
@@ -188,7 +177,7 @@ const Render = {
 
           if (iconImage) {
             const iconEl = document.createElement('img');
-            iconEl.className = 'cell-icon cell-icon-img';
+            iconEl.className = `cell-icon cell-icon-img ${iconImage.className || ''}`.trim();
             iconEl.src = iconImage.src;
             iconEl.alt = iconImage.alt || '';
             iconEl.draggable = false;
@@ -588,9 +577,9 @@ const Render = {
     if (cell.content?.reward === 'rescue') return '🗝️';
     if (cell.content?.reward === 'echo_site') return '◆';
     if (cell.type === 'enemy')  return '⚔️';
-    if (cell.type === 'chest')  return cell.content?.chestKind === 'dark_gift' ? '' : '🧰';
+    if (cell.type === 'chest')  return '';
     if (cell.type === 'relic')  return '💎';
-    if (cell.type === 'rest')   return G.phase === 'night' ? '🔥' : '';
+    if (cell.type === 'rest')   return '';
     if (cell.type === 'altar')  return '';
     if (cell.type === 'forest') return '';
     if (cell.type === 'ruins')  return '';
@@ -601,7 +590,29 @@ const Render = {
   _cellIconImage(cell, isPlayer) {
     if (isPlayer || cell.cleared) return null;
     if (cell.type === 'chest' && cell.content?.chestKind === 'dark_gift') {
-      return { src: 'assets/ui/dark-gift-chest-map.png', alt: '黑暗贈禮' };
+      return { src: 'assets/ui/dark-gift-chest-map.png', alt: '黑暗贈禮', className: 'dark-gift-map-icon' };
+    }
+    if (cell.type === 'chest') {
+      const kind = cell.content?.chestKind === 'broken' ? 'broken' : 'weapon';
+      return {
+        src: 'assets/ui/treasure-chest-map.png',
+        alt: kind === 'broken' ? '殘破寶箱' : '完整寶箱',
+        className: `treasure-chest-map-icon treasure-chest-${kind}`,
+      };
+    }
+    if (cell.type === 'enemy' && cell.content?.enemy?.mapIconImage) {
+      return {
+        src: cell.content.enemy.mapIconImage,
+        alt: cell.content.enemy.name || '特殊敵人',
+        className: `enemy-map-icon enemy-map-${cell.content.enemy.id || 'special'}`,
+      };
+    }
+    if (cell.type === 'enemy') {
+      return {
+        src: 'assets/ui/battle-map-icon.png',
+        alt: '敵人',
+        className: 'battle-map-icon',
+      };
     }
     return null;
   },
@@ -682,7 +693,7 @@ const Render = {
 
   _passiveDesc(cls) {
     const map = {
-      warrior:  '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面的格檔，最多 6',
+      warrior:  '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面一半（向上取整）的格檔，最多 4',
       explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
       scholar:  '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空。戰鬥中實際損失 HP 後，下回合獲得損失 HP x2 的格檔',
       support:  '我方攻擊回合結束時，若輔助存活，治療目前 HP 百分比最低的一名存活隊友 1 HP；若輔助是主戰者，改為治療最低兩名隊友各 1 HP。觸發後輔助仇恨 +1',
@@ -1008,7 +1019,8 @@ const Render = {
     }
     const phase = ['day', 'night', 'nightfall', 'dawn'].includes(info.phase) ? info.phase : 'day';
     const kicker = info.kickerLabel || (phase === 'nightfall' ? '夜幕逼近' : (phase === 'dawn' ? '黎明將至' : '日終'));
-    overlay.className = `day-transition-overlay ${phase}`;
+    const heavyDarkness = Number(info.darknessDelta) >= 2;
+    overlay.className = `day-transition-overlay ${phase}${heavyDarkness ? ' heavy-darkness' : ''}`;
     overlay.setAttribute('aria-hidden', 'false');
     overlay.innerHTML = `
       <div class="day-transition-panel">
