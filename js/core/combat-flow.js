@@ -665,7 +665,7 @@ const GameCombatFlow = {
         canUseBag: false,
         rollItemBlocked: true,
         followUpStatusId: attacker.id,
-        followUpLabel: '連擊中',
+        followUpLabel: '連擊中...',
         followUpHint: '自動追擊',
       },
       combatAnims,

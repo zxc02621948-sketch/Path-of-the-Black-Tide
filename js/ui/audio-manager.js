@@ -3,9 +3,9 @@ const AudioManager = {
     exploreEarly: 'assets/audio/explore-early.mp3',
     exploreNight: 'assets/audio/explore-night.mp3',
     battleNormal: 'assets/audio/battle-normal.mp3',
-    battleGuardian: 'assets/audio/battle-guardian.mp3',
+    battleGuardian: 'assets/audio/battle-final.mp3',
     battleDarkAvatar: 'assets/audio/battle-dark-avatar.mp3',
-    battleFinal: 'assets/audio/battle-final.mp3',
+    battleFinal: 'assets/audio/battle-guardian.mp3',
   },
   sfx: {
     button: 'assets/audio/sfx/ui-button.ogg',

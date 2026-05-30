@@ -3501,14 +3501,22 @@ html, body {
     linear-gradient(180deg, transparent 0%, rgba(10, 10, 10, .10) 100%);
 }
 
-.combat-unit > :not(.combat-character-art) {
+.combat-unit > :not(.combat-character-art):not(.combat-blood-splatter):not(.combat-card-dice):not(.combat-followup-badge) {
   position: relative;
   z-index: 1;
+}
+
+.combat-unit > .combat-blood-splatter {
+  position: absolute;
 }
 
 .combat-unit > .combat-card-dice {
   position: absolute;
   z-index: 6;
+}
+
+.combat-unit > .combat-followup-badge {
+  position: absolute;
 }
 
 .combat-unit.anim-iron-scabbard-empower {
@@ -3617,32 +3625,40 @@ html, body {
 
 .combat-followup-badge {
   position: absolute;
-  left: 50%;
-  top: -13px;
-  z-index: 9;
+  left: auto;
+  right: 39px;
+  top: 6px;
+  z-index: 5;
   display: inline-flex;
   align-items: center;
-  gap: 7px;
-  transform: translateX(-50%);
-  padding: 4px 10px;
+  justify-content: center;
+  gap: 0;
+  transform: none;
+  max-width: min(96px, calc(100% - 64px));
+  min-height: 26px;
+  padding: 4px 11px;
   color: #fff4c4;
   border: 1px solid rgba(255, 217, 112, .78);
   background:
     linear-gradient(180deg, rgba(92, 58, 13, .98), rgba(31, 17, 5, .98));
   box-shadow: 0 0 14px rgba(255, 170, 48, .5), inset 0 1px 0 rgba(255, 239, 180, .18);
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
   pointer-events: none;
 }
 
 .combat-followup-badge strong {
   font-family: var(--font-serif);
-  font-size: .96em;
+  font-size: .98em;
+  line-height: 1;
   letter-spacing: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .combat-followup-badge span {
-  font-size: .74em;
-  color: #e9c577;
+  display: none;
 }
 
 @keyframes combat-followup-pulse {
@@ -9906,14 +9922,12 @@ body::before {
 
   .combat-followup-badge {
     left: auto;
-    right: 7px;
-    top: -9px;
+    right: 38px;
+    top: 6px;
     transform: none;
+    max-width: min(76px, calc(100% - 58px));
+    min-height: 24px;
     padding: 3px 8px;
-  }
-
-  .combat-followup-badge span {
-    display: none;
   }
 
   .modal-content.combat-modal #modal-desc {
