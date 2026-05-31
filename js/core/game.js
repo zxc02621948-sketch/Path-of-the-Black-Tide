@@ -73,7 +73,7 @@ const Game = {
     // Section.
     this._revealAround(cx, cy);
 
-    this._log('你們踏入黑夜邊境。', 'important');
+    this._log('你們踏上黑潮之途。', 'important');
     this._syncKnownRelicNotes();
 
     this._updateResonances();
@@ -299,7 +299,7 @@ const Game = {
     }
     const boss = typeof getFinalBossEnemy === 'function' ? getFinalBossEnemy(G.darkness || 0) : null;
     if (!boss) {
-      this._log('第 20 天黎明到來，你們撐過了黑夜邊境。', 'important');
+      this._log('第 20 天黎明到來，你們走過了黑潮之途。', 'important');
       this._endGame('dawn');
       return;
     }

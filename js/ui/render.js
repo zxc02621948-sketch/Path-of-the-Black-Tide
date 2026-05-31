@@ -1093,7 +1093,7 @@ const Render = {
       devoured: '黑暗吞噬',
     };
     const descs = {
-      lose: '小隊倒在黑夜邊境之中。',
+      lose: '小隊倒在黑潮之途上。',
       evacuate: '你們帶著殘存的火光撤離了邊境。',
       dawn: '黑夜退去，黎明終於抵達。',
       devoured: '黑暗值達到極限，邊境吞沒了一切。',

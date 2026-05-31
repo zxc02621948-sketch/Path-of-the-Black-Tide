@@ -1,4 +1,4 @@
-// 《黑夜邊境》— 所有平衡數值集中於此，方便調整
+// 《黑潮之途》— 所有平衡數值集中於此，方便調整
 const CONFIG = {
   // Development helper: show advanced notes and locked rule entries for testing.
   DEV_UNLOCK_ALL_NOTES: true,
