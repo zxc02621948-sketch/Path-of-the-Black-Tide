@@ -1704,7 +1704,6 @@ const RenderModal = {
           </div>
           <button type="button" class="combat-enemy-sprite combat-enemy-detail-button"
             onclick="event.stopPropagation(); Game.showCombatEnemyDetail(event)"
-            title="${enemyHoverTitle}"
             aria-label="${enemyHoverTitle}">
             ${combat.enemy.hideIconInCombat ? '' : this._enemyIconHtml(combat.enemy)}
           </button>
