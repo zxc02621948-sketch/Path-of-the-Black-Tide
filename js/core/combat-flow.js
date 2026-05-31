@@ -2304,6 +2304,8 @@ const GameCombatFlow = {
         iconFlipX: !!enemy.iconFlipX,
         iconScale: enemy.iconScale || null,
         iconSoftEdge: !!enemy.iconSoftEdge,
+        darkMonsterOriginalLevel: enemy.darkMonsterOriginalLevel || 0,
+        darkMonsterCombatLevel: enemy.darkMonsterCombatLevel || 0,
         defeated: !inCombat && !!attacker,
         cardBgImage: enemy.cardBgImage || null,
         hideIconInCombat: !!enemy.hideIconInCombat,
@@ -2313,6 +2315,10 @@ const GameCombatFlow = {
         attackTrailFamily: enemy.attackTrailFamily || '',
         attackSfx: enemy.attackSfx || '',
         attackSfxVolume: enemy.attackSfxVolume,
+        damageDieSides: Math.max(0, Math.floor(enemy.damageDieSides || 0)),
+        abilities: Array.isArray(enemy.abilities)
+          ? enemy.abilities.map(ability => ({ ...ability }))
+          : [],
         desc: enemy.desc || '',
         hp: enemy.hp, maxHp: enemy.maxHp || enemy.hp,
         block: CombatStatus.getBlock(enemy),
@@ -2347,7 +2353,7 @@ const GameCombatFlow = {
             executed: !!enemy.abilityState.executionCountdown.executed,
           }
           : null,
-        damageDieSides: ['weak', 'medium'].includes(enemy.tier) ? 3 : 0,
+        damageDieSides: Math.max(0, Math.floor(enemy.damageDieSides || 0)) || (['weak', 'medium'].includes(enemy.tier) ? 3 : 0),
         weaknessDesc: enemy.weaknessEffect?.desc || '',
       },
       squad: G.squad.map(c => ({
@@ -2393,7 +2399,8 @@ const GameCombatFlow = {
       : { damageBonus: 0 };
     const attackBonus = painBonus + (bannerInfo.damageBonus || 0);
     const baseAttack = Math.max(0, enemy.attack || 0);
-    const weakDamageDie = ['weak', 'medium'].includes(enemy?.tier);
+    const damageDieSides = Math.max(0, Math.floor(enemy?.damageDieSides || 0));
+    const weakDamageDie = damageDieSides > 0 || ['weak', 'medium'].includes(enemy?.tier);
     const damageText = (damage) => weakDamageDie ? `${damage}+骰` : `${damage}`;
     const damageTitleText = (damage) => weakDamageDie ? `${damage}+骰（三面骰）` : `${damage}`;
     const target = {

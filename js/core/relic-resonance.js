@@ -91,15 +91,119 @@ const GameRelicResonance = {
   },
 
   _showResonanceActivatedModal(resonances = []) {
-    const lines = resonances.map(res => {
+    const escape = value => this._escapeHtmlLocal ? this._escapeHtmlLocal(value) : String(value ?? '');
+    const primaryTheme = this._resonanceAwakenTheme(resonances[0]);
+    const sceneStyle = [
+      `--res-primary:${primaryTheme.primary}`,
+      `--res-secondary:${primaryTheme.secondary}`,
+      `--res-shadow:${primaryTheme.shadow}`,
+    ].join(';');
+    const cards = resonances.map(res => {
       const owner = res.bodyChar?.name ? `${res.bodyChar.name}：` : '';
-      return `${owner}${res.name}\n${this._resonanceEffectText(res)}`;
-    }).join('\n\n');
+      const theme = this._resonanceAwakenTheme(res);
+      const style = [
+        `--res-primary:${theme.primary}`,
+        `--res-secondary:${theme.secondary}`,
+        `--res-shadow:${theme.shadow}`,
+      ].join(';');
+      return `
+        <section class="resonance-awaken-card resonance-theme-${escape(theme.key)}" style="${style}">
+          <div class="resonance-awaken-sigil" aria-hidden="true">
+            <span>${escape(theme.sigil)}</span>
+          </div>
+          <div class="resonance-awaken-kicker">${escape(owner || '隊伍共鳴')}</div>
+          <h3>${escape(res.name || '未知共鳴')}</h3>
+          <p>${escape(this._resonanceEffectText(res)).replace(/\n/g, '<br>')}</p>
+        </section>
+      `;
+    }).join('');
+    const lead = resonances.length > 1
+      ? '多股聖物氣息同時交疊，隊伍的戰鬥方式被重新改寫。'
+      : '聖物彼此回應，沉睡的力量在這一刻成形。';
     this._openModal({
       title: resonances.length > 1 ? '聖物共鳴啟動' : `聖物共鳴啟動：${resonances[0]?.name || ''}`,
-      desc: lines,
+      descHtml: `
+        <div class="resonance-awaken-scene resonance-theme-${escape(primaryTheme.key)}" style="${sceneStyle}" aria-hidden="true">
+          <span class="resonance-awaken-echo resonance-awaken-echo-a">${escape(primaryTheme.sigil)}</span>
+          <span class="resonance-awaken-echo resonance-awaken-echo-b">${escape(primaryTheme.sigil)}</span>
+          <span class="resonance-awaken-core"></span>
+          <span class="resonance-awaken-ring resonance-awaken-ring-a"></span>
+          <span class="resonance-awaken-ring resonance-awaken-ring-b"></span>
+          <span class="resonance-awaken-spark resonance-awaken-spark-a"></span>
+          <span class="resonance-awaken-spark resonance-awaken-spark-b"></span>
+          <span class="resonance-awaken-spark resonance-awaken-spark-c"></span>
+        </div>
+        <div class="resonance-awaken-copy">
+          <p class="resonance-awaken-lead">${escape(lead)}</p>
+          <div class="resonance-awaken-list">${cards}</div>
+        </div>
+      `,
+      resultFx: 'resonance-awaken',
+      eventSfx: 'swordWoosh',
+      eventSfxVolume: 0.32,
       choices: [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
+  },
+
+  _resonanceAwakenTheme(res) {
+    const themes = {
+      pain_resonance: {
+        key: 'pain',
+        sigil: '傷',
+        primary: 'rgba(230, 54, 42, .92)',
+        secondary: 'rgba(255, 178, 112, .78)',
+        shadow: 'rgba(130, 0, 0, .52)',
+      },
+      pain_scar_resonance: {
+        key: 'scar',
+        sigil: '痕',
+        primary: 'rgba(190, 40, 86, .9)',
+        secondary: 'rgba(255, 134, 174, .76)',
+        shadow: 'rgba(92, 0, 38, .52)',
+      },
+      greatsword_resonance: {
+        key: 'iron',
+        sigil: '鐵',
+        primary: 'rgba(228, 180, 96, .92)',
+        secondary: 'rgba(118, 210, 198, .72)',
+        shadow: 'rgba(68, 46, 18, .52)',
+      },
+      rapier_resonance: {
+        key: 'bee',
+        sigil: '蜂',
+        primary: 'rgba(190, 242, 255, .92)',
+        secondary: 'rgba(255, 214, 96, .76)',
+        shadow: 'rgba(18, 74, 92, .5)',
+      },
+      dodeca_fate_dice: {
+        key: 'fate',
+        sigil: '命',
+        primary: 'rgba(184, 116, 255, .92)',
+        secondary: 'rgba(255, 222, 122, .8)',
+        shadow: 'rgba(54, 18, 96, .52)',
+      },
+      dodeca_lucky_dice: {
+        key: 'lucky',
+        sigil: '星',
+        primary: 'rgba(255, 228, 112, .94)',
+        secondary: 'rgba(124, 218, 255, .78)',
+        shadow: 'rgba(100, 74, 10, .5)',
+      },
+      star_hunter_eye: {
+        key: 'eye',
+        sigil: '眼',
+        primary: 'rgba(92, 214, 255, .92)',
+        secondary: 'rgba(255, 248, 172, .8)',
+        shadow: 'rgba(18, 42, 96, .5)',
+      },
+    };
+    return themes[res?.id] || {
+      key: 'default',
+      sigil: '共',
+      primary: 'rgba(126, 255, 232, .9)',
+      secondary: 'rgba(255, 211, 128, .76)',
+      shadow: 'rgba(24, 88, 82, .5)',
+    };
   },
 
   _resonanceEffectText(res) {

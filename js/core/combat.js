@@ -1120,6 +1120,13 @@ const CombatRules = {
   },
 
   _enemyAttackDamageDie(enemy) {
+    const sides = Math.max(0, Math.floor(enemy?.damageDieSides || 0));
+    if (sides > 0) {
+      return {
+        roll: Math.ceil(Math.random() * sides),
+        sides,
+      };
+    }
     if (!['weak', 'medium'].includes(enemy?.tier)) return { roll: 0, sides: 0 };
     return {
       roll: Math.ceil(Math.random() * 3),

@@ -46,6 +46,9 @@ const GameCombatTooltips = {
     if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'execution_countdown')) {
       abilityNotes.push('處刑倒數：倒數歸零後，下一次行動會處刑牢中的倖存者。處刑不傷害隊伍，但救援會失敗；命中原生弱點可讓倒數 +1。');
     }
+    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
+      abilityNotes.push('再生硬殼：戰鬥開始與每回合開始時會把格檔補回硬殼值。命中原生弱點可破殼，清除格檔並停止本場戰鬥的硬殼再生。攻擊有格檔的目標時傷害 +2。');
+    }
     const titleText = `${enemy.icon || ''} ${enemy.name}`.trim();
     const descText = [
       enemy.desc || enemy.lore || '',

@@ -1,6 +1,8 @@
 ﻿// Section.
 let G = {};
 
+const GUIDE_QUEST_DISABLED_KEY = 'bbn_guide_quest_disabled';
+
 const Game = {
 
   // Section.
@@ -25,6 +27,7 @@ const Game = {
       echoSites: [],
       spawnedUniqueEnemies: [],
       defeatedUniqueEnemies: [],
+      guideQuest: null,
 
       map: MapGen.generate(),
       playerX: cx,
@@ -66,12 +69,14 @@ const Game = {
       G.squad.push(char);
       usedNames.add(char.name);
     }
+    this._applyStartingLibraryRelic(startingLibraryRelicId, startingLibraryCarrierCls);
 
     // Section.
     this._dedupeMapRelics();
 
     // Section.
     this._revealAround(cx, cy);
+    this._initGuideQuest();
 
     this._log('你們踏上黑潮之途。', 'important');
     this._syncKnownRelicNotes();
@@ -81,6 +86,135 @@ const Game = {
     if (Render.shouldShowOpeningTutorial?.()) {
       Render.showTutorial?.(0);
     }
+    this._showGuideQuestIntro();
+  },
+
+  _initGuideQuest() {
+    if (this._isGuideQuestDisabled()) {
+      G.guideQuest = { active: false, completed: true };
+      return;
+    }
+    const hasRelic = this._aliveSquad().some(char => char.relic || char.fusedRelic);
+    G.guideQuest = {
+      active: true,
+      stage: hasRelic ? 'find_altar' : 'find_relic',
+      introShown: false,
+      relicHintShown: hasRelic,
+      altarTarget: null,
+      completed: false,
+    };
+    if (hasRelic) this._revealGuideAltarTarget();
+  },
+
+  _showGuideQuestIntro() {
+    if (!G.guideQuest?.active || G.guideQuest.introShown) return;
+    G.guideQuest.introShown = true;
+    const hasRelic = G.guideQuest.stage === 'find_altar';
+    this._queueSystemModal({
+      title: hasRelic ? '指引任務：前往神壇' : '指引任務：尋找第一件聖物',
+      desc: hasRelic
+        ? '你已經帶著聖物踏上旅程。前往地圖上發光的神壇，可以融合聖物，讓它變得更強大。'
+        : '先讓小隊取得第一件聖物。\n\n你可以挑戰怪物，也可以前往森林、遺跡或洞穴等地形區域調查，事件中有機會找到聖物。',
+      resultFx: hasRelic ? 'event-discover' : 'event-scene',
+      choices: [
+        { label: '開始行動', action: () => { this._closeModal(); Render.fullRender(); } },
+        { label: '不再顯示', action: () => this._disableGuideQuest() },
+      ],
+    });
+  },
+
+  _onGuideRelicAcquired(relic = null) {
+    if (!G.guideQuest?.active || G.guideQuest.stage !== 'find_relic') return;
+    G.guideQuest.stage = 'find_altar';
+    G.guideQuest.relicHintShown = true;
+    const altar = this._revealGuideAltarTarget();
+    const altarText = altar ? `\n\n神壇位置已標記在地圖上：(${altar.x},${altar.y})。` : '';
+    this._queueSystemModal({
+      title: '指引任務：聖物可以融合',
+      desc: [
+        relic?.name ? `你取得了聖物「${relic.name}」。` : '你取得了第一件聖物。',
+        '接下來前往神壇，可以融合目前攜帶的聖物，讓它變得更強大。',
+        '融合後角色的普通聖物欄會空出來，之後再攜帶第二件聖物，就有機會形成更強大的共鳴效果。',
+      ].join('\n\n') + altarText,
+      resultFx: 'event-discover',
+      choices: [
+        { label: '前往神壇', action: () => { this._closeModal(); Render.fullRender(); } },
+        { label: '不再顯示', action: () => this._disableGuideQuest() },
+      ],
+    });
+  },
+
+  _onGuideAltarFusion() {
+    if (!G.guideQuest?.active || G.guideQuest.completed) return;
+    G.guideQuest.stage = 'complete';
+    G.guideQuest.completed = true;
+    this._queueSystemModal({
+      title: '指引任務完成',
+      desc: '聖物已完成融合。\n\n接下來你可以繼續探索，尋找第二件能搭配的聖物。當聖物彼此呼應時，就可能啟動強大的共鳴效果。',
+      resultFx: 'event-reward',
+      choices: [{ label: '繼續探索', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
+  _isGuideQuestDisabled() {
+    try {
+      return localStorage.getItem(GUIDE_QUEST_DISABLED_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  },
+
+  _disableGuideQuest() {
+    try {
+      localStorage.setItem(GUIDE_QUEST_DISABLED_KEY, 'true');
+    } catch {
+      // Storage may be unavailable; still hide the guide for this run.
+    }
+    if (G.guideQuest) {
+      G.guideQuest.active = false;
+      G.guideQuest.completed = true;
+    }
+    this._closeModal();
+    Render.fullRender();
+  },
+
+  _revealGuideAltarTarget() {
+    if (!G.guideQuest) return null;
+    let target = null;
+    let bestDist = Infinity;
+    for (const row of G.map || []) {
+      for (const cell of row || []) {
+        if (!cell || cell.cleared) continue;
+        const isAltar = cell.type === 'altar' || cell.hiddenSite?.type === 'altar';
+        if (!isAltar) continue;
+        const dist = MapGen.distance(G.playerX, G.playerY, cell.x, cell.y);
+        if (dist < bestDist) {
+          target = cell;
+          bestDist = dist;
+        }
+      }
+    }
+    if (!target) return null;
+    if (target.hiddenSite?.type === 'altar') {
+      this._revealHiddenSite?.(target);
+    } else {
+      target.revealed = true;
+      target.altarHidden = false;
+    }
+    G.guideQuest.altarTarget = { x: target.x, y: target.y };
+    return target;
+  },
+
+  _isGuideTargetCell(x, y, cell) {
+    const quest = G.guideQuest;
+    if (!quest?.active || quest.completed || !cell?.revealed) return false;
+    if (quest.stage === 'find_altar') {
+      return quest.altarTarget?.x === x && quest.altarTarget?.y === y;
+    }
+    if (quest.stage === 'find_relic') {
+      return !cell.cleared && ['enemy', 'relic', 'forest', 'ruins', 'cave'].includes(cell.type);
+    }
+    return false;
   },
 
   // Section.
@@ -438,7 +572,8 @@ const Game = {
           this._log(`${char.name} 獲得聖物「${relic.name}」。`, 'reward');
           this._closeModal();
           const newly = this._updateResonances({ announceModal: true });
-          if (!newly.length) Render.fullRender();
+          this._onGuideRelicAcquired(relic);
+          if (!newly.length && !G.modal) Render.fullRender();
         },
       });
     }
@@ -642,7 +777,8 @@ const Game = {
     this._log(`${char.name} 改為攜帶聖物「${relic.name}」。${replaced ? `原本的「${replaced.name}」掉落在原地。` : ''}`, 'reward');
     this._closeModal();
     const newly = this._updateResonances({ announceModal: true });
-    if (!newly.length) Render.fullRender();
+    this._onGuideRelicAcquired(relic);
+    if (!newly.length && !G.modal) Render.fullRender();
   },
 
   // Section.

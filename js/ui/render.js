@@ -5,6 +5,7 @@ const Render = {
   // Section.
   fullRender() {
     this._safeRender('top bar', () => this.renderTopBar());
+    this._safeRender('guide quest', () => this.renderGuideQuest());
     this._safeRender('map', () => this.renderMap(), 'map-grid');
     this._safeRender('squad', () => this.renderSquad(), 'squad-list');
     this._safeRender('effects', () => this.renderEffects());
@@ -12,6 +13,34 @@ const Render = {
     this._safeRender('resonances', () => this.renderResonances());
     this._safeRender('phase class', () => this.updatePhaseClass());
     AudioManager?.sync?.();
+  },
+
+  renderGuideQuest() {
+    const panel = document.getElementById('log-panel');
+    if (!panel) return;
+    let card = document.getElementById('guide-quest-card');
+    const quest = G.guideQuest;
+    if (!quest?.active || quest.completed) {
+      card?.remove();
+      return;
+    }
+    if (!card) {
+      card = document.createElement('div');
+      card.id = 'guide-quest-card';
+      panel.appendChild(card);
+    }
+    const isAltarStage = quest.stage === 'find_altar';
+    const title = isAltarStage ? '前往神壇融合聖物' : '尋找第一件聖物';
+    const body = isAltarStage
+      ? '地圖上發光的神壇可以融合聖物。融合後可再攜帶第二件聖物，形成更強大的共鳴。'
+      : '挑戰怪物，或前往森林、遺跡、洞穴等地形區域調查。先讓隊伍取得第一件聖物。';
+    const step = isAltarStage ? '2 / 2' : '1 / 2';
+    card.className = `guide-quest-card ${isAltarStage ? 'altar-stage' : 'relic-stage'}`;
+    card.innerHTML = `
+      <div class="guide-quest-step">指引任務 ${step}</div>
+      <div class="guide-quest-title">${this._escapeHtml(title)}</div>
+      <div class="guide-quest-body">${this._escapeHtml(body)}</div>
+    `;
   },
 
   _safeRender(name, fn, fallbackElementId = null) {
@@ -163,6 +192,13 @@ const Render = {
           }
           if (cell.corrupted) {
             el.classList.add('corrupted');
+          }
+          if (typeof Game !== 'undefined' && Game._isGuideTargetCell?.(x, y, cell)) {
+            el.classList.add('guide-quest-target');
+            const guideBadge = document.createElement('div');
+            guideBadge.className = 'guide-quest-badge';
+            guideBadge.textContent = G.guideQuest?.stage === 'find_altar' ? '神壇' : '目標';
+            el.appendChild(guideBadge);
           }
 
           // Section.

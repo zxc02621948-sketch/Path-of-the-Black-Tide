@@ -51,14 +51,14 @@ const GameSiteActions = {
         label: '融合聖物',
         hint: G.actionsLeft > 0
           ? '消耗 1 行動，角色最大 HP -1。'
-          : '行動不足，無法融合。',
+          : '今天行動力已用完，明天再回到神壇融合。',
         action: () => this._chooseAltarFusionTarget(cell),
       });
       choices.push({
         label: '血祭',
         hint: '全隊最大 HP -1；探索骰 4-5 黑暗 -1，6 黑暗 -2。',
         danger: true,
-        action: () => this._doAltarBloodSacrifice(cell),
+        action: () => this._confirmAltarBloodSacrifice(cell),
       });
     }
 
@@ -96,7 +96,7 @@ const GameSiteActions = {
     if (G.actionsLeft <= 0) {
       this._openModal({
         title: '神壇融合',
-        desc: '行動不足，無法融合聖物。',
+        desc: '今天的行動力已經用完，無法再進行融合。\n\n如果還想使用這座神壇，請先結束今天，明天再回到這裡。',
         choices: [{ label: '返回', action: () => this._triggerAltar(cell) }],
       });
       return;
@@ -153,6 +153,30 @@ const GameSiteActions = {
       title: '神壇融合成功',
       desc: `${char.name} 最大 HP -1，融合聖物「${fusedRelic.name}」。\n\n消耗 1 行動。${resonanceText}`,
       choices: [{ label: '離開神壇', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+    this._onGuideAltarFusion?.();
+  },
+
+  _confirmAltarBloodSacrifice(cell) {
+    if (cell.altarUsedDay === G.day) {
+      this._triggerAltar(cell);
+      return;
+    }
+    this._openModal({
+      title: '確認血祭',
+      desc: [
+        '血祭會讓全隊存活角色最大 HP -1。',
+        '接著進行一次探索骰判定：擲出 4-5 時黑暗 -1，擲出 6 時黑暗 -2。',
+        '這是高代價行動，請確認真的要獻上生命上限。',
+      ].join('\n\n'),
+      choices: [
+        {
+          label: '確認血祭',
+          danger: true,
+          action: () => this._doAltarBloodSacrifice(cell),
+        },
+        { label: '取消', action: () => this._triggerAltar(cell) },
+      ],
     });
   },
 

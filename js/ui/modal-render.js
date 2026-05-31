@@ -39,7 +39,8 @@ const RenderModal = {
       'event-discover',
       'event-reward',
       'event-quiet',
-      'event-intro-scene'
+      'event-intro-scene',
+      'resonance-awaken'
     );
     const activeIntroFx = cfg.introFx || this._defaultModalIntroFx(cfg);
     const activeResultFx = cfg.resultFx || '';
@@ -201,19 +202,26 @@ const RenderModal = {
         const extraText = nativeInfo.extras.length
           ? `<div class="cct-row"><span class="cct-label">原生+</span>${nativeInfo.extras.map(w => `${Dice.face(w)} ${w}`).join('、')}</div>`
           : '';
+        const abilityRows = this._combatEnemyAbilityRowsHtml(e);
         let tip = document.getElementById('combat-float-tip');
         if (!tip) { tip = document.createElement('div'); tip.id = 'combat-float-tip'; document.body.appendChild(tip); }
         const enemyHtml = `
           <div class="cct-name">${e.icon || '⚔️'} ${e.name}</div>
           ${e.desc ? `<div class="cct-row" style="margin-bottom:7px;color:var(--text)">${e.desc}</div>` : ''}
-          <div class="cct-row"><span class="cct-label">HP</span>${e.hp} / ${e.maxHp}</div>
           <div class="cct-row"><span class="cct-label">格檔</span>${e.block}</div>
           <div class="cct-row"><span class="cct-label">攻擊</span>${e.attack}</div>
           <div class="cct-row"><span class="cct-label">原生弱點</span>${nativeText}</div>
           ${extraText}
+          ${abilityRows}
           ${e.tempWeakness ? `<div class="cct-row"><span class="cct-label">破綻</span>${e.tempWeakness}</div>` : ''}
         `;
-        enemyCard.addEventListener('mouseenter', () => { tip.innerHTML = enemyHtml; tip.classList.add('visible'); });
+        enemyCard.addEventListener('mouseenter', () => {
+          tip.innerHTML = enemyHtml;
+          const rows = [...tip.querySelectorAll('.cct-row')];
+          const firstStatRow = e.desc ? 1 : 0;
+          rows.slice(firstStatRow, firstStatRow + 2).forEach(row => row.remove());
+          tip.classList.add('visible');
+        });
         enemyCard.addEventListener('mousemove', ev => {
           const x = ev.clientX + 16, y = ev.clientY + 12;
           tip.style.left = Math.min(x, window.innerWidth - tip.offsetWidth - 8) + 'px';
@@ -979,6 +987,24 @@ const RenderModal = {
       });
       return;
     }
+    if (fx === 'resonance-awaken') {
+      this._modalFxCleanup = FxPlayer.after(100, () => {
+        if (!contentEl.isConnected) return;
+        this._modalFxCleanup = FxPlayer.layer(contentEl, 'event-fx-layer resonance-awaken-fx-layer', [
+          { className: 'resonance-awaken-fx-vignette' },
+          { className: 'resonance-awaken-fx-beam resonance-awaken-fx-beam-a' },
+          { className: 'resonance-awaken-fx-beam resonance-awaken-fx-beam-b' },
+          { className: 'resonance-awaken-fx-rune resonance-awaken-fx-rune-a' },
+          { className: 'resonance-awaken-fx-rune resonance-awaken-fx-rune-b' },
+          { className: 'resonance-awaken-fx-rune resonance-awaken-fx-rune-c' },
+          { className: 'resonance-awaken-fx-mote', style: { '--x': '20%', '--y': '54%', '--delay': '120ms' } },
+          { className: 'resonance-awaken-fx-mote', style: { '--x': '34%', '--y': '28%', '--delay': '220ms' } },
+          { className: 'resonance-awaken-fx-mote', style: { '--x': '62%', '--y': '32%', '--delay': '160ms' } },
+          { className: 'resonance-awaken-fx-mote', style: { '--x': '78%', '--y': '58%', '--delay': '280ms' } },
+        ], 1500);
+      });
+      return;
+    }
     if (fx !== 'event-ambush') return;
     const embers = [
       ['22%', '68%', '-16px', '10px', '280ms', '2px'],
@@ -1200,14 +1226,12 @@ const RenderModal = {
   },
 
   _showCombatAttackTrail(targetEl, trail = '', opts = {}) {
-    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'shell_impact', 'jaw_bite', 'poison_cloud'].includes(trail)) return;
+    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'shell_impact', 'jaw_bite', 'poison_cloud', 'dark_avatar'].includes(trail)) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
-    const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
+    let sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     if (!sceneEl || !sourceRect) return;
     const targetRect = targetEl.getBoundingClientRect();
     const sceneRect = sceneEl.getBoundingClientRect();
-    const sourceX = sourceRect.left + sourceRect.width / 2;
-    const sourceY = sourceRect.top + sourceRect.height / 2;
     const sourceWeaponFamily = opts.weaponFamily || opts.sourceEl?.dataset?.weaponFamily || '';
     const swordSlash = trail === 'slash' && sourceWeaponFamily === 'sword';
     const daggerSlash = trail === 'slash' && sourceWeaponFamily === 'dagger';
@@ -1217,6 +1241,12 @@ const RenderModal = {
     const shellImpact = trail === 'shell_impact';
     const jawBite = trail === 'jaw_bite';
     const poisonCloud = trail === 'poison_cloud';
+    const darkAvatar = trail === 'dark_avatar';
+    if (darkAvatar) {
+      sourceRect = opts.sourceEl?.querySelector?.('.combat-enemy-sprite')?.getBoundingClientRect?.() || sourceRect;
+    }
+    const sourceX = sourceRect.left + sourceRect.width / 2;
+    const sourceY = sourceRect.top + sourceRect.height / 2;
     const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker || shellImpact || jawBite || poisonCloud;
     const enemyFigureRect = fixedTargetTrail && opts.side === 'enemy'
       ? targetEl.querySelector('.combat-enemy-figure')?.getBoundingClientRect?.()
@@ -1224,9 +1254,17 @@ const RenderModal = {
     const enemySpriteRect = fixedTargetTrail && opts.side === 'enemy' && !targetEl.classList.contains('has-card-bg')
       ? targetEl.querySelector('.combat-enemy-sprite')?.getBoundingClientRect?.()
       : null;
-    const impactRect = enemySpriteRect || enemyFigureRect || targetRect;
+    const allyArtRect = darkAvatar && opts.side === 'ally'
+      ? targetEl.querySelector('.combat-character-art')?.getBoundingClientRect?.()
+      : null;
+    const allyMainRect = darkAvatar && opts.side === 'ally'
+      ? targetEl.querySelector('.combat-unit-main')?.getBoundingClientRect?.()
+      : null;
+    const impactRect = allyArtRect || allyMainRect || enemySpriteRect || enemyFigureRect || targetRect;
     const targetX = impactRect.left + impactRect.width / 2;
-    const targetY = targetEl.classList.contains('has-card-bg') && fixedTargetTrail
+    const targetY = darkAvatar && opts.side === 'ally'
+      ? impactRect.top + impactRect.height * 0.42
+      : targetEl.classList.contains('has-card-bg') && fixedTargetTrail
       ? targetRect.top + 118
       : (impactRect === targetRect ? targetRect.top + (opts.side === 'ally' ? 54 : 72) : impactRect.top + impactRect.height / 2);
     const dx = targetX - sourceX;
@@ -1237,7 +1275,7 @@ const RenderModal = {
     const trailClass = String(trail).replace(/_/g, '-');
     fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}`;
     fx.setAttribute('aria-hidden', 'true');
-    if (trail === 'pierce' || trail === 'silver_bee_pin') {
+    if (trail === 'pierce' || trail === 'silver_bee_pin' || darkAvatar) {
       fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
       fx.style.top = `${Math.round(sourceY - sceneRect.top)}px`;
       fx.style.width = `${Math.round(distance)}px`;
@@ -1263,6 +1301,7 @@ const RenderModal = {
       shell_impact: 760,
       jaw_bite: 760,
       poison_cloud: 820,
+      dark_avatar: 920,
     };
     FxPlayer.removeAfter(fx, durationByTrail[trail] || 620);
   },
@@ -1632,14 +1671,22 @@ const RenderModal = {
       </div>
     ` : '';
 
-    const enemyCardBgStyle = combat.enemy.cardBgImage
-      ? ` style="--enemy-card-bg: url('${combat.enemy.cardBgImage}')"`
+    const enemyCardVars = [];
+    if (combat.enemy.cardBgImage) enemyCardVars.push(`--enemy-card-bg: url('${combat.enemy.cardBgImage}')`);
+    if (combat.enemy.iconImage === 'assets/enemies/dark-avatar-combat.png') {
+      const darkLevel = Math.max(0, Number(combat.enemy.darkMonsterOriginalLevel || combat.enemy.darkMonsterCombatLevel || 0));
+      const scale = Math.min(1.34, 1 + Math.min(darkLevel, 24) * 0.02);
+      enemyCardVars.push(`--dark-avatar-scale: ${scale.toFixed(3)}`);
+    }
+    const enemyCardBgStyle = enemyCardVars.length
+      ? ` style="${enemyCardVars.join('; ')}"`
       : '';
     const enemyCardBgClass = combat.enemy.cardBgImage ? ' has-card-bg' : '';
     const enemyCardIdClass = combat.enemy.id
       ? ` enemy-${String(combat.enemy.id).replace(/[^a-z0-9_-]/gi, '-')}`
       : '';
     const enemyDefeatedClass = combat.enemy.defeated ? ' pending-defeated' : '';
+    const enemyHoverTitle = this._combatEnemyHoverTitle(combat.enemy);
 
     return `
       ${intentArrowHtml}
@@ -1657,6 +1704,8 @@ const RenderModal = {
           </div>
           <button type="button" class="combat-enemy-sprite combat-enemy-detail-button"
             onclick="event.stopPropagation(); Game.showCombatEnemyDetail(event)"
+            onmouseenter="this.title='${enemyHoverTitle}'"
+            onfocus="this.title='${enemyHoverTitle}'"
             title="查看敵人詳情">
             ${combat.enemy.hideIconInCombat ? '' : this._enemyIconHtml(combat.enemy)}
           </button>
@@ -1695,6 +1744,23 @@ const RenderModal = {
       </div>
       <div class="combat-status-bar${selectable ? ' selectable-hint' : ''}">${combat.status || '選擇一名角色出手'}</div>
     `;
+  },
+
+  _combatEnemyAbilityRowsHtml(enemy) {
+    const rows = [];
+    if (Array.isArray(enemy?.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
+      rows.push('再生硬殼：戰鬥開始與每回合開始時補回格檔。命中原生弱點可破殼並停止本場硬殼再生。攻擊有格檔的目標時傷害 +2。');
+    }
+    return rows.map(text => `<div class="cct-row"><span class="cct-label">能力</span>${this._escapeHtml(text)}</div>`).join('');
+  },
+
+  _combatEnemyHoverTitle(enemy) {
+    const lines = [`${enemy?.name || '敵人'}：點擊查看詳細資訊`];
+    if (Array.isArray(enemy?.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
+      lines.push('再生硬殼：戰鬥開始與每回合開始時補回格檔。命中原生弱點可破殼並停止本場硬殼再生。攻擊有格檔的目標時傷害 +2。');
+    }
+    if (enemy?.weaknessDesc) lines.push(`破除效果：${enemy.weaknessDesc}`);
+    return this._escapeHtml(lines.filter(Boolean).join('\n'));
   },
 
   _combatShouldShowIntentArrow(combat) {
