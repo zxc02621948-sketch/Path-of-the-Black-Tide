@@ -586,9 +586,15 @@ const CombatRules = {
     }
 
     const preBlockDamage = damage;
+    let enemyBlockBefore = null;
+    let enemyBlockAfter = null;
+    let enemyBlockAbsorbed = 0;
     if (CombatStatus.getBlock(enemy) > 0 && damage > 0) {
+      enemyBlockBefore = CombatStatus.getBlock(enemy);
       const blockResult = CombatStatus.consumeBlock(enemy, damage);
       damage = blockResult.damage;
+      enemyBlockAfter = blockResult.block;
+      enemyBlockAbsorbed = blockResult.absorbed;
       logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，剩餘傷害 ${damage}`);
     }
 
@@ -650,12 +656,15 @@ const CombatRules = {
       weapon?.family === 'sword' &&
       roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
       damage > 0;
-    if (damage > 0) {
+    if (damage > 0 || enemyBlockAbsorbed > 0) {
       playerDamageEvents.push({
         type: 'primary',
         damage,
         from: primaryHpBefore,
         to: enemy.hp,
+        enemyBlockBefore,
+        enemyBlockAfter,
+        enemyBlockAbsorbed,
         hitEffect: primaryHitEffect,
         attackTrail: primaryAttackTrail,
         sfx: weapon?.family === 'bow'
@@ -863,12 +872,16 @@ const CombatRules = {
     }
     const enemyDead = enemy.hp <= 0;
     let enemyBlockGain = 0;
+    let enemyBlockBeforeAction = null;
+    let enemyBlockAfterAction = null;
     const enemyWillBlock = !suppressEnemyAction && !stunned && !enemyDead && !enemy.blockBroken &&
       (intent?.type === 'block' || intent?.type === 'block_attack');
     if (enemyWillBlock) {
       const blockVal = Math.max(0, enemy.block || 0);
       if (blockVal > 0) {
+        enemyBlockBeforeAction = CombatStatus.getBlock(enemy);
         CombatStatus.raiseBlock(enemy, blockVal);
+        enemyBlockAfterAction = CombatStatus.getBlock(enemy);
         enemyBlockGain = blockVal;
         logs.push(`${enemy.name} 格檔 +${blockVal}`);
         EnemyAbilities.afterEnemyBlock?.({
@@ -923,6 +936,8 @@ const CombatRules = {
       counterDmg,
       aoeCounter,
       enemyBlockGain,
+      enemyBlockBeforeAction,
+      enemyBlockAfterAction,
       enemyDiceRoll,
       enemyDiceSides,
       enemyAttackFlow,
@@ -979,9 +994,15 @@ const CombatRules = {
       counterDmg = CombatStatus.applyBannerBearerDamageReduction(counterTarget, counterDmg, logs);
       counterDmg = CombatStatus.applyExplorerEvasion(counterTarget, counterDmg, logs, '敵方攻擊傷害');
       let finalEyePierceDamage = 0;
+      let allyBlockBefore = null;
+      let allyBlockAfter = null;
+      let allyBlockAbsorbed = 0;
       if (CombatStatus.getBlock(counterTarget) > 0) {
+        allyBlockBefore = CombatStatus.getBlock(counterTarget);
         const blockResult = CombatStatus.consumeBlock(counterTarget, counterDmg);
         counterDmg = blockResult.damage;
+        allyBlockAfter = blockResult.block;
+        allyBlockAbsorbed = blockResult.absorbed;
         logs.push(`格檔吸收 ${blockResult.absorbed}，剩餘格檔 ${blockResult.block}，敵方攻擊 ${counterDmg}`);
         if (intent?.finalEye && blockResult.absorbed > 0) {
           finalEyePierceDamage = this._finalEyeBlockPierceDamage(enemy);
@@ -1010,10 +1031,27 @@ const CombatRules = {
           damage: totalCounterDamage,
           from: beforeHp,
           to: counterTarget.hp,
+          allyBlockBefore,
+          allyBlockAfter,
+          allyBlockAbsorbed,
+          fullBlock: allyBlockAbsorbed > 0 && totalCounterDamage <= 0,
         });
         counterDmg = totalCounterDamage;
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
+        if (allyBlockAbsorbed > 0 && counterTarget) {
+          incomingDamageEvents.push({
+            type: 'counter_blocked',
+            targetId: counterTarget.id,
+            damage: 0,
+            from: counterTarget.hp,
+            to: counterTarget.hp,
+            allyBlockBefore,
+            allyBlockAfter,
+            allyBlockAbsorbed,
+            fullBlock: true,
+          });
+        }
         logs.push(`${enemy.name} 的攻擊被完全抵消。`);
       }
     } else if (suppressEnemyAction && !enemyDead && !deferEnemyAction) {
@@ -1047,6 +1085,8 @@ const CombatRules = {
       counterTargetId: counterTarget?.id || null,
       counterTargetName: counterTarget?.name || null,
       enemyBlockGain,
+      enemyBlockBeforeAction: enemyActionResult.enemyBlockBeforeAction ?? enemyBlockBeforeAction,
+      enemyBlockAfterAction: enemyActionResult.enemyBlockAfterAction ?? enemyBlockAfterAction,
       aoeCounter,
       aoeDamageByChar,
       enemyDiceRoll,

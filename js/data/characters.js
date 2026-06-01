@@ -18,7 +18,7 @@ const CHARACTER_CLASSES = {
     maxHp: 20,
     attack: 3,
     passive: 'suspicious_flaw',
-    passiveDesc: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
+    passiveDesc: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束準備 10% 閃避率，下一回合開始生效；若探索者主戰，額外準備最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
   },
   scholar: {
     id: 'scholar',
@@ -77,6 +77,13 @@ const CLASS_BATTLE_ART = {
   support: 'assets/portraits/battle-support.png',
 };
 
+const CLASS_DEATH_SFX = {
+  warrior: 'warriorDeath',
+  explorer: 'explorerDeath',
+  scholar: 'scholarDeath',
+  support: 'supportDeath',
+};
+
 const _CLASS_DEFAULT_WEAPON = {
   warrior: 'sword',
   explorer: 'bow',
@@ -120,6 +127,7 @@ function createCharacter(name, cls, id) {
     portrait: CLASS_PORTRAITS[cls] || '',
     avatar: CLASS_AVATARS[cls] || '',
     battleArt: CLASS_BATTLE_ART[cls] || '',
+    deathSfx: CLASS_DEATH_SFX[cls] || '',
     flavor: '',
     firstAidUsed: false,
     safeMoveUsed: false,

@@ -69,7 +69,7 @@ const GameCombatInventoryFlow = {
   },
 
   _canUseCombatBag() {
-    return !!G.combat && G.combat.itemUsedRound !== G.combat.round;
+    return !!G.combat && G.combat.itemUsedRound !== G.combat.round && this._combatActableSquad().length > 0;
   },
 
 };

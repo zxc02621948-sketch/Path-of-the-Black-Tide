@@ -152,6 +152,7 @@ const GameStateHelpers = {
 
   _endGame(result) {
     G.phase = 'over';
+    G.gameResult = result;
     G.modal = null;
     this._saveNotes();
 
@@ -241,6 +242,11 @@ const GameStateHelpers = {
     char.hp = 0;
     char.dead = true;
     char.deathLocation = { x: G.playerX, y: G.playerY };
+    const deathSfx = char.deathSfx || (typeof CLASS_DEATH_SFX !== 'undefined' ? CLASS_DEATH_SFX[char.cls] : '');
+    if (deathSfx && !char._deathSfxPlayed) {
+      char._deathSfxPlayed = true;
+      AudioManager?.playSfx?.(deathSfx, char.deathSfxVolume ?? 0.58);
+    }
     this._log(`${char.name} 倒下了。`, 'danger');
 
     if (char.fusedRelic) {
@@ -270,6 +276,7 @@ const GameStateHelpers = {
   _reviveChar(char, hp = 1) {
     char.dead = false;
     char.hp = Math.min(char.maxHp, Math.max(1, hp));
+    char._deathSfxPlayed = false;
     this._log(`${char.name} 被救起，恢復 ${char.hp} HP。`, 'reward');
     this._updateResonances();
   },

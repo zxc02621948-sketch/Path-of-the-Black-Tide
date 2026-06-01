@@ -184,6 +184,7 @@ const RenderModal = {
       sceneEl.className = 'modal-extra combat-scene';
       const combatScene = { ...cfg.combat, playerDice: cfg.dice || null, enemyDice: cfg.enemyDice || null };
       sceneEl.innerHTML = this._combatSceneHtml(combatScene);
+      this.updateCombatTutorialInline(combatScene.tutorial || null, sceneEl);
       descEl.before(sceneEl);
       if (cfg.enemyDice && cfg.enemyDice.animate !== false && !cfg.combatAnims) {
         requestAnimationFrame(() => this._animateCombatEnemyDice(sceneEl, cfg.enemyDice));
@@ -430,7 +431,9 @@ const RenderModal = {
       const playerFollowHits = Math.max(0, cfg.combatAnims.playerFollowHits || 0, playerDamageEvents.length);
       const playerFollowStepMs = 380;
       const guardBlock = Math.max(0, cfg.combatAnims.guardBlock || 0);
-      const hasCombatAnim = playerFollowHits > 0 || incomingDamageEvents.length > 0 || healEvents.length > 0 || guardBlock > 0 || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
+      const hasEnemyBlockChange = Number.isFinite(cfg.combatAnims.enemyBlockBefore) || Number.isFinite(cfg.combatAnims.enemyBlockAfter);
+      const hasNextRoundEvasion = cfg.combatAnims.nextRoundEvasionByChar && Object.keys(cfg.combatAnims.nextRoundEvasionByChar).length > 0;
+      const hasCombatAnim = playerFollowHits > 0 || incomingDamageEvents.length > 0 || healEvents.length > 0 || guardBlock > 0 || hasEnemyBlockChange || hasNextRoundEvasion || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
       const hasEnemyAttack = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe);
       const enemyDiceWindup = hasEnemyAttack && cfg.enemyDice && cfg.enemyDice.animate !== false ? 760 : 0;
       const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * playerFollowStepMs + (incomingDamageEvents.length > 0 ? 520 : 0) + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
@@ -470,6 +473,8 @@ const RenderModal = {
         }, lockMs);
       }
       this._preparePlayerDamageSequence(playerDamageEvents);
+      this._prepareEnemyBlockSequence(cfg.combatAnims);
+      this._prepareAllyStatusSequence(cfg.combatAnims);
       this._prepareHealSequence(healEvents);
       this._prepareIncomingDamageSequence(incomingDamageEvents);
       setTimeout(() => this._triggerCounterAnims({ ...cfg.combatAnims, enemyDice: cfg.enemyDice || null, playerFollowStepMs }), delay);
@@ -1107,6 +1112,8 @@ const RenderModal = {
     const cleanEvents = events.filter(event => Number.isFinite(event?.from) && Number.isFinite(event?.to));
     if (cleanEvents.length === 0) return;
     this._setDisplayedEnemyHp(cleanEvents[0].from);
+    const blockEvent = cleanEvents.find(event => Number.isFinite(event?.enemyBlockBefore));
+    if (blockEvent) this._setDisplayedEnemyBlock(blockEvent.enemyBlockBefore);
   },
 
   _setDisplayedEnemyHp(value) {
@@ -1123,9 +1130,48 @@ const RenderModal = {
     if (text && max > 0) text.textContent = `${hp}/${max}`;
   },
 
+  _prepareEnemyBlockSequence(anims = {}) {
+    if (Number.isFinite(anims?.enemyBlockBefore)) this._setDisplayedEnemyBlock(anims.enemyBlockBefore);
+  },
+
+  _setDisplayedEnemyBlock(value) {
+    const panel = document.querySelector('.combat-enemy-block-panel');
+    if (!panel) return;
+    const block = Math.max(0, Math.round(value || 0));
+    const valueEl = panel.querySelector('.combat-enemy-block-value');
+    if (valueEl) valueEl.textContent = String(block);
+    panel.classList.toggle('empty', block <= 0);
+    panel.disabled = block <= 0;
+    if (block > 0) {
+      panel.setAttribute('onclick', 'event.stopPropagation(); Game.showCombatBlockDetail(event)');
+      panel.setAttribute('title', `格檔 ${block}：會先抵銷受到的傷害`);
+      panel.removeAttribute('aria-hidden');
+    } else {
+      panel.removeAttribute('onclick');
+      panel.setAttribute('title', '');
+      panel.setAttribute('aria-hidden', 'true');
+    }
+  },
+
+  _prepareAllyStatusSequence(anims = {}) {
+    const beforeGroups = [anims?.guardBlockBeforeByChar, anims?.nextRoundBlockBeforeByChar];
+    beforeGroups
+      .filter(blocks => blocks && typeof blocks === 'object')
+      .forEach(blocks => {
+        Object.entries(blocks).forEach(([charId, block]) => this._setDisplayedAllyBlock(charId, block, { animateBreak: false }));
+      });
+    const evasionBefore = anims?.nextRoundEvasionBeforeByChar;
+    if (evasionBefore && typeof evasionBefore === 'object') {
+      Object.entries(evasionBefore).forEach(([charId, chance]) => this._setDisplayedAllyEvasion(charId, chance));
+    }
+  },
+
   _prepareIncomingDamageSequence(events = []) {
     const cleanEvents = events.filter(event => event?.targetId && Number.isFinite(event.from) && Number.isFinite(event.to));
-    for (const event of cleanEvents) this._setDisplayedAllyHp(event.targetId, event.from);
+    for (const event of cleanEvents) {
+      this._setDisplayedAllyHp(event.targetId, event.from);
+      if (Number.isFinite(event.allyBlockBefore)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockBefore, { animateBreak: false });
+    }
   },
 
   _prepareHealSequence(events = []) {
@@ -1148,15 +1194,38 @@ const RenderModal = {
     }
     if (text && max > 0) text.textContent = `${hp}/${max}`;
     unit.classList.toggle('down', hp <= 0);
+    if (hp > 0) {
+      unit.querySelectorAll('.combat-blood-splatter.ally').forEach(el => el.remove());
+    } else if (!unit.querySelector('.combat-blood-splatter.ally')) {
+      unit.insertAdjacentHTML('beforeend', this._combatBloodSplatterHtml(charId, 'ally'));
+    }
   },
 
-  _setDisplayedAllyBlock(charId, value) {
+  _setDisplayedAllyBlock(charId, value, opts = {}) {
     const unit = document.querySelector(`.combat-unit[data-char-id="${charId}"]`);
     if (!unit) return;
     const block = Math.max(0, Math.round(value || 0));
-    const badge = unit.querySelector('.combat-block-badge.ally');
+    let badge = unit.querySelector('.combat-block-badge.ally');
+    if (!badge && block > 0) {
+      badge = document.createElement('button');
+      badge.type = 'button';
+      badge.className = 'combat-block-badge ally';
+      badge.setAttribute('onclick', `event.stopPropagation(); Game.showCombatAllyBlockDetail('${charId}', event)`);
+      badge.innerHTML = `
+        <span class="combat-block-main">
+          <img class="combat-block-icon" src="assets/icons/block-icon-clean.png" alt="格檔">
+          <strong>${block}</strong>
+        </span>
+      `;
+      const statusRow = unit.querySelector('.combat-unit-main') || unit;
+      statusRow.appendChild(badge);
+    }
     if (!badge) return;
     if (block <= 0) {
+      if (opts.animateBreak === false) {
+        badge.remove();
+        return;
+      }
       badge.classList.add('anim-guard-break');
       setTimeout(() => badge.remove(), 180);
       return;
@@ -1164,6 +1233,24 @@ const RenderModal = {
     const valueEl = badge.querySelector('strong');
     if (valueEl) valueEl.textContent = String(block);
     badge.title = `格檔 ${block}：會先吸收受到的傷害`;
+  },
+
+  _setDisplayedAllyEvasion(charId, value) {
+    const unit = document.querySelector(`.combat-unit[data-char-id="${charId}"]`);
+    if (!unit) return;
+    const chance = Math.max(0, Math.min(50, Math.round(value || 0)));
+    let badge = unit.querySelector('.combat-status-badge.evasion');
+    if (chance <= 0) {
+      badge?.remove();
+      return;
+    }
+    const html = this._combatAllyEvasionBadgeHtml({ id: charId }, chance).trim();
+    if (badge) {
+      badge.outerHTML = html;
+    } else {
+      const statusRow = unit.querySelector('.combat-unit-main') || unit;
+      statusRow.insertAdjacentHTML('beforeend', html);
+    }
   },
 
   _showCombatDamageNumber(targetEl, damage, opts = {}) {
@@ -1323,29 +1410,98 @@ const RenderModal = {
     });
   },
 
-  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], healEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, counterTarget, aoe, enemyBlock, enemyDice = null, enemyAttackTrail = '', enemyAttackTrailFamily = '', enemyAttackSfx = '', enemyAttackSfxVolume = null }) {
+  _triggerCounterAnims({ playerAttacker, playerFollowHits = 0, playerDamageEvents = [], incomingDamageEvents = [], healEvents = [], playerFollowStepMs = 380, guardBlock = 0, guardTargetId = null, guardRemainingBlockByChar = null, nextRoundBlockBeforeByChar = null, nextRoundBlockByChar = null, nextRoundEvasionBeforeByChar = null, nextRoundEvasionByChar = null, counterTarget, aoe, enemyBlock, enemyBlockAfter = null, enemyDice = null, enemyAttackTrail = '', enemyAttackTrailFamily = '', enemyAttackSfx = '', enemyAttackSfxVolume = null }) {
     this._preloadCombatDamageDigits();
     const enemyCard = document.querySelector('.combat-enemy-card');
     const combatScene = enemyCard?.closest('.combat-scene') || document.querySelector('.combat-scene');
     const findAllyUnit = charId => combatScene?.querySelector(`.combat-unit.ally[data-char-id="${charId}"]`) || null;
+    const playAllyDeathSfxOnce = event => {
+      if (!event?.targetId || !event.deathSfx) return;
+      const char = (typeof G !== 'undefined' ? G.squad : [])
+        ?.find?.(item => item?.id === event.targetId);
+      if (char?._deathSfxPlayed) return;
+      if (char) char._deathSfxPlayed = true;
+      AudioManager?.playSfx?.(event.deathSfx, event.deathSfxVolume ?? 0.58);
+    };
     const damageEvents = Array.isArray(playerDamageEvents) ? playerDamageEvents : [];
     const incomingEvents = Array.isArray(incomingDamageEvents) ? incomingDamageEvents : [];
     const healingEvents = Array.isArray(healEvents) ? healEvents : [];
     const remainingBlocks = guardRemainingBlockByChar && typeof guardRemainingBlockByChar === 'object' ? guardRemainingBlockByChar : null;
+    const nextRoundBlocks = nextRoundBlockByChar && typeof nextRoundBlockByChar === 'object' ? nextRoundBlockByChar : null;
+    const nextRoundEvasions = nextRoundEvasionByChar && typeof nextRoundEvasionByChar === 'object' ? nextRoundEvasionByChar : null;
     const shouldShowGuard = Math.max(0, guardBlock || 0) > 0;
     const followHits = Math.max(0, playerFollowHits || 0, damageEvents.length);
     const followStep = Math.max(260, playerFollowStepMs || 380);
-    if (!followHits && !healingEvents.length && !shouldShowGuard && !counterTarget && !aoe && !enemyBlock) return;
+    if (!followHits && !incomingEvents.length && !healingEvents.length && !shouldShowGuard && !counterTarget && !aoe && !enemyBlock && !remainingBlocks && !nextRoundBlocks && !nextRoundEvasions) return;
+    let lastBlockUpSfxAt = 0;
+    const playBlockUpSfx = () => {
+      const now = performance.now();
+      if (now - lastBlockUpSfxAt < 90) return;
+      lastBlockUpSfxAt = now;
+      AudioManager?.playSfx?.('blockUp', 0.48);
+    };
+    let lastFullBlockSfxAt = 0;
+    const playFullBlockSfx = () => {
+      const now = performance.now();
+      if (now - lastFullBlockSfxAt < 90) return;
+      lastFullBlockSfxAt = now;
+      AudioManager?.playSfx?.('blockFull', 0.52);
+    };
+    const showBlockUpBurst = targetEl => {
+      if (!targetEl) return;
+      const burst = document.createElement('span');
+      burst.className = 'combat-block-up-burst';
+      burst.setAttribute('aria-hidden', 'true');
+      burst.innerHTML = '<img src="assets/icons/block-icon-clean.png" alt="">';
+      targetEl.appendChild(burst);
+      setTimeout(() => burst.remove(), 620);
+    };
+    let remainingBlocksApplied = false;
+    const applyRemainingBlocks = () => {
+      if (!remainingBlocks || remainingBlocksApplied) return;
+      remainingBlocksApplied = true;
+      Object.entries(remainingBlocks).forEach(([charId, block]) => this._setDisplayedAllyBlock(charId, block));
+    };
+    let nextRoundBlocksApplied = false;
+    const applyNextRoundStatuses = () => {
+      if (nextRoundBlocksApplied) return;
+      nextRoundBlocksApplied = true;
+      if (nextRoundBlocks) {
+        Object.entries(nextRoundBlocks).forEach(([charId, block]) => {
+          this._setDisplayedAllyBlock(charId, block);
+          const unit = findAllyUnit(charId);
+          if (!unit) return;
+          playBlockUpSfx();
+          showBlockUpBurst(unit);
+          FxPlayer.restartClass(unit, 'anim-guard-up', 520);
+          const badge = unit.querySelector('.combat-block-badge');
+          if (badge) FxPlayer.restartClass(badge, 'anim-guard-badge', 520);
+        });
+      }
+      if (nextRoundEvasions) {
+        Object.entries(nextRoundEvasions).forEach(([charId, chance]) => {
+          this._setDisplayedAllyEvasion(charId, chance);
+          const unit = findAllyUnit(charId);
+          if (!unit) return;
+          FxPlayer.restartClass(unit, 'anim-evasion-up', 520);
+          const badge = unit.querySelector('.combat-status-badge.evasion');
+          if (badge) FxPlayer.restartClass(badge, 'anim-evasion-badge', 520);
+        });
+      }
+    };
 
     if (shouldShowGuard) {
       const guardUnits = guardTargetId
         ? [...document.querySelectorAll(`.combat-unit.ally[data-char-id="${guardTargetId}"]`)]
         : [...document.querySelectorAll('.combat-unit.ally:not(.empty-slot)')];
       guardUnits.forEach(el => {
+        playBlockUpSfx();
+        showBlockUpBurst(el);
         FxPlayer.restartClass(el, 'anim-guard-up', 520);
         const badge = el.querySelector('.combat-block-badge');
         if (badge) FxPlayer.restartClass(badge, 'anim-guard-badge', 520);
       });
+      setTimeout(applyRemainingBlocks, 80);
     }
 
     for (let i = 0; i < followHits; i++) {
@@ -1371,6 +1527,10 @@ const RenderModal = {
               this._pulseCombatImpact(combatScene, damageEvent.damage, { crushing: heavyRelicImpact });
               if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, 0.44);
               this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
+              if (Number.isFinite(damageEvent.enemyBlockAfter)) {
+                this._setDisplayedEnemyBlock(damageEvent.enemyBlockAfter);
+                if (damageEvent.enemyBlockAbsorbed > 0 && damageEvent.damage <= 0) playFullBlockSfx();
+              }
               if (delayedRelicFx) {
                 setTimeout(() => {
                   this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
@@ -1409,7 +1569,10 @@ const RenderModal = {
     const followDelay = (shouldShowGuard ? 260 : 0) + followHits * followStep;
     if (enemyBlock && enemyCard) {
       setTimeout(() => {
+        playBlockUpSfx();
+        showBlockUpBurst(enemyCard);
         FxPlayer.restartClass(enemyCard, 'anim-block-up', 430);
+        if (Number.isFinite(enemyBlockAfter)) this._setDisplayedEnemyBlock(enemyBlockAfter);
       }, followDelay);
     }
 
@@ -1440,8 +1603,11 @@ const RenderModal = {
           if (!event?.targetId) continue;
           const targetEl = findAllyUnit(event.targetId);
           if (targetEl) this._pulseCombatImpact(combatScene, event.damage);
+          if (Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
+          if (event.fullBlock) playFullBlockSfx();
           if (targetEl) setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene }), 140);
           if (Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
+          if (Number.isFinite(event.to) && event.to <= 0) playAllyDeathSfxOnce(event);
         }
       } else if (counterTarget) {
         const el = findAllyUnit(counterTarget);
@@ -1451,18 +1617,51 @@ const RenderModal = {
           el.classList.add('anim-hit');
           const event = incomingEvents.find(item => item?.targetId === counterTarget);
           if (event) this._pulseCombatImpact(combatScene, event.damage);
+          if (event && Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
+          if (event?.fullBlock) playFullBlockSfx();
           if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene }), 140);
           setTimeout(() => el.classList.remove('anim-hit'), 420);
         }
         const event = incomingEvents.find(item => item?.targetId === counterTarget);
-        if (event && Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
+        if (event && Number.isFinite(event.to)) {
+          this._setDisplayedAllyHp(event.targetId, event.to);
+          if (event.to <= 0) playAllyDeathSfxOnce(event);
+        }
       }
       if (remainingBlocks) {
-        setTimeout(() => {
-          Object.entries(remainingBlocks).forEach(([charId, block]) => this._setDisplayedAllyBlock(charId, block));
-        }, 120);
+        applyRemainingBlocks();
       }
     }, enemyHitDelay + 270);
+
+    if (nextRoundBlocks || nextRoundEvasions) {
+      const nextBlockDelay = hasEnemyAttack
+        ? enemyHitDelay + 700
+        : followDelay + (incomingEvents.length > 0 ? 900 : 360);
+      setTimeout(applyNextRoundStatuses, nextBlockDelay);
+    }
+
+    if (!hasEnemyAttack && incomingEvents.length > 0) {
+      const reactionDelay = followDelay + (enemyBlock ? 220 : 0) + 260;
+      setTimeout(() => {
+        for (const event of incomingEvents) {
+          if (!event?.targetId) continue;
+          const targetEl = findAllyUnit(event.targetId);
+          if (!targetEl) continue;
+          this._pulseCombatImpact(combatScene, event.damage);
+          FxPlayer.restartClass(targetEl, 'anim-hit', 420);
+          if (Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
+          if (event.fullBlock) playFullBlockSfx();
+          setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, {
+            side: 'ally',
+            scene: combatScene,
+          }), 120);
+          if (Number.isFinite(event.to)) {
+            setTimeout(() => this._setDisplayedAllyHp(event.targetId, event.to), 160);
+            if (event.to <= 0) setTimeout(() => playAllyDeathSfxOnce(event), 160);
+          }
+        }
+      }, reactionDelay);
+    }
 
     if (healingEvents.length > 0) {
       const healDelay = hasEnemyAttack ? enemyHitDelay + 620 : attackDelay + 220;
@@ -1505,6 +1704,8 @@ const RenderModal = {
     const selectable = !!combat.selectable;
     const itemTargeting = !!combat.itemTargeting;
     const guardTargeting = !!combat.guardTargeting;
+    const tutorial = combat.tutorial || null;
+    const tutorialTarget = tutorial?.target || '';
     if (combat.onFollowUpTarget && combat.followUpTargetId) {
       if (!this._combatFollowUpActions) this._combatFollowUpActions = {};
       this._combatFollowUpActions[combat.followUpTargetId] = combat.onFollowUpTarget;
@@ -1609,7 +1810,7 @@ const RenderModal = {
       const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
       const weaponFamily = char.weapon?.family || char.weapon?.id || '';
       return `
-        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${canClick ? ' selectable' : ''}${isFollowUpStatus ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}"
+        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${isIntimidated ? ' intimidated' : ''}${canClick ? ' selectable' : ''}${isFollowUpStatus ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}${tutorialTarget === 'ally' && !isDown ? ' combat-tutorial-highlight' : ''}"
           data-char-id="${char.id}" data-weapon-family="${weaponFamily}" ${clickAttr}>
           ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
@@ -1691,7 +1892,7 @@ const RenderModal = {
     return `
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}"${enemyCardBgStyle}>
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}${tutorialTarget === 'enemy' ? ' combat-tutorial-highlight' : ''}"${enemyCardBgStyle}>
         ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
         ${this._combatEnemyDamageDiePanelHtml(combat.enemy)}
         <div class="combat-side-label" aria-hidden="true"></div>
@@ -1730,7 +1931,7 @@ const RenderModal = {
           <div class="combat-actions"></div>
           <div class="combat-vs">VS</div>
           <div class="combat-bottom-tools">
-            <button class="combat-guard-button${guardTargeting ? ' active' : ''}${combat.canGuard || guardTargeting ? '' : ' disabled'}" ${guardTargeting ? 'onclick="Game.cancelCombatGuardTargeting()"' : (combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled')} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
+            <button class="combat-guard-button${guardTargeting ? ' active' : ''}${combat.canGuard || guardTargeting ? '' : ' disabled'}${tutorialTarget === 'guard' ? ' combat-tutorial-highlight' : ''}" ${guardTargeting ? 'onclick="Game.cancelCombatGuardTargeting()"' : (combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled')} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
             <button class="combat-bag-button${combat.canUseBag ? '' : ' disabled'}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
           </div>
         </div>
@@ -1744,18 +1945,44 @@ const RenderModal = {
     `;
   },
 
-  _combatEnemyAbilityRowsHtml(enemy) {
-    const rows = [];
-    if (Array.isArray(enemy?.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
-      rows.push('再生硬殼：戰鬥開始與每回合開始時補回格檔。命中原生弱點可破殼並停止本場硬殼再生。攻擊有格檔的目標時傷害 +2。');
+  _combatTutorialCardHtml(tutorial = null) {
+    if (!tutorial) return '';
+    return `
+      <div class="combat-tutorial-card target-${tutorial.target || 'none'}" data-step="${tutorial.step || ''}">
+        <div class="combat-tutorial-step">戰鬥教學</div>
+        <div class="combat-tutorial-title">${this._escapeHtml(tutorial.title || '')}</div>
+        <div class="combat-tutorial-body">${this._escapeHtml(tutorial.body || '')}</div>
+        <div class="combat-tutorial-cta">${this._escapeHtml(tutorial.cta || '')}</div>
+      </div>
+    `;
+  },
+
+  updateCombatTutorialInline(tutorial = null, sceneOverride = null) {
+    const scene = sceneOverride || document.querySelector('.combat-scene');
+    if (!scene) return;
+    scene.querySelectorAll('.combat-tutorial-highlight').forEach(el => el.classList.remove('combat-tutorial-highlight'));
+    scene.querySelector('.combat-tutorial-card')?.remove();
+    if (!tutorial) return;
+    const target = tutorial.target || '';
+    if (target === 'enemy') scene.querySelector('.combat-enemy-card')?.classList.add('combat-tutorial-highlight');
+    if (target === 'guard') scene.querySelector('.combat-guard-button')?.classList.add('combat-tutorial-highlight');
+    if (target === 'ally') {
+      scene.querySelectorAll('.combat-unit.ally:not(.empty-slot):not(.down)').forEach(el => el.classList.add('combat-tutorial-highlight'));
     }
+    scene.insertAdjacentHTML('beforeend', this._combatTutorialCardHtml(tutorial));
+  },
+
+  _combatEnemyAbilityRowsHtml(enemy) {
+    const rows = typeof Game !== 'undefined' && typeof Game._combatEnemyAbilityNotes === 'function'
+      ? Game._combatEnemyAbilityNotes(enemy)
+      : [];
     return rows.map(text => `<div class="cct-row"><span class="cct-label">能力</span>${this._escapeHtml(text)}</div>`).join('');
   },
 
   _combatEnemyHoverTitle(enemy) {
     const lines = [`${enemy?.name || '敵人'}：點擊查看詳細資訊`];
-    if (Array.isArray(enemy?.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
-      lines.push('再生硬殼：戰鬥開始與每回合開始時補回格檔。命中原生弱點可破殼並停止本場硬殼再生。攻擊有格檔的目標時傷害 +2。');
+    if (typeof Game !== 'undefined' && typeof Game._combatEnemyAbilityNotes === 'function') {
+      lines.push(...Game._combatEnemyAbilityNotes(enemy));
     }
     if (enemy?.weaknessDesc) lines.push(`破除效果：${enemy.weaknessDesc}`);
     return this._escapeHtml(lines.filter(Boolean).join('\n'));

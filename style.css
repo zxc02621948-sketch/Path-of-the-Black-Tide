@@ -4034,7 +4034,7 @@ html, body {
     linear-gradient(180deg, transparent 0%, rgba(10, 10, 10, .10) 100%);
 }
 
-.combat-unit > :not(.combat-character-art):not(.combat-blood-splatter):not(.combat-card-dice):not(.combat-followup-badge) {
+.combat-unit > :not(.combat-character-art):not(.combat-blood-splatter):not(.combat-card-dice):not(.combat-followup-badge):not(.combat-block-up-burst) {
   position: relative;
   z-index: 1;
 }
@@ -4100,6 +4100,87 @@ html, body {
 .combat-unit.intent-targeted {
   border-color: rgba(231, 64, 48, .76);
   box-shadow: 0 0 0 1px rgba(231, 64, 48, .22), 0 0 14px rgba(231, 64, 48, .18);
+}
+
+.combat-tutorial-highlight {
+  position: relative;
+  z-index: 36;
+  outline: 2px solid rgba(255, 218, 112, .95);
+  outline-offset: 3px;
+  box-shadow: 0 0 0 4px rgba(255, 218, 112, .18), 0 0 22px rgba(255, 188, 64, .42) !important;
+  animation: combat-tutorial-highlight-pulse 1s ease-in-out infinite alternate;
+}
+
+.combat-tutorial-card {
+  position: absolute;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  z-index: 40;
+  width: min(430px, calc(100% - 28px));
+  padding: 12px 14px 13px;
+  border: 1px solid rgba(255, 220, 142, .62);
+  border-radius: 6px;
+  color: #f7ead2;
+  background: rgba(12, 10, 8, .82);
+  box-shadow: 0 10px 34px rgba(0, 0, 0, .48), inset 0 0 18px rgba(255, 198, 91, .06);
+  pointer-events: none;
+}
+
+.combat-tutorial-card.target-guard {
+  top: 18px;
+  bottom: auto;
+}
+
+.combat-tutorial-card.target-ally {
+  left: 32px;
+  right: auto;
+  bottom: 18px;
+  transform: none;
+  width: min(390px, calc(50% - 48px));
+}
+
+.combat-tutorial-step {
+  color: #f0b85b;
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+
+.combat-tutorial-title {
+  margin-top: 3px;
+  font-size: .98rem;
+  font-weight: 900;
+}
+
+.combat-tutorial-body {
+  margin-top: 6px;
+  color: rgba(247, 234, 210, .86);
+  font-size: .82rem;
+  line-height: 1.55;
+}
+
+.combat-tutorial-cta {
+  margin-top: 8px;
+  color: #ffd875;
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+@keyframes combat-tutorial-highlight-pulse {
+  from { outline-color: rgba(255, 218, 112, .72); }
+  to { outline-color: rgba(255, 245, 184, 1); }
+}
+
+.combat-unit.intimidated {
+  border-color: rgba(135, 86, 166, .68);
+  box-shadow: inset 0 0 0 1px rgba(111, 72, 145, .24), 0 0 14px rgba(92, 42, 122, .22);
+}
+
+.combat-unit.intimidated .combat-character-art,
+.combat-unit.intimidated > :not(.combat-character-art):not(.combat-blood-splatter) {
+  opacity: .48;
+  filter: grayscale(.75) brightness(.52) saturate(.72);
 }
 
 .combat-unit.down {
@@ -5346,6 +5427,27 @@ html, body {
   42%  { transform: scale(1.18); filter: drop-shadow(0 0 10px rgba(128, 208, 255, .76)); }
   100% { transform: scale(1); }
 }
+@keyframes anim-evasion-up {
+  0%   { box-shadow: inset 0 0 0 rgba(112, 231, 255, 0), 0 0 0 rgba(112, 231, 255, 0); }
+  38%  { box-shadow: inset 0 0 24px rgba(112, 231, 255, .18), 0 0 20px rgba(112, 231, 255, .34); }
+  100% { box-shadow: inset 0 0 0 rgba(112, 231, 255, 0), 0 0 0 rgba(112, 231, 255, 0); }
+}
+@keyframes anim-evasion-badge {
+  0%   { transform: translateY(0) scale(1); }
+  36%  { transform: translateY(-2px) scale(1.2); filter: drop-shadow(0 0 10px rgba(112, 231, 255, .76)); }
+  100% { transform: translateY(0) scale(1); }
+}
+@keyframes combat-block-up-burst {
+  0%   { transform: translate(-50%, -50%) scale(.58); opacity: 0; filter: drop-shadow(0 0 0 rgba(128, 208, 255, 0)); }
+  18%  { transform: translate(-50%, -50%) scale(1.16); opacity: .95; filter: drop-shadow(0 0 14px rgba(128, 208, 255, .9)); }
+  58%  { transform: translate(-50%, -60%) scale(1); opacity: .72; }
+  100% { transform: translate(-50%, -86%) scale(.84); opacity: 0; filter: drop-shadow(0 0 4px rgba(128, 208, 255, 0)); }
+}
+@keyframes combat-block-up-ring {
+  0%   { transform: translate(-50%, -50%) scale(.58); opacity: 0; }
+  24%  { opacity: .64; }
+  100% { transform: translate(-50%, -50%) scale(1.9); opacity: 0; }
+}
 @keyframes anim-guard-break {
   0%   { transform: scale(1); opacity: 1; filter: drop-shadow(0 0 8px rgba(128, 208, 255, .72)); }
   100% { transform: scale(.72); opacity: 0; filter: drop-shadow(0 0 0 rgba(128, 208, 255, 0)); }
@@ -5372,9 +5474,46 @@ html, body {
 .anim-block-up     { animation: anim-block-up   .4s ease; }
 .anim-guard-up     { animation: anim-guard-up   .52s ease; }
 .anim-guard-badge  { animation: anim-guard-badge .52s ease; }
+.anim-evasion-up   { animation: anim-evasion-up .52s ease; }
+.anim-evasion-badge { animation: anim-evasion-badge .52s ease; }
 .anim-guard-break  { animation: anim-guard-break .18s ease forwards; }
 .anim-heal         { animation: anim-heal-pulse .52s ease; }
 .anim-pulse-left   { animation: anim-pulse-left .36s ease-in-out forwards; }
+
+.combat-block-up-burst {
+  position: absolute;
+  left: 50%;
+  top: 38%;
+  z-index: 24;
+  width: 42px;
+  height: 42px;
+  pointer-events: none;
+  animation: combat-block-up-burst .62s ease-out forwards;
+}
+.combat-unit > .combat-block-up-burst,
+.combat-enemy-card > .combat-block-up-burst {
+  position: absolute;
+  z-index: 24;
+}
+.combat-block-up-burst::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 44px;
+  height: 44px;
+  border: 1px solid rgba(134, 211, 255, .72);
+  border-radius: 50%;
+  box-shadow: 0 0 18px rgba(86, 170, 255, .34), inset 0 0 14px rgba(134, 211, 255, .18);
+  animation: combat-block-up-ring .62s ease-out forwards;
+}
+.combat-block-up-burst img {
+  position: absolute;
+  inset: 7px;
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
 
 .combat-damage-pop {
   position: absolute;

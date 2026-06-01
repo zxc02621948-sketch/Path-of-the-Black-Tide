@@ -9,10 +9,6 @@ const GameCombatTooltips = {
       existingPopover.dataset.combatPopoverKind = '';
       return;
     }
-    const intent = G.combat?.intent || null;
-    const intentView = typeof this._combatIntentView === 'function'
-      ? this._combatIntentView(intent, enemy)
-      : null;
     const nativeInfo = typeof this._activeEnemyNativeWeaknesses === 'function'
       ? this._activeEnemyNativeWeaknesses(enemy)
       : { main: enemy.weakness || null, extras: [] };
@@ -25,8 +21,6 @@ const GameCombatTooltips = {
     const states = [];
     const wounds = CombatStatus.getWounds(enemy);
     if (wounds > 0) states.push(`傷口 ${wounds}/${CombatStatus.maxWounds(enemy)}`);
-    const block = CombatStatus.getBlock(enemy);
-    if (block > 0) states.push(`格檔 ${block}`);
     if (enemy.blockBroken) states.push('格檔破除中');
     if (enemy.exposed) states.push('揭露中');
     if (enemy.abilityState?.shellCharge > 0) states.push(`蓄撞 ${enemy.abilityState.shellCharge} 層`);
@@ -35,34 +29,50 @@ const GameCombatTooltips = {
     if (enemy.abilityState?.executionCountdown && !enemy.abilityState.executionCountdown.executed) {
       states.push(`處刑倒數 ${enemy.abilityState.executionCountdown.remaining}`);
     }
-    const abilityNotes = [];
-    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'dice_pollution')) {
-      abilityNotes.push('每次行動都會污染骰面：污染孢子污染隨機隊友，撲擊污染被攻擊目標，污潮污染隨機隊友。污染骰面無法被改骰，擲出時傷害歸零並讓牠回血。');
-    }
-    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'final_boss')) {
-      abilityNotes.push('黑夜輪轉：閉眼回合遮蔽核心弱點並獲得格檔；開眼回合顯現 1 個核心原生弱點，攻擊追加半個骰數並濺射其他隊友。破除開眼弱點會讓下一次閉眼失去格檔，下一次開眼不濺射。');
-      abilityNotes.push('黑暗 15+：開眼攻擊若造成實際 HP 傷害，目標下回合無法主戰。');
-    }
-    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'execution_countdown')) {
-      abilityNotes.push('處刑倒數：倒數歸零後，下一次行動會處刑牢中的倖存者。處刑不傷害隊伍，但救援會失敗；命中原生弱點可讓倒數 +1。');
-    }
-    if (Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'shell_regen')) {
-      abilityNotes.push('再生硬殼：戰鬥開始與每回合開始時會把格檔補回硬殼值。命中原生弱點可破殼，清除格檔並停止本場戰鬥的硬殼再生。攻擊有格檔的目標時傷害 +2。');
-    }
+    const abilityNotes = this._combatEnemyAbilityNotes(enemy);
     const titleText = `${enemy.icon || ''} ${enemy.name}`.trim();
     const descText = [
       enemy.desc || enemy.lore || '',
       abilityNotes.length ? `能力：${abilityNotes.join('\n')}` : '',
-      `HP ${enemy.hp}/${enemy.maxHp || enemy.hp}　攻擊 ${enemy.attack || 0}`,
       `原生弱點：${nativeText}`,
       enemy.weaknessEffect?.desc ? `破除效果：${enemy.weaknessEffect.desc}` : '',
       extrasText,
-      intentView?.title ? `目前意圖：${intentView.title}` : '',
       states.length ? `目前狀態：${states.join('、')}` : '',
     ].filter(Boolean).join('\n\n');
     this._showCombatStatusPopover(titleText, descText, ev);
     const popover = document.getElementById('combat-status-popover');
     if (popover) popover.dataset.combatPopoverKind = 'enemy-detail';
+    this._advanceCombatTutorial?.('enemy_detail', 'guard_button');
+  },
+
+  _combatEnemyAbilityNotes(enemy) {
+    const abilities = Array.isArray(enemy?.abilities) ? enemy.abilities : [];
+    const hasAbility = type => abilities.some(ability => ability?.type === type);
+    const notes = [];
+    if (hasAbility('dice_pollution')) {
+      notes.push('每次行動都會污染骰面：污染孢子污染隨機隊友，撲擊污染被攻擊目標，污潮污染隨機隊友。污染骰面無法被改骰，擲出時傷害歸零並讓牠回血。');
+    }
+    if (hasAbility('final_boss')) {
+      notes.push('黑夜輪轉：閉眼回合遮蔽核心弱點並獲得格檔；開眼回合顯現 1 個核心原生弱點，攻擊追加半個骰數並濺射其他隊友。破除開眼弱點會讓下一次閉眼失去格檔，下一次開眼不濺射。');
+      notes.push('黑暗 15+：開眼攻擊若造成實際 HP 傷害，目標下回合無法主戰。');
+    }
+    if (hasAbility('execution_countdown')) {
+      notes.push('處刑倒數：倒數歸零後，下一次行動會處刑牢中的倖存者。處刑不傷害隊伍，但救援會失敗；命中原生弱點可讓倒數 +1。');
+    }
+    if (hasAbility('shell_regen')) {
+      notes.push('再生硬殼：戰鬥開始與每回合開始時會把格檔補回硬殼值。命中原生弱點可破殼，清除格檔並停止本場戰鬥的硬殼再生。攻擊有格檔的目標時傷害 +2。');
+    }
+    if (hasAbility('block_thorns')) {
+      const thornDamage = Math.max(0, enemy?.thornDamage || abilities.find(ability => ability?.type === 'block_thorns')?.damage || 1);
+      notes.push(`格檔反震：牠仍有格檔時，被攻擊會反震攻擊者 ${thornDamage} 傷害。命中原生弱點可暫時破甲，阻止格檔與反震。`);
+    }
+    if (hasAbility('blood_hunt')) {
+      const ability = abilities.find(item => item?.type === 'blood_hunt') || {};
+      const threshold = Math.round(Math.max(0, Math.min(1, ability.lowHpThreshold ?? 0.5)) * 100);
+      const bonus = Math.max(0, ability.damageBonus || 1);
+      notes.push(`血味追獵：攻擊時優先盯上生命比例最低的隊友；目標生命低於 ${threshold}% 時傷害 +${bonus}。命中原生弱點可揭露牠，使追獵暫時失效。`);
+    }
+    return notes;
   },
 
   showCombatStatusDetail(charId, statusType, ev = null) {

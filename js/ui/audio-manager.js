@@ -6,11 +6,14 @@ const AudioManager = {
     battleGuardian: 'assets/audio/battle-final.mp3',
     battleDarkAvatar: 'assets/audio/battle-dark-avatar.mp3',
     battleFinal: 'assets/audio/battle-guardian.mp3',
+    gameOver: 'assets/audio/game-over.wav',
   },
   sfx: {
     button: 'assets/audio/sfx/ui-button.ogg',
     dice: 'assets/audio/sfx/dice-shake.ogg',
     hover: 'assets/audio/sfx/ui-hover.ogg',
+    blockUp: 'assets/audio/sfx/block-up.mp3',
+    blockFull: 'assets/audio/sfx/block-full.mp3',
     bowShot: 'assets/audio/sfx/bow-shot.wav',
     swordWoosh: 'assets/audio/sfx/sword-woosh.wav',
     daggerWoosh: 'assets/audio/sfx/dagger-woosh.wav',
@@ -23,6 +26,10 @@ const AudioManager = {
     plagueMothSpawn: 'assets/audio/sfx/plague-moth-spawn.wav',
     mimicSpawnGrowl: 'assets/audio/sfx/mimic-spawn-growl.wav',
     mimicDeathCrateBreak: 'assets/audio/sfx/mimic-death-crate-break.mp3',
+    warriorDeath: 'assets/audio/sfx/warrior-death-laowei.mp3',
+    explorerDeath: 'assets/audio/sfx/explorer-death-linjia.mp3',
+    scholarDeath: 'assets/audio/sfx/scholar-death-chenshuming.mp3',
+    supportDeath: 'assets/audio/sfx/support-death-xiaoci.mp3',
     rotKnightSpawnRoar: 'assets/audio/sfx/rot-knight-spawn-roar.wav',
     shadowHunterSpawnRoar: 'assets/audio/sfx/shadow-hunter-spawn-roar.wav',
     forestDarkGrowth: 'assets/audio/sfx/forest-dark-growth.wav',
@@ -38,6 +45,7 @@ const AudioManager = {
   trackVolumes: {
     battleGuardian: 0.9,
     battleFinal: 0.98,
+    gameOver: 0.82,
   },
   sfxVolume: 0.42,
   hoverVolume: 0.18,
@@ -46,11 +54,13 @@ const AudioManager = {
   currentId: '',
   currentAudio: null,
   fadeTimer: null,
+  fadeTokens: new WeakMap(),
   unlocked: false,
   wantedId: '',
   resumeTrackIds: ['exploreEarly', 'exploreNight'],
   resumeTimes: {},
   lastHoverSfxAt: 0,
+  preloadedTracks: {},
   preloadedSfx: {},
   pageHidden: false,
   toneContext: null,
@@ -60,18 +70,22 @@ const AudioManager = {
     this.ready = true;
     const unlock = () => this.unlock();
     document.addEventListener('pointerdown', unlock, { once: true });
+    document.addEventListener('pointerdown', () => this.sync());
     document.addEventListener('keydown', unlock, { once: true });
+    document.addEventListener('keydown', () => this.sync());
     document.addEventListener('click', ev => this.handleDocumentClick(ev));
     document.addEventListener('pointerover', ev => this.handleDocumentHover(ev));
     document.addEventListener('visibilitychange', () => this.handlePageVisibility(document.hidden));
     window.addEventListener('pagehide', () => this.handlePageVisibility(true));
     window.addEventListener('pageshow', () => this.handlePageVisibility(document.hidden));
     this.handlePageVisibility(document.hidden);
+    this.preloadTracks();
   },
 
   unlock() {
     this.unlocked = true;
     this.preloadSfx();
+    this.preloadTracks();
     this.sync();
   },
 
@@ -96,7 +110,9 @@ const AudioManager = {
       if (enemy.echoGuardian) return 'battleGuardian';
       return 'battleNormal';
     }
-    if (G.phase === 'over') return '';
+    if (G.phase === 'over') {
+      return ['lose', 'devoured'].includes(G.gameResult) ? 'gameOver' : '';
+    }
     return G.phase === 'night' ? 'exploreNight' : 'exploreEarly';
   },
 
@@ -114,17 +130,19 @@ const AudioManager = {
         return;
       }
     }
-    const src = this.tracks[trackId];
-    if (!src) return;
+    const audio = this.trackAudio(trackId);
+    if (!audio) return;
     const previousId = this.currentId;
     this.currentId = trackId;
     const previous = this.currentAudio;
     this.rememberTrackTime(previousId, previous);
-    const audio = new Audio(src);
     audio.loop = true;
     audio.preload = 'auto';
     audio.volume = 0;
     this.restoreTrackTime(trackId, audio);
+    try {
+      if (audio.readyState === 0) audio.load();
+    } catch (err) {}
     this.currentAudio = audio;
     audio.play()
       .then(() => {
@@ -139,6 +157,7 @@ const AudioManager = {
       .catch(() => {
         this.currentAudio = previous || null;
         this.currentId = previous ? previousId : '';
+        setTimeout(() => this.sync(), 250);
       });
   },
 
@@ -188,10 +207,12 @@ const AudioManager = {
     const button = ev.target?.closest?.('button');
     if (!button || button.disabled) return;
     this.playSfx('button');
+    this.sync();
   },
 
   handleDocumentHover(ev) {
     if (this.pageHidden) return;
+    if (!this.canPlayHoverSfx(ev)) return;
     const target = ev.target?.closest?.('button, [role="button"], .clickable, .choice-card, .combat-unit, .inventory-item');
     if (!target || target.disabled || target.getAttribute?.('aria-disabled') === 'true') return;
     if (ev.relatedTarget && target.contains(ev.relatedTarget)) return;
@@ -199,6 +220,12 @@ const AudioManager = {
     if (now - this.lastHoverSfxAt < this.hoverCooldownMs) return;
     this.lastHoverSfxAt = now;
     this.playSfx('hover', this.hoverVolume);
+  },
+
+  canPlayHoverSfx(ev = null) {
+    if (ev?.pointerType && ev.pointerType !== 'mouse') return false;
+    if (!window.matchMedia) return true;
+    return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   },
 
   playSfx(id, volume = this.sfxVolume) {
@@ -267,6 +294,25 @@ const AudioManager = {
     });
   },
 
+  preloadTracks(id = '') {
+    const ids = id ? [id] : Object.keys(this.tracks);
+    ids.forEach(trackId => this.trackAudio(trackId));
+  },
+
+  trackAudio(trackId) {
+    if (!trackId || !this.tracks[trackId]) return null;
+    if (this.preloadedTracks[trackId]) return this.preloadedTracks[trackId];
+    const audio = new Audio(this.tracks[trackId]);
+    audio.loop = true;
+    audio.preload = 'auto';
+    audio.volume = 0;
+    try {
+      audio.load();
+    } catch (err) {}
+    this.preloadedTracks[trackId] = audio;
+    return audio;
+  },
+
   trackVolume(trackId) {
     return Math.max(0, Math.min(1, this.trackVolumes?.[trackId] ?? this.volume));
   },
@@ -301,8 +347,11 @@ const AudioManager = {
 
   fade(audio, from, to, duration, done = null) {
     if (!audio) return;
+    const token = {};
+    this.fadeTokens.set(audio, token);
     const start = performance.now();
     const tick = now => {
+      if (this.fadeTokens.get(audio) !== token) return;
       const t = Math.min(1, (now - start) / Math.max(1, duration));
       audio.volume = from + (to - from) * t;
       if (t < 1) {
@@ -310,6 +359,7 @@ const AudioManager = {
         return;
       }
       audio.volume = to;
+      this.fadeTokens.delete(audio);
       if (typeof done === 'function') done();
     };
     requestAnimationFrame(tick);

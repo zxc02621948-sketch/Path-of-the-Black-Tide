@@ -128,14 +128,13 @@ const ENEMIES = [
     nightOnly: false,
     lore: '有人說它們曾經是守衛，是黑夜將它們留下，讓它們繼續站崗。',
     intents: [
-      { type: 'block',        weight: 3 },
-      { type: 'block_attack', weight: 1 },
-      { type: 'attack',       weight: 1 },
+      { type: 'block',  weight: 2 },
+      { type: 'attack', weight: 3 },
     ],
     tiers: [
-      { name: '腐骨騎士', desc: '腐爛的盔甲仍然堅固，硬砍格檔會受到反震',           hp: 28, block: 4, attack: 3, thornDamage: 1 },
-      { name: '黑鐵騎士', desc: '黑暗強化了甲冑，格檔幾乎成為本能',                 hp: 36, block: 5, attack: 4, thornDamage: 2 },
-      { name: '深淵騎士', desc: '已與黑暗融合，盔甲是它的皮膚，格檔是它的呼吸',     hp: 45, block: 6, attack: 5, thornDamage: 2 },
+      { name: '腐骨騎士', desc: '腐爛的盔甲仍然堅固，硬砍格檔會受到反震',           hp: 28, block: 3, attack: 4, thornDamage: 2 },
+      { name: '黑鐵騎士', desc: '黑暗強化了甲冑，格檔幾乎成為本能',                 hp: 36, block: 4, attack: 5, thornDamage: 2 },
+      { name: '深淵騎士', desc: '已與黑暗融合，盔甲是它的皮膚，格檔是它的呼吸',     hp: 45, block: 5, attack: 6, thornDamage: 3 },
     ],
   },
 

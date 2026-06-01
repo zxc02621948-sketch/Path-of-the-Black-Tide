@@ -28,6 +28,7 @@ const Game = {
       spawnedUniqueEnemies: [],
       defeatedUniqueEnemies: [],
       guideQuest: null,
+      combatTutorial: { active: false, completed: false, firstCombatStarted: false },
 
       map: MapGen.generate(),
       playerX: cx,
@@ -102,6 +103,7 @@ const Game = {
       relicHintShown: hasRelic,
       altarTarget: null,
       completed: false,
+      firstCombatStarted: false,
     };
     if (hasRelic) this._revealGuideAltarTarget();
   },
@@ -215,6 +217,13 @@ const Game = {
       return !cell.cleared && ['enemy', 'relic', 'forest', 'ruins', 'cave'].includes(cell.type);
     }
     return false;
+  },
+
+  _shouldUseCombatTutorialEnemy(opts = {}) {
+    if (!G.combatTutorial) G.combatTutorial = { active: false, completed: false, firstCombatStarted: false };
+    if (G.combatTutorial.completed || G.combatTutorial.firstCombatStarted) return false;
+    if (opts.source === 'devTest' || opts.source === 'finalBoss') return false;
+    return true;
   },
 
   // Section.

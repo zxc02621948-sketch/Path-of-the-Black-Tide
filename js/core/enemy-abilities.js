@@ -476,12 +476,59 @@ const EnemyAbilities = {
     },
 
     block_thorns: {
-      afterPlayerAttack(ability, { attacker, enemy, logs }) {
+      afterPlayerAttack(ability, { attacker, enemy, result, logs }) {
         if (!attacker || attacker.hp <= 0 || attacker.dead) return;
         if (enemy.hp <= 0 || CombatStatus.getBlock(enemy) <= 0 || enemy.blockBroken) return;
-        const damage = Math.max(0, enemy.thornDamage || ability.damage || 1);
+        let damage = Math.max(0, enemy.thornDamage || ability.damage || 1);
         if (damage <= 0) return;
-        attacker.hp = Math.max(0, attacker.hp - damage);
+        let finalDamage = damage;
+        if (result) {
+          result.guardRemainingBlockByChar = result.guardRemainingBlockByChar && typeof result.guardRemainingBlockByChar === 'object'
+            ? result.guardRemainingBlockByChar
+            : {};
+        }
+        finalDamage = CombatStatus.applyExplorerEvasion(attacker, finalDamage, logs, '反震');
+        damage = finalDamage;
+        if (CombatStatus.getBlock(attacker) > 0) {
+          const allyBlockBefore = CombatStatus.getBlock(attacker);
+          const blockResult = CombatStatus.consumeBlock(attacker, damage);
+          finalDamage = blockResult.damage;
+          if (result) result.guardRemainingBlockByChar[attacker.id] = blockResult.block;
+          if (blockResult.absorbed > 0) logs.push(`${attacker.name} 的格檔抵銷 ${blockResult.absorbed} 點反震。`);
+          if (result && blockResult.absorbed > 0 && finalDamage <= 0) {
+            result.incomingDamageEvents = Array.isArray(result.incomingDamageEvents)
+              ? result.incomingDamageEvents
+              : [];
+            result.incomingDamageEvents.push({
+              type: 'block_thorns_blocked',
+              targetId: attacker.id,
+              damage: 0,
+              from: attacker.hp,
+              to: attacker.hp,
+              allyBlockBefore,
+              allyBlockAfter: blockResult.block,
+              allyBlockAbsorbed: blockResult.absorbed,
+              fullBlock: true,
+            });
+          }
+        }
+        damage = finalDamage;
+        if (finalDamage > 0) {
+          const beforeHp = attacker.hp;
+          attacker.hp = Math.max(0, attacker.hp - finalDamage);
+          if (result) {
+            result.incomingDamageEvents = Array.isArray(result.incomingDamageEvents)
+              ? result.incomingDamageEvents
+              : [];
+            result.incomingDamageEvents.push({
+              type: 'block_thorns',
+              targetId: attacker.id,
+              damage: finalDamage,
+              from: beforeHp,
+              to: attacker.hp,
+            });
+          }
+        }
         logs.push(`${enemy.name} 格檔反震：${attacker.name} 受到 ${damage} 點傷害。`);
       },
     },

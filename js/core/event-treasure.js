@@ -4,10 +4,16 @@ const GameEventTreasure = {
     const attacker = G.squad.find(c => !c.dead && c.cls === 'explorer' && c.hp > 0)
       || this._aliveSquad().sort((a, b) => b.hp - a.hp)[0];
     if (!attacker) { Render.fullRender(); return; }
+    const actorNote = attacker.cls === 'explorer'
+      ? `${attacker.name} 是探索者，能看出危險標記並修正破損線索。`
+      : `隊伍中沒有可行動的探索者，將由目前狀態最穩的 ${attacker.name} 代為解讀藏寶圖。`;
+    const resultRule = attacker.cls === 'explorer'
+      ? '探索者讀圖：骰出單數時，有 50% 機率修正破損線索並顯示完整武器寶箱；修正失敗則仍會顯示可疑寶箱。'
+      : '非探索者讀圖：單數會使藏寶圖破損，但仍會顯示一個可能有危險的寶箱；雙數會顯示只出武器的寶箱。';
 
     this._openModal({
       title: ev.name,
-      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n使用探索骰判定藏寶圖結果：單數會使藏寶圖破損，但仍會顯示一個可能有危險的寶箱；雙數會顯示只出武器的寶箱。`,
+      desc: `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${actorNote}\n\n${resultRule}`,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
       choices: [
@@ -21,11 +27,14 @@ const GameEventTreasure = {
     const rollResult = this._rollWithMods('explore', attacker, { successMin: 1 });
     rollResult.animate = true;
     const roll = rollResult.value;
+    const explorerRead = attacker?.cls === 'explorer';
+    const explorerFixedBrokenMap = explorerRead && roll % 2 === 1 && Math.random() < 0.5;
+    const weaponResult = roll % 2 === 0 || explorerFixedBrokenMap;
     const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
     let desc = `${attacker.name} 正在擲探索骰解讀藏寶圖。\n\n${attacker.name} 擲出 ${Dice.face(roll)}（${roll}）。`;
     let choices = [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }];
 
-    if (roll % 2 === 1) {
+    if (!weaponResult) {
       const chestCell = this._placeTreasureChestRandom('broken');
       if (chestCell) {
         desc += `\n\n單數：藏寶圖破損，但仍指出一個可疑寶箱位置 (${chestCell.x},${chestCell.y})。這個寶箱可能只有怪物或普通物品。`;
@@ -37,10 +46,16 @@ const GameEventTreasure = {
     } else {
       const chestCell = this._placeTreasureChestRandom('weapon');
       if (chestCell) {
-        desc += `\n\n雙數：找到武器寶箱位置 (${chestCell.x},${chestCell.y})。`;
-        this._log(`藏寶圖找到武器寶箱 (${chestCell.x},${chestCell.y})。`, 'reward');
+        desc += explorerFixedBrokenMap
+          ? `\n\n探索者讀圖：${attacker.name} 避開錯誤標記，將破損線索修正為完整武器寶箱位置 (${chestCell.x},${chestCell.y})。`
+          : `\n\n雙數：找到武器寶箱位置 (${chestCell.x},${chestCell.y})。`;
+        this._log(explorerFixedBrokenMap
+          ? `${attacker.name} 修正藏寶圖線索，找到武器寶箱 (${chestCell.x},${chestCell.y})。`
+          : `藏寶圖找到武器寶箱 (${chestCell.x},${chestCell.y})。`, 'reward');
       } else {
-        desc += '\n\n雙數：找到寶藏方向，但地圖上沒有合適位置可放置寶箱。';
+        desc += explorerFixedBrokenMap
+          ? '\n\n探索者讀圖：已修正破損線索，但地圖上沒有合適位置可放置寶箱。'
+          : '\n\n雙數：找到寶藏方向，但地圖上沒有合適位置可放置寶箱。';
         this._log('藏寶圖未能放置武器寶箱。', 'dim');
       }
     }
@@ -53,7 +68,7 @@ const GameEventTreasure = {
       resultAppend: desc,
       eventImage: ev.eventImage || '',
       eventImageAlt: ev.name || '',
-      dice: { type: roll % 2 === 0 ? 'neutral' : 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: true, charCls: rollResult.charCls },
+      dice: { type: weaponResult ? 'neutral' : 'danger', label: `${attacker.name} 的探索骰`, value: roll, raw: rollResult.raw, animate: true, charCls: rollResult.charCls },
       choices,
     });
   },
