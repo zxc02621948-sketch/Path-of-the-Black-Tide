@@ -2230,18 +2230,61 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   z-index: 3;
 }
 
+.resonance-awaken-copy.compact {
+  display: grid;
+  gap: 8px;
+}
+
 .resonance-awaken-lead {
-  margin: 0 0 14px;
+  margin: 0;
   color: #f2e8cb;
-  text-align: center;
-  font-weight: 650;
-  letter-spacing: .04em;
+  font-weight: 600;
+  letter-spacing: 0;
+  line-height: 1.45;
   text-shadow: 0 0 12px rgba(84, 226, 204, .28);
 }
 
 .resonance-awaken-list {
   display: grid;
   gap: 10px;
+}
+
+.resonance-awaken-list.compact {
+  gap: 7px;
+}
+
+.resonance-awaken-entry {
+  border-left: 2px solid var(--res-primary, rgba(122, 238, 218, .48));
+  padding: 2px 0 2px 10px;
+}
+
+.resonance-awaken-heading {
+  display: flex;
+  align-items: baseline;
+  gap: 2px;
+  margin-bottom: 2px;
+  color: var(--res-secondary, #ffe1a0);
+  font-family: var(--font-serif);
+  line-height: 1.35;
+}
+
+.resonance-awaken-heading strong {
+  font-size: 1.02em;
+  letter-spacing: 0;
+}
+
+.resonance-awaken-owner {
+  color: var(--res-primary, #94e7da);
+  font-family: var(--font-sans);
+  font-size: .92em;
+  font-weight: 700;
+}
+
+.resonance-awaken-entry p {
+  margin: 0;
+  color: var(--text);
+  font-size: .94em;
+  line-height: 1.48;
 }
 
 .resonance-awaken-card {

@@ -92,14 +92,8 @@ const GameRelicResonance = {
 
   _showResonanceActivatedModal(resonances = []) {
     const escape = value => this._escapeHtmlLocal ? this._escapeHtmlLocal(value) : String(value ?? '');
-    const primaryTheme = this._resonanceAwakenTheme(resonances[0]);
-    const sceneStyle = [
-      `--res-primary:${primaryTheme.primary}`,
-      `--res-secondary:${primaryTheme.secondary}`,
-      `--res-shadow:${primaryTheme.shadow}`,
-    ].join(';');
-    const cards = resonances.map(res => {
-      const owner = res.bodyChar?.name ? `${res.bodyChar.name}：` : '';
+    const rows = resonances.map(res => {
+      const owner = res.bodyChar?.name || '隊伍';
       const theme = this._resonanceAwakenTheme(res);
       const style = [
         `--res-primary:${theme.primary}`,
@@ -107,12 +101,11 @@ const GameRelicResonance = {
         `--res-shadow:${theme.shadow}`,
       ].join(';');
       return `
-        <section class="resonance-awaken-card resonance-theme-${escape(theme.key)}" style="${style}">
-          <div class="resonance-awaken-sigil" aria-hidden="true">
-            <span>${escape(theme.sigil)}</span>
+        <section class="resonance-awaken-entry resonance-theme-${escape(theme.key)}" style="${style}">
+          <div class="resonance-awaken-heading">
+            <span class="resonance-awaken-owner">${escape(owner)}：</span>
+            <strong>${escape(res.name || '未知共鳴')}</strong>
           </div>
-          <div class="resonance-awaken-kicker">${escape(owner || '隊伍共鳴')}</div>
-          <h3>${escape(res.name || '未知共鳴')}</h3>
           <p>${escape(this._resonanceEffectText(res)).replace(/\n/g, '<br>')}</p>
         </section>
       `;
@@ -123,19 +116,9 @@ const GameRelicResonance = {
     this._openModal({
       title: resonances.length > 1 ? '聖物共鳴啟動' : `聖物共鳴啟動：${resonances[0]?.name || ''}`,
       descHtml: `
-        <div class="resonance-awaken-scene resonance-theme-${escape(primaryTheme.key)}" style="${sceneStyle}" aria-hidden="true">
-          <span class="resonance-awaken-echo resonance-awaken-echo-a">${escape(primaryTheme.sigil)}</span>
-          <span class="resonance-awaken-echo resonance-awaken-echo-b">${escape(primaryTheme.sigil)}</span>
-          <span class="resonance-awaken-core"></span>
-          <span class="resonance-awaken-ring resonance-awaken-ring-a"></span>
-          <span class="resonance-awaken-ring resonance-awaken-ring-b"></span>
-          <span class="resonance-awaken-spark resonance-awaken-spark-a"></span>
-          <span class="resonance-awaken-spark resonance-awaken-spark-b"></span>
-          <span class="resonance-awaken-spark resonance-awaken-spark-c"></span>
-        </div>
-        <div class="resonance-awaken-copy">
+        <div class="resonance-awaken-copy compact">
           <p class="resonance-awaken-lead">${escape(lead)}</p>
-          <div class="resonance-awaken-list">${cards}</div>
+          <div class="resonance-awaken-list compact">${rows}</div>
         </div>
       `,
       resultFx: 'resonance-awaken',
