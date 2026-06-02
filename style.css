@@ -11553,3 +11553,66 @@ body::before {
     height: 24px;
   }
 }
+
+@media (max-width: 760px) {
+  .combat-tutorial-card.target-enemy,
+  .combat-tutorial-card.target-popover_close {
+    display: none;
+  }
+
+  .combat-status-popover {
+    left: 50% !important;
+    right: auto !important;
+    top: auto !important;
+    bottom: 14px !important;
+    transform: translateX(-50%);
+    width: min(352px, calc(100vw - 28px));
+    max-height: min(52vh, 360px);
+    overflow-y: auto;
+    border-color: rgba(201, 145, 47, .5);
+    background:
+      linear-gradient(180deg, rgba(18, 15, 12, .98), rgba(6, 8, 7, .98));
+    box-shadow:
+      0 16px 38px rgba(0, 0, 0, .64),
+      inset 0 0 18px rgba(201, 145, 47, .08);
+  }
+
+  .combat-enemy-card.enemy-cage_warden.has-card-bg,
+  .combat-enemy-card.enemy-dice_corruptor.has-card-bg,
+  .combat-enemy-card.enemy-echo_guardian_wound.has-card-bg,
+  .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg,
+  .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg,
+  .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg,
+  .combat-enemy-card.enemy-night_heart.has-card-bg {
+    background: rgba(10, 10, 10, .18);
+  }
+
+  .combat-enemy-card.enemy-cage_warden.has-card-bg::before,
+  .combat-enemy-card.enemy-dice_corruptor.has-card-bg::before,
+  .combat-enemy-card.enemy-echo_guardian_wound.has-card-bg::before,
+  .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg::before,
+  .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg::before,
+  .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg::before,
+  .combat-enemy-card.enemy-night_heart.has-card-bg::before,
+  .combat-enemy-card.enemy-cage_warden.has-card-bg::after,
+  .combat-enemy-card.enemy-dice_corruptor.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_wound.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg::after,
+  .combat-enemy-card.enemy-night_heart.has-card-bg::after {
+    height: 100%;
+  }
+
+  .combat-enemy-card.enemy-cage_warden.has-card-bg::after,
+  .combat-enemy-card.enemy-dice_corruptor.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_wound.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg::after,
+  .combat-enemy-card.enemy-night_heart.has-card-bg::after {
+    background:
+      linear-gradient(180deg, transparent 0, transparent 56%, rgba(3, 1, 6, .28) 76%, rgba(2, 1, 5, .54) 100%),
+      var(--enemy-card-bg) center top / 100% auto no-repeat;
+  }
+}
