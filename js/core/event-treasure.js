@@ -971,7 +971,7 @@ const GameEventTreasure = {
   },
 
   _openFateTableRelicChoice(ctx, title, intro, onDone) {
-    const pool = this._getAvailableRelics([...getDayRelics(), ...getNightRelics()]);
+    const pool = this._getAvailableRelics([...getDayRelics(), ...getNightRelics()], { ignoreWeaponRequirements: true });
     const relicChoices = typeof this._pickEventRelicChoices === 'function'
       ? this._pickEventRelicChoices(pool)
       : pool.slice(0, 2);
@@ -1012,16 +1012,19 @@ const GameEventTreasure = {
     const lore = this._getFirstLore(relic.id);
     const shortDesc = this._shortEventRelicDesc(relic.desc || '');
     const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
+    const locked = !this._squadMeetsRelicWeaponRequirement(relic);
+    const requirementText = locked ? this._relicRequirementText(relic) : '';
     const visual = relic.iconImage
       ? `<img class="event-relic-choice-img" src="${this._escapeEventAttr(relic.iconImage)}" alt="">`
       : `<span class="event-relic-choice-emoji">${this._escapeEventHtml(relic.icon || '◆')}</span>`;
     return `
-      <button type="button" class="event-relic-choice relic-${relicClass}" onclick="Game.chooseFateTableRelicChoice(${index})">
+      <button type="button" class="event-relic-choice relic-${relicClass}${locked ? ' locked' : ''}" ${locked ? 'disabled' : `onclick="Game.chooseFateTableRelicChoice(${index})"`}>
         <span class="event-relic-choice-visual">${visual}</span>
         <span class="event-relic-choice-body">
           <span class="event-relic-choice-kicker">接受命運贈禮</span>
           <span class="event-relic-choice-name">${this._escapeEventHtml(relic.name || '未知聖物')}</span>
           <span class="event-relic-choice-desc">${this._escapeEventHtml(shortDesc)}</span>
+          ${locked ? `<span class="event-relic-choice-lock">${this._escapeEventHtml(requirementText)}</span>` : ''}
           ${lore ? `<span class="event-relic-choice-lore">「${this._escapeEventHtml(this._shortEventRelicDesc(lore, 32))}」</span>` : ''}
         </span>
       </button>
@@ -1032,6 +1035,7 @@ const GameEventTreasure = {
     const ctx = G.fateTableRelicChoiceContext;
     const relic = ctx?.relicChoices?.[index];
     if (!ctx || !relic) return;
+    if (!this._squadMeetsRelicWeaponRequirement(relic)) return;
     this._openFateTableRelicAssignModal({
       title: ctx.title,
       intro: ctx.intro,
@@ -1042,9 +1046,9 @@ const GameEventTreasure = {
 
   _openFateTableRelicAssignModal({ title, intro, relic, onDone }) {
     if (!relic) return;
-    const carriers = relic.scholarOnly
+    const carriers = (relic.scholarOnly
       ? this._aliveSquad().filter(c => c.cls === 'scholar')
-      : this._aliveSquad();
+      : this._aliveSquad()).filter(char => this._charMeetsRelicWeaponRequirement(char, relic));
     const choices = carriers.map(char => ({
       label: `${char.name}${char.relic ? `（替換 ${char.relic.name}）` : ''}`,
       detail: char.relic ? `目前效果：${char.relic.desc}` : '',

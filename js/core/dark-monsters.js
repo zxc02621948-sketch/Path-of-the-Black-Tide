@@ -142,6 +142,7 @@ const GameDarkMonsters = {
       name: `黑暗化身 Lv.${originalLevel}`,
       icon: 'D',
       iconImage: 'assets/enemies/dark-avatar-combat.png',
+      cardBgImage: 'assets/enemies/dark-avatar-card-bg.png',
       mapIconImage: 'assets/enemies/dark-monster-icon.png',
       iconScale: 'large',
       attackTrail: 'dark_avatar',
@@ -188,7 +189,12 @@ const GameDarkMonsters = {
   _settleDarkMonsterActiveVictory(monsterId, monsterRef = null, opts = {}) {
     const before = Math.max(0, Number(G.darkness) || 0);
     const nativeBonus = opts.nativeWeaknessBreak ? 1 : 0;
-    const reduction = 2 + nativeBonus;
+    const monsterLevel = Math.max(
+      0,
+      Math.floor(monsterRef?.level || G.combat?.enemy?.darkMonsterOriginalLevel || G.combat?.enemy?.darkMonsterCombatLevel || 0)
+    );
+    const levelBonus = monsterLevel >= 10 ? 1 : 0;
+    const reduction = 2 + nativeBonus + levelBonus;
     const beforeCount = Array.isArray(G.darkMonsters) ? G.darkMonsters.length : 0;
     if (!Array.isArray(G.darkMonsters)) G.darkMonsters = [];
     G.darkMonsters = G.darkMonsters.filter(monster =>
@@ -201,13 +207,19 @@ const GameDarkMonsters = {
         monster.pendingChase = false;
       }
     }
-    const bonusText = nativeBonus > 0 ? '，原生弱點擊破額外 -1' : '';
+    const bonusParts = [
+      nativeBonus > 0 ? '原生弱點擊破額外 -1' : '',
+      levelBonus > 0 ? 'Lv.10+ 追擊額外 -1' : '',
+    ].filter(Boolean);
+    const bonusText = bonusParts.length ? `，${bonusParts.join('，')}` : '';
     this._log(`主動討伐勝利：黑暗 ${before} → ${G.darkness}（-${reduction}${bonusText}），其他黑暗化身追殺倒數 +1。`, 'reward');
     return {
       before,
       after: G.darkness,
       reduction,
       nativeBonus,
+      levelBonus,
+      monsterLevel,
       removed: Array.isArray(G.darkMonsters) && G.darkMonsters.length < beforeCount,
     };
   },

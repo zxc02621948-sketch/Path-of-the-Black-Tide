@@ -74,7 +74,7 @@ const GameStateHelpers = {
           '黑暗凝成了化身。從現在開始，黑暗化身會在地圖上出現並朝小隊移動。',
           '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
           '黑暗化身本體固定，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後即使黑暗繼續上升，已存在的黑暗化身不會跟著即時變強。',
-          '擊敗追殺而來的黑暗化身只會移除該化身，不會降低黑暗；主動討伐黑暗化身可使黑暗 -2，並震懾其他黑暗化身，使牠們的追殺延後 1 天。主動討伐中若本場曾命中並擊破原生弱點，額外黑暗 -1，每場最多一次。',
+          '擊敗追殺而來的黑暗化身只會移除該化身，不會降低黑暗；主動討伐黑暗化身可使黑暗 -2，若目標為 Lv.10 以上再額外黑暗 -1，並震懾其他黑暗化身，使牠們的追殺延後 1 天。主動討伐中若本場曾命中並擊破原生弱點，額外黑暗 -1，每場最多一次。',
         ].join('\n\n'),
       },
       10: {
@@ -151,6 +151,8 @@ const GameStateHelpers = {
   },
 
   _endGame(result) {
+    this._clearSquadCombatCarryover?.();
+    G.combat = null;
     G.phase = 'over';
     G.gameResult = result;
     G.modal = null;
@@ -374,10 +376,60 @@ const GameStateHelpers = {
     return ids;
   },
 
-  _getAvailableRelics(pool) {
+  _relicRequiredWeaponFamilies(relic) {
+    return Array.isArray(relic?.requiredWeaponFamilies)
+      ? relic.requiredWeaponFamilies.filter(Boolean)
+      : [];
+  },
+
+  _weaponFamilyLabel(family = '') {
+    const labels = {
+      sword: '劍系武器',
+      bow: '弓',
+      dagger: '匕首',
+      battle_drum: '戰鼓',
+      healing_staff: '治療杖',
+      katana: '太刀',
+    };
+    return labels[family] || family || '指定武器';
+  },
+
+  _relicRequirementText(relic) {
+    const families = this._relicRequiredWeaponFamilies(relic);
+    if (!families.length) return '';
+    const labels = families.map(family => this._weaponFamilyLabel(family)).join('或');
+    return `需要攜帶${labels}`;
+  },
+
+  _charMeetsRelicWeaponRequirement(char, relic) {
+    const families = this._relicRequiredWeaponFamilies(relic);
+    if (!families.length) return true;
+    const weaponFamily = char?.weapon?.family || char?.weapon?.id || '';
+    return families.includes(weaponFamily);
+  },
+
+  _squadMeetsRelicWeaponRequirement(relic) {
+    const families = this._relicRequiredWeaponFamilies(relic);
+    if (!families.length) return true;
+    return (G.squad || []).some(char =>
+      !char.dead &&
+      char.hp > 0 &&
+      this._charMeetsRelicWeaponRequirement(char, relic)
+    );
+  },
+
+  _filterRelicsByWeaponRequirements(pool) {
+    return (pool || []).filter(relic => this._squadMeetsRelicWeaponRequirement(relic));
+  },
+
+  _getAvailableRelics(pool, opts = {}) {
     const used = this._getRelicIdsInRun();
     const strict = pool.filter(r => !used.has(r.id));
-    if (strict.length > 0) return strict;
+    const filterWeapons = relics => opts.ignoreWeaponRequirements
+      ? relics
+      : this._filterRelicsByWeaponRequirements(relics);
+    const strictFiltered = filterWeapons(strict);
+    if (strict.length > 0) return strictFiltered;
 
     const heldOrReserved = new Set();
     for (const char of G.squad) {
@@ -392,7 +444,7 @@ const GameStateHelpers = {
     for (const site of (G.echoSites || [])) {
       if (!site.defeated && site.reservedRelicId) heldOrReserved.add(site.reservedRelicId);
     }
-    return pool.filter(r => !heldOrReserved.has(r.id));
+    return filterWeapons(pool.filter(r => !heldOrReserved.has(r.id)));
   },
 
   _relicRewardPoolForPhase(phase = G.phase) {
@@ -411,10 +463,15 @@ const GameStateHelpers = {
       for (const cell of row) {
         const r = cell.content?.relic;
         if (r) {
-          if (!seen.has(r.id)) {
+          if (!this._squadMeetsRelicWeaponRequirement(r)) {
+            const altPool = this._filterRelicsByWeaponRequirements(getDayRelics()).filter(c => !seen.has(c.id));
+            const alt = weightedRelicPick(altPool);
+            if (alt) { cell.content = { relic: { ...alt } }; seen.add(alt.id); }
+            else { cell.type = 'empty'; cell.content = null; }
+          } else if (!seen.has(r.id)) {
             seen.add(r.id);
           } else {
-            const alt = getDayRelics().find(c => !seen.has(c.id));
+            const alt = this._filterRelicsByWeaponRequirements(getDayRelics()).find(c => !seen.has(c.id));
             if (alt) { cell.content = { relic: { ...alt } }; seen.add(alt.id); }
             else { cell.type = 'empty'; cell.content = null; }
           }

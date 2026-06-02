@@ -256,15 +256,15 @@ const GameRelicResonance = {
         return [
           `${res.bodyChar?.name || '持有者'} 融合沉鐵劍鞘並攜帶銀蜂針。`,
           '銀蜂針不再觸發刺劍連擊，改為強化重劍。',
-          '重劍命中後額外獲得 5 點氣勢。',
+          '重劍命中後額外獲得氣勢。',
           '每 5 點氣勢，使重劍傷害 +1。',
+          '氣勢 20 以上未打出重劍時，失去一半氣勢。',
         ].join('\n');
-      case 'rapier_resonance':
+                  case 'rapier_resonance':
         return [
-          `${res.bodyChar?.name || '持有者'} 融合銀蜂針並攜帶沉鐵劍鞘。`,
-          '沉鐵劍鞘不再觸發重劍，改為強化刺劍。',
-          '刺劍連擊不再獲得保底成功。',
-          '本次刺劍每成功連擊 1 次，後續連擊傷害 +1。',
+          `${res.bodyChar?.name || '\u6301\u6709\u8005'} \u555f\u52d5\u9280\u8702\u528d\u5f8b\u3002`,
+          '\u6c89\u9435\u528d\u9798\u4e0d\u518d\u89f8\u767c\u91cd\u528d\uff0c\u6539\u70ba\u5f37\u5316\u523a\u528d\u3002',
+          '\u672c\u6b21\u523a\u528d\u6bcf\u6210\u529f\u9023\u64ca 1 \u6b21\uff0c\u5f8c\u7e8c\u9023\u64ca\u50b7\u5bb3\u984d\u5916 +1\uff0c\u6700\u591a +5\u3002',
         ].join('\n');
       default:
         return res.effect?.desc || '共鳴效果已啟動。';

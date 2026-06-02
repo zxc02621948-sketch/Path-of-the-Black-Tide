@@ -194,7 +194,8 @@ const RenderModal = {
 
       // Section.
       const enemyCard = sceneEl.querySelector('.hoverable-enemy');
-      if (enemyCard && cfg.combat.enemy) {
+      const enemyHoverTarget = sceneEl.querySelector('.combat-enemy-detail-button');
+      if (enemyHoverTarget && cfg.combat.enemy) {
         const e = cfg.combat.enemy;
         const nativeInfo = this._activeEnemyNativeWeaknesses(e);
         const nativeText = nativeInfo.main
@@ -216,19 +217,46 @@ const RenderModal = {
           ${abilityRows}
           ${e.tempWeakness ? `<div class="cct-row"><span class="cct-label">破綻</span>${e.tempWeakness}</div>` : ''}
         `;
-        enemyCard.addEventListener('mouseenter', () => {
+        enemyHoverTarget.addEventListener('mouseenter', () => {
           tip.innerHTML = enemyHtml;
           const rows = [...tip.querySelectorAll('.cct-row')];
           const firstStatRow = e.desc ? 1 : 0;
           rows.slice(firstStatRow, firstStatRow + 2).forEach(row => row.remove());
           tip.classList.add('visible');
         });
-        enemyCard.addEventListener('mousemove', ev => {
+        enemyHoverTarget.addEventListener('mousemove', ev => {
           const x = ev.clientX + 16, y = ev.clientY + 12;
           tip.style.left = Math.min(x, window.innerWidth - tip.offsetWidth - 8) + 'px';
           tip.style.top = y + 'px';
         });
-        enemyCard.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+        enemyHoverTarget.addEventListener('mouseleave', () => tip.classList.remove('visible'));
+      }
+
+      const fateBoard = sceneEl.querySelector('.fate-board-effect');
+      if (fateBoard && cfg.combat.enemy?.fateGamble) {
+        const fateGamble = cfg.combat.enemy.fateGamble;
+        const luckyFaces = Array.isArray(fateGamble.luckyFaces) && fateGamble.luckyFaces.length > 0
+          ? fateGamble.luckyFaces
+          : (fateGamble.luckyFace ? [fateGamble.luckyFace] : []);
+        const unluckyFaces = Array.isArray(fateGamble.unluckyFaces) ? fateGamble.unluckyFaces : [];
+        let tip = document.getElementById('combat-float-tip');
+        if (!tip) { tip = document.createElement('div'); tip.id = 'combat-float-tip'; document.body.appendChild(tip); }
+        const fateHtml = `
+          <div class="cct-name">🎲 命運盤</div>
+          <div class="cct-row"><span class="cct-label">幸運</span>${luckyFaces.join('、')}</div>
+          <div class="cct-row"><span class="cct-label">厄運</span>${unluckyFaces.join('、')}</div>
+          <div class="cct-row">擲命守衛攻擊前會擲命運骰。命中幸運面會提高本次傷害並新增幸運面；命中厄運面會讓牠自損並使本回合攻擊減半。</div>
+        `;
+        fateBoard.addEventListener('mouseenter', () => {
+          tip.innerHTML = fateHtml;
+          tip.classList.add('visible');
+        });
+        fateBoard.addEventListener('mousemove', ev => {
+          const x = ev.clientX + 16, y = ev.clientY + 12;
+          tip.style.left = Math.min(x, window.innerWidth - tip.offsetWidth - 8) + 'px';
+          tip.style.top = y + 'px';
+        });
+        fateBoard.addEventListener('mouseleave', () => tip.classList.remove('visible'));
       }
 
       // Section.
@@ -470,7 +498,11 @@ const RenderModal = {
           selectableUnits.forEach(unit => unit.classList.remove('combat-anim-locked'));
           if (G.combat) G.combat.actionInProgress = false;
           this._positionCombatIntentArrow();
+          if (cfg.syncAudioAfterCombatAnims) AudioManager?.sync?.();
         }, lockMs);
+      }
+      if (cfg.syncAudioAfterCombatAnims && (!hasCombatAnim || !combatActionsEl || cfg.combatAnims.lockActions === false)) {
+        setTimeout(() => AudioManager?.sync?.(), hasCombatAnim ? lockMs : 0);
       }
       this._preparePlayerDamageSequence(playerDamageEvents);
       this._prepareEnemyBlockSequence(cfg.combatAnims);
@@ -674,6 +706,10 @@ const RenderModal = {
       '"': '&quot;',
       "'": '&#39;',
     }[ch]));
+  },
+
+  _escapeAttr(value) {
+    return this._escapeHtml(value);
   },
 
   _positionCombatIntentArrow() {
@@ -1694,18 +1730,26 @@ const RenderModal = {
       ? `<div class="combat-weakness-effect">⚡ ${combat.enemy.weaknessDesc}</div>`
       : '';
     const fateGamble = combat.enemy.fateGamble || null;
-    const fateGambleHtml = fateGamble?.luckyFace && Array.isArray(fateGamble.unluckyFaces) && fateGamble.unluckyFaces.length > 0
-      ? `<div class="combat-weakness-effect">命運盤：幸運 ${Dice.face(fateGamble.luckyFace)} ${fateGamble.luckyFace}／厄運 ${fateGamble.unluckyFaces.map(face => `${Dice.face(face)} ${face}`).join('、')}</div>`
+    const fateLuckyFaces = Array.isArray(fateGamble?.luckyFaces) && fateGamble.luckyFaces.length > 0
+      ? fateGamble.luckyFaces
+      : (fateGamble?.luckyFace ? [fateGamble.luckyFace] : []);
+    const fateGambleHtml = fateLuckyFaces.length > 0 && Array.isArray(fateGamble.unluckyFaces) && fateGamble.unluckyFaces.length > 0
+      ? `<button type="button" class="combat-weakness-effect fate-board-effect" onclick="event.stopPropagation(); Game.showCombatFateBoardDetail(event)" title="命運盤：左側為幸運骰面，右側為厄運骰面">
+          <span class="fate-board-faces lucky" aria-label="幸運骰面">${fateLuckyFaces.join('、')}</span>
+          <img class="fate-board-icon" src="assets/icons/fate-guardian-dice.png" alt="命運盤">
+          <span class="fate-board-faces unlucky" aria-label="厄運骰面">${fateGamble.unluckyFaces.join('、')}</span>
+        </button>`
       : '';
     const bannerGuardian = combat.enemy.bannerGuardian || null;
     const bannerGuardianHtml = bannerGuardian
-      ? `<div class="combat-weakness-effect">旗面：${bannerGuardian.stance === 'damage' ? '戰吼旗（攻擊傷害 +2）' : '創傷旗（攻擊前全隊傷口 +2）'}</div>`
+      ? `<div class="combat-weakness-effect">旗面：${bannerGuardian.interrupted ? '已中斷，換旗前不生效' : (bannerGuardian.stance === 'damage' ? '戰吼旗（攻擊傷害 +3）' : '創傷旗（攻擊前全隊傷口 +4）')}</div>`
       : '';
     const selectable = !!combat.selectable;
     const itemTargeting = !!combat.itemTargeting;
     const guardTargeting = !!combat.guardTargeting;
     const tutorial = combat.tutorial || null;
     const tutorialTarget = tutorial?.target || '';
+    const tutorialTargetId = tutorial?.targetId || '';
     if (combat.onFollowUpTarget && combat.followUpTargetId) {
       if (!this._combatFollowUpActions) this._combatFollowUpActions = {};
       this._combatFollowUpActions[combat.followUpTargetId] = combat.onFollowUpTarget;
@@ -1809,8 +1853,12 @@ const RenderModal = {
         : (selectable && !isDown && !isIntimidated ? `onclick="Game.selectCombatAttacker('${char.id}')"` : '');
       const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
       const weaponFamily = char.weapon?.family || char.weapon?.id || '';
+      const tutorialAllyHighlight = !isDown && (
+        tutorialTarget === 'ally' ||
+        ((tutorialTarget === 'guard_ally' || tutorialTarget === 'item_ally') && tutorialTargetId === char.id)
+      );
       return `
-        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${isIntimidated ? ' intimidated' : ''}${canClick ? ' selectable' : ''}${isFollowUpStatus ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}${tutorialTarget === 'ally' && !isDown ? ' combat-tutorial-highlight' : ''}"
+        <${tag} class="combat-unit ally${isActive ? ' active' : ''}${isDown ? ' down' : ''}${isIntimidated ? ' intimidated' : ''}${canClick ? ' selectable' : ''}${isFollowUpStatus ? ' followup-ready' : ''}${(itemTargeting || guardTargeting) && !isDown ? ' item-target' : ''}${isIntentTarget ? ' intent-targeted' : ''}${tutorialAllyHighlight ? ' combat-tutorial-highlight' : ''}"
           data-char-id="${char.id}" data-weapon-family="${weaponFamily}" ${clickAttr}>
           ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
@@ -1864,7 +1912,9 @@ const RenderModal = {
           const item = entry.item;
           const blocked = item.useType === 'roll_mod' && combat.rollItemBlocked;
           const countText = entry.count > 1 ? ` x${entry.count}` : '';
-          return `<button class="combat-bag-item" ${blocked ? 'disabled' : ''} onclick="Game.selectCombatBagItem(${entry.index})">
+          const tutorialItemClass = tutorialTarget === 'bag_item' && item.id === 'whetstone' ? ' combat-tutorial-highlight' : '';
+          const indexArg = JSON.stringify(entry.index);
+          return `<button class="combat-bag-item${tutorialItemClass}" data-item-id="${this._escapeAttr(item.id || '')}" ${blocked ? 'disabled' : ''} onclick="Game.selectCombatBagItem(${this._escapeAttr(indexArg)})">
             <span>${EquipmentIcon.label(item, 'equipment-inline-icon item-combat-icon')}${countText}</span>
             <small>${blocked ? '本次攻擊已使用擲骰道具' : item.desc}</small>
           </button>`;
@@ -1887,13 +1937,22 @@ const RenderModal = {
       ? ` enemy-${String(combat.enemy.id).replace(/[^a-z0-9_-]/gi, '-')}`
       : '';
     const enemyDefeatedClass = combat.enemy.defeated ? ' pending-defeated' : '';
+    const enemySelfTargetClass = combat.intent?.targetSelf ? ' self-targeted' : '';
     const enemyHoverTitle = this._combatEnemyHoverTitle(combat.enemy);
+    const guardCancelLocked = guardTargeting && tutorial?.step === 'guard_target';
+    const guardButtonClass = `combat-guard-button${guardTargeting ? ' active' : ''}${combat.canGuard || guardTargeting ? '' : ' disabled'}${guardCancelLocked ? ' disabled' : ''}${tutorialTarget === 'guard' ? ' combat-tutorial-highlight' : ''}`;
+    const bagButtonClass = `combat-bag-button${combat.canUseBag ? '' : ' disabled'}${tutorialTarget === 'bag' ? ' combat-tutorial-highlight' : ''}`;
+    const guardButtonAction = guardCancelLocked
+      ? 'disabled'
+      : guardTargeting
+      ? 'onclick="Game.cancelCombatGuardTargeting()"'
+      : (combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled');
 
     return `
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}${tutorialTarget === 'enemy' ? ' combat-tutorial-highlight' : ''}"${enemyCardBgStyle}>
-        ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.value, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}${enemySelfTargetClass}${tutorialTarget === 'enemy' ? ' combat-tutorial-highlight' : ''}"${enemyCardBgStyle}>
+        ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.animate === false ? combat.enemyDice.value : null, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
         ${this._combatEnemyDamageDiePanelHtml(combat.enemy)}
         <div class="combat-side-label" aria-hidden="true"></div>
         <div class="combat-enemy-figure">
@@ -1931,8 +1990,8 @@ const RenderModal = {
           <div class="combat-actions"></div>
           <div class="combat-vs">VS</div>
           <div class="combat-bottom-tools">
-            <button class="combat-guard-button${guardTargeting ? ' active' : ''}${combat.canGuard || guardTargeting ? '' : ' disabled'}${tutorialTarget === 'guard' ? ' combat-tutorial-highlight' : ''}" ${guardTargeting ? 'onclick="Game.cancelCombatGuardTargeting()"' : (combat.canGuard ? 'onclick="Game.selectCombatGuard()"' : 'disabled')} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
-            <button class="combat-bag-button${combat.canUseBag ? '' : ' disabled'}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
+            <button class="${guardButtonClass}" ${guardButtonAction} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
+            <button class="${bagButtonClass}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
           </div>
         </div>
         ${itemTargeting ? `<button class="btn-tiny combat-cancel-item" onclick="Game.cancelCombatItemTargeting()">取消道具</button>` : ''}
@@ -1947,12 +2006,17 @@ const RenderModal = {
 
   _combatTutorialCardHtml(tutorial = null) {
     if (!tutorial) return '';
+    if (tutorial.hideCard) return '';
+    const nextButton = tutorial.step === 'guard_cooldown'
+      ? '<button type="button" class="combat-tutorial-next" onclick="Game.continueCombatTutorial()">下一步</button>'
+      : '';
     return `
       <div class="combat-tutorial-card target-${tutorial.target || 'none'}" data-step="${tutorial.step || ''}">
         <div class="combat-tutorial-step">戰鬥教學</div>
         <div class="combat-tutorial-title">${this._escapeHtml(tutorial.title || '')}</div>
         <div class="combat-tutorial-body">${this._escapeHtml(tutorial.body || '')}</div>
         <div class="combat-tutorial-cta">${this._escapeHtml(tutorial.cta || '')}</div>
+        ${nextButton}
       </div>
     `;
   },
@@ -1964,12 +2028,21 @@ const RenderModal = {
     scene.querySelector('.combat-tutorial-card')?.remove();
     if (!tutorial) return;
     const target = tutorial.target || '';
-    if (target === 'enemy') scene.querySelector('.combat-enemy-card')?.classList.add('combat-tutorial-highlight');
+    if (target === 'enemy') scene.querySelector('.combat-enemy-detail-button')?.classList.add('combat-tutorial-highlight');
+    if (target === 'popover_close') document.querySelector('#combat-status-popover .combat-banner-popover-close')?.classList.add('combat-tutorial-highlight');
     if (target === 'guard') scene.querySelector('.combat-guard-button')?.classList.add('combat-tutorial-highlight');
+    if (target === 'bag') scene.querySelector('.combat-bag-button')?.classList.add('combat-tutorial-highlight');
+    if (target === 'bag_item') scene.querySelector('.combat-bag-item[data-item-id="whetstone"]')?.classList.add('combat-tutorial-highlight');
+    if (target === 'guard_ally' && tutorial.targetId) {
+      scene.querySelectorAll('.combat-unit.ally').forEach(el => {
+        if (el.dataset.charId === tutorial.targetId) el.classList.add('combat-tutorial-highlight');
+      });
+    }
     if (target === 'ally') {
       scene.querySelectorAll('.combat-unit.ally:not(.empty-slot):not(.down)').forEach(el => el.classList.add('combat-tutorial-highlight'));
     }
-    scene.insertAdjacentHTML('beforeend', this._combatTutorialCardHtml(tutorial));
+    const cardHtml = this._combatTutorialCardHtml(tutorial);
+    if (cardHtml) scene.insertAdjacentHTML('beforeend', cardHtml);
   },
 
   _combatEnemyAbilityRowsHtml(enemy) {
@@ -2250,11 +2323,12 @@ const RenderModal = {
 
   _combatDicePips(value, side, cls = null, sides = 6, d12Type = null) {
     const diceSides = Math.max(1, Number(sides || 6));
+    const pending = value == null;
     const d12Class = diceSides > 6 ? ' dice-d12' : '';
     const d12TypeClass = diceSides > 6 && d12Type ? ` dice-d12-${d12Type}` : '';
-    const faceClass = diceSides <= 6 && value >= 1 && value <= 6 ? `dice-face-${value}` : '';
-    return `<div class="combat-card-dice ${side} ${this._diceThemeClass(cls)}${d12Class}${d12TypeClass} ${faceClass}" data-sides="${diceSides}" aria-label="骰出 ${value}">
-      ${this._dicePipHtml(value, diceSides)}
+    const faceClass = !pending && diceSides <= 6 && value >= 1 && value <= 6 ? `dice-face-${value}` : '';
+    return `<div class="combat-card-dice ${side} ${this._diceThemeClass(cls)}${d12Class}${d12TypeClass} ${faceClass}" data-sides="${diceSides}" aria-label="${pending ? '骰子判定中' : `骰出 ${value}`}">
+      ${pending ? '<strong class="dice-number">?</strong>' : this._dicePipHtml(value, diceSides)}
     </div>`;
   },
 

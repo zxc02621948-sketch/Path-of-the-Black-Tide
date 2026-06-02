@@ -8,7 +8,7 @@ const CHARACTER_CLASSES = {
     maxHp: 26,
     attack: 5,
     passive: 'combat_floor',
-    passiveDesc: '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面一半（向上取整）的格檔，最多 4',
+    passiveDesc: '戰鬥骰最低視為 3。主戰攻擊後，依最終骰面準備下回合格檔：獲得最終骰面一半（向上取整）的格檔，最多 4 點。準備中的格檔會在下一回合開始時生效',
   },
   explorer: {
     id: 'explorer',
@@ -28,7 +28,7 @@ const CHARACTER_CLASSES = {
     maxHp: 20,
     attack: 4,
     passive: 'gambler_attack',
-    passiveDesc: '主戰攻擊時，單數視為命中破綻，並刷新敵人破綻且本次傷害 +1；雙數獲得 1 層反噬，下一次受擊流程受到的傷害每層 +20%，最多 3 層，觸發後清空。戰鬥中實際損失 HP 後，下回合獲得損失 HP x2 的格檔',
+    passiveDesc: '\u4e3b\u6230\u653b\u64ca\u6642\uff0c\u55ae\u6578\u8996\u70ba\u547d\u4e2d\u7834\u7dbb\uff0c\u4e26\u5237\u65b0\u6575\u4eba\u7834\u7dbb\u4e14\u672c\u6b21\u50b7\u5bb3 +1\uff1b\u96d9\u6578\u7372\u5f97 1 \u5c64\u53cd\u566c\uff0c\u4e0b\u4e00\u6b21\u53d7\u64ca\u6d41\u7a0b\u53d7\u5230\u7684\u50b7\u5bb3\u6bcf\u5c64 +20%\uff0c\u6700\u591a 2 \u5c64\uff0c\u89f8\u767c\u5f8c\u6e05\u7a7a\u3002\u6230\u9b25\u4e2d\u5be6\u969b\u640d\u5931 HP \u5f8c\uff0c\u4e0b\u56de\u5408\u7372\u5f97\u640d\u5931 HP x2 \u7684\u683c\u6a94',
   },
   support: {
     id: 'support',

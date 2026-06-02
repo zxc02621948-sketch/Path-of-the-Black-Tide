@@ -3,9 +3,13 @@ const GameCombatTooltips = {
   showCombatEnemyDetail(ev = null) {
     const enemy = G.combat?.enemy;
     if (!enemy) return;
+    const tutorialStep = G.combatTutorial?.active && !G.combatTutorial.completed
+      ? G.combatTutorial.step
+      : '';
+    if (tutorialStep && !['enemy_detail', 'enemy_detail_close'].includes(tutorialStep)) return;
     const existingPopover = document.getElementById('combat-status-popover');
     if (existingPopover?.classList.contains('visible') && existingPopover.dataset.combatPopoverKind === 'enemy-detail') {
-      existingPopover.classList.remove('visible');
+      this._hideCombatStatusPopover(existingPopover);
       existingPopover.dataset.combatPopoverKind = '';
       return;
     }
@@ -42,7 +46,39 @@ const GameCombatTooltips = {
     this._showCombatStatusPopover(titleText, descText, ev);
     const popover = document.getElementById('combat-status-popover');
     if (popover) popover.dataset.combatPopoverKind = 'enemy-detail';
-    this._advanceCombatTutorial?.('enemy_detail', 'guard_button');
+    if (tutorialStep === 'enemy_detail') {
+      this._advanceCombatTutorial?.('enemy_detail', 'enemy_detail_close');
+    }
+  },
+
+  showCombatFateBoardDetail(ev = null) {
+    const enemy = G.combat?.enemy;
+    const fateGamble = enemy?.abilityState?.fateGamble || null;
+    if (!enemy || !fateGamble) return;
+    const luckyFaces = Array.isArray(fateGamble.luckyFaces) && fateGamble.luckyFaces.length > 0
+      ? fateGamble.luckyFaces
+      : (fateGamble.luckyFace ? [fateGamble.luckyFace] : []);
+    const unluckyFaces = Array.isArray(fateGamble.unluckyFaces) ? fateGamble.unluckyFaces : [];
+    const ability = Array.isArray(enemy.abilities)
+      ? enemy.abilities.find(item => item?.type === 'fate_gamble') || {}
+      : {};
+    const multiplier = Math.max(1, ability.luckyMultiplier || 1);
+    const rerollEvery = Math.max(1, ability.rerollEvery || 2);
+    const maxLucky = Math.max(1, ability.maxLuckyFaces || 3);
+    const maxUnlucky = Math.max(1, ability.maxUnluckyFaces || 3);
+    const unluckyRate = Math.round(Math.max(0, ability.unluckySelfDamageRate ?? 0.25) * 100);
+    const titleText = '🎲 命運盤';
+    const descText = [
+      `幸運骰面：${luckyFaces.join('、') || '無'}`,
+      `厄運骰面：${unluckyFaces.join('、') || '無'}`,
+      `擲命守衛每 ${rerollEvery} 回合重擲命運盤，但保留目前面數。`,
+      `命中幸運面：本次單體傷害 x${multiplier}，並新增 1 個幸運面，最多 ${maxLucky} 面。`,
+      `命中厄運面：擲命守衛失去目前生命的 ${unluckyRate}%，且本回合攻擊減半。`,
+      `命中牠的原生弱點可新增 1 個厄運面，最多 ${maxUnlucky} 面。`,
+    ].join('\n\n');
+    this._showCombatStatusPopover(titleText, descText, ev);
+    const popover = document.getElementById('combat-status-popover');
+    if (popover) popover.dataset.combatPopoverKind = 'fate-board';
   },
 
   _combatEnemyAbilityNotes(enemy) {
@@ -50,7 +86,17 @@ const GameCombatTooltips = {
     const hasAbility = type => abilities.some(ability => ability?.type === type);
     const notes = [];
     if (hasAbility('dice_pollution')) {
-      notes.push('每次行動都會污染骰面：污染孢子污染隨機隊友，撲擊污染被攻擊目標，污潮污染隨機隊友。污染骰面無法被改骰，擲出時傷害歸零並讓牠回血。');
+      const ability = abilities.find(item => item?.type === 'dice_pollution') || {};
+      const heal = Math.max(0, ability.heal || 6);
+      const baseSelfDamage = Math.max(0, ability.pollutedFaceSelfDamage || 0);
+      const selfDamage = Math.max(0, ability.empoweredSelfDamage || 1);
+      const maxStacks = Math.max(1, ability.empoweredMax || 3);
+      const pulse = Math.max(0, ability.pollutePulseDamage || 0);
+      const extra = Math.max(0, ability.extraRandomPollutions || 0);
+      const pulseText = pulse > 0
+        ? `\u6c61\u67d3\u8108\u885d\u6703\u5148\u5c0d\u5168\u968a\u9020\u6210 ${pulse} \u50b7\u5bb3\uff0c\u4e26\u6c61\u67d3\u4e3b\u6230\u8005\u8207 ${1 + extra} \u540d\u96a8\u6a5f\u968a\u53cb\u3002`
+        : '\u6c61\u67d3\u5b62\u5b50\u4e0d\u9020\u6210\u76f4\u63a5\u50b7\u5bb3\u3002';
+      notes.push(`\u6bcf\u6b21\u884c\u52d5\u90fd\u6703\u6c61\u67d3\u9ab0\u9762\uff1a${pulseText}\u64b2\u64ca\u6703\u6c61\u67d3\u88ab\u653b\u64ca\u76ee\u6a19\uff0c\u6c61\u6f6e\u6703\u6c61\u67d3\u96a8\u6a5f\u968a\u53cb\u3002\u6c61\u67d3\u9ab0\u9762\u7121\u6cd5\u88ab\u6539\u9ab0\uff0c\u64f2\u51fa\u6642\u672c\u6b21\u50b7\u5bb3\u6b78\u96f6\uff0c\u8b93\u7260\u56de\u5fa9 ${heal} HP\uff0c\u81ea\u5df1\u53d7\u5230 ${baseSelfDamage} \u50b7\u5bb3\uff0c\u4e26\u6e05\u9664\u8a72\u6c61\u67d3\u9762\u3002\u6c61\u67d3\u5f37\u5316\u6700\u591a ${maxStacks} \u5c64\uff0c\u89f8\u767c\u6642\u6bcf\u5c64\u984d\u5916\u53cd\u566c ${selfDamage} \u50b7\u5bb3\u3002`);
     }
     if (hasAbility('final_boss')) {
       notes.push('黑夜輪轉：閉眼回合遮蔽核心弱點並獲得格檔；開眼回合顯現 1 個核心原生弱點，攻擊追加半個骰數並濺射其他隊友。破除開眼弱點會讓下一次閉眼失去格檔，下一次開眼不濺射。');
@@ -71,6 +117,36 @@ const GameCombatTooltips = {
       const threshold = Math.round(Math.max(0, Math.min(1, ability.lowHpThreshold ?? 0.5)) * 100);
       const bonus = Math.max(0, ability.damageBonus || 1);
       notes.push(`血味追獵：攻擊時優先盯上生命比例最低的隊友；目標生命低於 ${threshold}% 時傷害 +${bonus}。命中原生弱點可揭露牠，使追獵暫時失效。`);
+    }
+    if (hasAbility('pain_growth')) {
+      const ability = abilities.find(item => item?.type === 'pain_growth') || {};
+      const natural = Math.max(0, ability.naturalStacks || 0);
+      const per = Math.max(1, ability.attackBonusPerWounds || 1);
+      const specialEvery = Math.max(1, ability.specialEvery || 0);
+      const specialStacks = Math.max(0, ability.specialStacks || 0);
+      notes.push(`痛痕滋長：戰鬥開始與每回合開始時獲得 ${natural} 層傷口；攻擊時每 ${per} 層傷口使傷害 +1。每 ${specialEvery} 回合會撕裂自身，額外獲得 ${specialStacks} 層傷口並自損。命中原生弱點可停止每回合自然滋長。`);
+    }
+    if (hasAbility('rift_gaze')) {
+      const ability = abilities.find(item => item?.type === 'rift_gaze') || {};
+      const add = Math.max(1, ability.addPerRound || 1);
+      const bonus = Math.max(0, ability.nativeDamageBonus ?? 3);
+      notes.push(`裂隙凝視：戰鬥開始與每回合開始時，為我方全體各新增 ${add} 個凝視原生弱點。攻擊前擲凝視骰，若命中受擊者原生弱點，該次傷害 +${bonus} 並移除該弱點。命中牠的原生弱點可清除我方全體凝視弱點。`);
+    }
+    if (hasAbility('fate_gamble')) {
+      const ability = abilities.find(item => item?.type === 'fate_gamble') || {};
+      const multiplier = Math.max(1, ability.luckyMultiplier || 1);
+      const rerollEvery = Math.max(1, ability.rerollEvery || 2);
+      const maxLucky = Math.max(1, ability.maxLuckyFaces || 3);
+      const maxUnlucky = Math.max(1, ability.maxUnluckyFaces || 3);
+      const unluckyRate = Math.round(Math.max(0, ability.unluckySelfDamageRate ?? 0.25) * 100);
+      notes.push(`命運盤：每 ${rerollEvery} 回合重擲幸運面與厄運面，但保留目前面數。攻擊前擲命運骰，命中幸運面時本次單體傷害 x${multiplier}，並新增 1 個幸運面（最多 ${maxLucky} 面）；命中厄運面時牠失去目前生命的 ${unluckyRate}%，且本回合攻擊減半。命中牠的原生弱點可新增 1 個厄運面（最多 ${maxUnlucky} 面）。`);
+    }
+    if (hasAbility('banner_guardian')) {
+      const ability = abilities.find(item => item?.type === 'banner_guardian') || {};
+      const wounds = Math.max(0, ability.woundStacks || 0);
+      const bonus = Math.max(0, ability.damageBonus || 0);
+      const block = Math.max(0, ability.switchBlock || 0);
+      notes.push(`殘旗號令：依序單體攻擊、全體攻擊、換旗整隊。創傷旗會使全隊傷口 +${wounds}；戰吼旗會使攻擊傷害 +${bonus}；換旗時不攻擊並獲得 ${block} 格檔。命中原生弱點可中斷當前旗面效果，直到牠下一次換旗。`);
     }
     return notes;
   },
@@ -156,6 +232,19 @@ const GameCombatTooltips = {
     this._showCombatStatusPopover(titleText, descText, ev);
   },
 
+  _hideCombatStatusPopover(popover = null) {
+    const panel = popover || document.getElementById('combat-status-popover');
+    if (!panel?.classList.contains('visible')) return;
+    const kind = panel.dataset.combatPopoverKind || '';
+    panel.classList.remove('visible');
+    if (kind === 'enemy-detail') {
+      panel.dataset.combatPopoverKind = '';
+      if (G.combatTutorial?.active && !G.combatTutorial.completed && G.combatTutorial.step === 'enemy_detail_close') {
+        this._advanceCombatTutorial?.('enemy_detail_close', 'guard_button');
+      }
+    }
+  },
+
   _showCombatStatusPopover(titleText, descText, ev = null) {
     let popover = document.getElementById('combat-status-popover');
     if (!popover) {
@@ -176,7 +265,7 @@ const GameCombatTooltips = {
     close.type = 'button';
     close.className = 'combat-banner-popover-close';
     close.textContent = '關閉';
-    close.addEventListener('click', () => popover.classList.remove('visible'));
+    close.addEventListener('click', () => this._hideCombatStatusPopover(popover));
     popover.append(title, desc, close);
 
     popover.dataset.combatPopoverKind = 'status';
@@ -193,7 +282,7 @@ const GameCombatTooltips = {
         const panel = document.getElementById('combat-status-popover');
         if (!panel?.classList.contains('visible')) return;
         if (event.target.closest?.('#combat-status-popover, .combat-status-badge, .combat-wound-badge, .combat-native-weakness-badge, .combat-temp-weakness-badge, .combat-block-badge, .combat-enemy-detail-button')) return;
-        panel.classList.remove('visible');
+        this._hideCombatStatusPopover(panel);
       };
       document.addEventListener('click', this._combatStatusOutsideHandler);
     }

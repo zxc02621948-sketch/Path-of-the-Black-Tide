@@ -146,8 +146,8 @@ WEAPONS.push(
     name: '逐星弓',
     icon: '🏹',
     iconImage: 'assets/weapons/star-chaser-bow.png',
-    desc: '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次；本回合每次追加攻擊傷害額外 +2，可疊加。',
-    effect: { type: 'bow_followup', maxPerRound: 3, followUpDamageStep: 2 },
+    desc: '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次。',
+    effect: { type: 'bow_followup', maxPerRound: 3 },
   },
   {
     id: 'dagger_plus',

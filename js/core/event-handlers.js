@@ -91,6 +91,10 @@ const GameEventHandlers = {
     if (ev.id === 'empty_old_camp') { this._triggerOldCamp(cell, ev); return; }
     if (ev.id === 'cave_starlight_shard') { this._triggerCaveStarlightShard(ev); return; }
     if (ev.choiceTrap) { this._triggerChoiceTrap(cell, ev); return; }
+    if (this._shouldConvertGuideRelicEventToCombat(ev)) {
+      this._triggerGuideRelicEventAmbush(cell, ev);
+      return;
+    }
     switch (ev.type) {
       case 'rescue':     this._triggerRescue(ev);              break;
       case 'supply':     this._triggerSupply(ev);              break;
@@ -107,9 +111,62 @@ const GameEventHandlers = {
   },
 
   _rollTerrainEventForCell(cell) {
+    const delayedRelicEvent = this._consumeGuideDelayedRelicEvent(cell);
+    if (delayedRelicEvent) return delayedRelicEvent;
     const echoEvent = this._maybeCreateEchoSiteClueEvent();
     if (echoEvent) return echoEvent;
     return this._rerollTerrainEventWithoutEchoSite(cell);
+  },
+
+  _shouldConvertGuideRelicEventToCombat(ev) {
+    if (!ev || ev.type !== 'find_relic' || ev._guideDelayedRelicCompensation) return false;
+    return !!G.guideQuest?.active && G.guideQuest.stage === 'find_relic' && !G.guideQuest.completed;
+  },
+
+  _triggerGuideRelicEventAmbush(cell, ev) {
+    if (G.guideQuest) {
+      G.guideQuest.delayedRelicChoice = true;
+      G.guideQuest.relicAmbushTarget = { x: cell.x, y: cell.y };
+    }
+    const ambushEvent = {
+      ...ev,
+      id: `${ev.id || 'guide_relic'}_ambush`,
+      type: 'combat',
+      name: ev.name || '黑暗伏擊',
+      desc: `${ev.desc || '你們發現了聖物的氣息。'}\n\n你們還沒來得及確認那件遺物，黑暗中的怪物先撲了出來。`,
+      _guideRelicAmbush: true,
+    };
+    this._log(`${ambushEvent.name}：聖物氣息被黑暗驚動，遭遇怪物。`, 'danger');
+    this._triggerTerrainCombat(cell, ambushEvent);
+  },
+
+  _consumeGuideDelayedRelicEvent(cell) {
+    if (!G.guideQuest?.delayedRelicChoice) return null;
+    if (!cell || !['forest', 'ruins', 'cave'].includes(cell.type)) return null;
+    if (!this._canFindEventRelic()) return null;
+    const pool = typeof EVENT_POOL !== 'undefined' && Array.isArray(EVENT_POOL[cell.type])
+      ? EVENT_POOL[cell.type]
+      : [];
+    const eventState = {
+      ...G,
+      squadHasRelic: relicId => this._squadHasRelic(relicId),
+      relicIdInRun: relicId => this._getRelicIdsInRun().has(relicId),
+      canFindEventRelic: () => this._canFindEventRelic(),
+    };
+    const relicEvent = pool.find(item =>
+      item?.type === 'find_relic' &&
+      (typeof _eventConditionPass !== 'function' || _eventConditionPass(item, eventState))
+    );
+    if (!relicEvent) return null;
+    G.guideQuest.delayedRelicChoice = false;
+    return {
+      ...relicEvent,
+      rarity: relicEvent.rarity || 'epic',
+      categoryRoll: null,
+      categoryName: '延後的聖物事件',
+      categoryDesc: '先前遭遇戰延後的聖物機會',
+      _guideDelayedRelicCompensation: true,
+    };
   },
 
   _rerollTerrainEventWithoutEchoSite(cell) {
@@ -147,7 +204,7 @@ const GameEventHandlers = {
   },
 
   _canFindEventRelic() {
-    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase());
+    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase(), { ignoreWeaponRequirements: true });
     return pool.length > 0;
   },
 
@@ -181,8 +238,9 @@ const GameEventHandlers = {
   // Note and discovery event methods live in js/core/event-notes.js.
 
   _triggerRandomRelicFind(cell, ev = null) {
-    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase());
+    const pool = this._getAvailableRelics(this._relicRewardPoolForPhase(), { ignoreWeaponRequirements: !!ev });
     if (pool.length > 0) {
+      if (ev?._guideDelayedRelicCompensation && G.guideQuest) G.guideQuest.delayedRelicChoice = false;
       if (ev) this._log(`${this._eventDiceInline(ev)}${ev.desc}`, 'reward');
       if (ev && pool.length > 1) {
         const choices = this._pickEventRelicChoices(pool);
@@ -257,16 +315,19 @@ const GameEventHandlers = {
     const lore = this._getFirstLore(relic.id);
     const shortDesc = this._shortEventRelicDesc(relic.desc || '');
     const relicClass = String(relic.id || 'unknown').replace(/[^a-zA-Z0-9_-]/g, '-');
+    const locked = !this._squadMeetsRelicWeaponRequirement(relic);
+    const requirementText = locked ? this._relicRequirementText(relic) : '';
     const visual = relic.iconImage
       ? `<img class="event-relic-choice-img" src="${this._escapeEventAttr(relic.iconImage)}" alt="">`
       : `<span class="event-relic-choice-emoji">${this._escapeEventHtml(relic.icon || '◆')}</span>`;
     return `
-      <button type="button" class="event-relic-choice relic-${relicClass}" onclick="Game.chooseEventRelicChoice(${index})">
+      <button type="button" class="event-relic-choice relic-${relicClass}${locked ? ' locked' : ''}" ${locked ? 'disabled' : `onclick="Game.chooseEventRelicChoice(${index})"`}>
         <span class="event-relic-choice-visual">${visual}</span>
         <span class="event-relic-choice-body">
           <span class="event-relic-choice-kicker">帶走這件聖物</span>
           <span class="event-relic-choice-name">${this._escapeEventHtml(relic.name || '未知聖物')}</span>
           <span class="event-relic-choice-desc">${this._escapeEventHtml(shortDesc)}</span>
+          ${locked ? `<span class="event-relic-choice-lock">${this._escapeEventHtml(requirementText)}</span>` : ''}
           ${lore ? `<span class="event-relic-choice-lore">「${this._escapeEventHtml(this._shortEventRelicDesc(lore, 32))}」</span>` : ''}
         </span>
       </button>
@@ -277,6 +338,7 @@ const GameEventHandlers = {
     const ctx = G.eventRelicChoiceContext;
     const relic = ctx?.relicChoices?.[index];
     if (!ctx || !relic) return;
+    if (!this._squadMeetsRelicWeaponRequirement(relic)) return;
     this._claimEventRelicChoice(ctx.cell, ctx.ev, relic);
   },
 

@@ -108,7 +108,7 @@ const CombatRules = {
         damage += bonus;
         logs.push(`賭命骰子：押中 ${roll}，本擊傷害 +${bonus}`);
       } else {
-        const maxStacks = wagerDice.maxMissStacks || 3;
+        const maxStacks = wagerDice.maxMissStacks || 2;
         const { before, after } = CombatStatus.addRemorse(attacker, 1, {
           maxStacks,
           rate: wagerDice.missPenaltyRate || 0.30,
@@ -415,7 +415,7 @@ const CombatRules = {
         } else if (rollResult.boneDiceBagSuppressScholarBacklash) {
           logs.push('骨骰袋：本次低骰補正變為偶數，不觸發雙數反噬');
         } else {
-          const { before, after } = CombatStatus.addBacklash(attacker, 1, { maxStacks: 3, rate: 0.20 });
+          const { before, after } = CombatStatus.addBacklash(attacker, 1, { maxStacks: 2, rate: 0.20 });
           logs.push(`搏命者：雙數反噬，${attacker.name} 反噬 ${before} → ${after} 層`);
         }
       }
@@ -517,7 +517,10 @@ const CombatRules = {
     const woundMax = painSplinterBadge?.effect?.woundMax || enemy.woundMax || 15;
     enemy.woundMax = Math.max(enemy.woundMax || 15, woundMax);
     const currentWounds = Math.max(0, Math.min(woundMax, enemy.wounds || 0));
-    const painResonanceActive = attacker.fusedRelic?.id === 'pain_mask' && attacker.relic?.id === 'pain_splinter_badge';
+    const painResonance = (typeof G !== 'undefined' ? (G.activeResonances || []) : [])
+      .find(res => res?.effect?.type === 'pain_resonance' && res?.bodyChar?.id === attacker.id) || null;
+    const painResonanceActive = !!painResonance || (attacker.fusedRelic?.id === 'pain_mask' && attacker.relic?.id === 'pain_splinter_badge');
+    const painResonanceEffect = painResonance?.effect || {};
     const painMask = attacker.fusedRelic?.effect?.type === 'pain_mask'
       ? attacker.fusedRelic
       : (attacker.relic?.effect?.type === 'pain_mask' ? attacker.relic : null);
@@ -543,7 +546,7 @@ const CombatRules = {
         predictedWoundGain += Math.max(0, painSplinterBadge.effect.woundOnHit || 0);
       }
     }
-    const explodeAtWounds = painResonanceActive ? 10 : painMask?.effect?.explodeAtWounds;
+    const explodeAtWounds = painResonanceActive ? (painResonanceEffect.threshold || 10) : painMask?.effect?.explodeAtWounds;
     const soulCutterWillExplode = !!explodeAtWounds && Math.min(woundMax, currentWounds + predictedWoundGain) >= explodeAtWounds;
     if (weapon?.effect?.type === 'wound_on_hit' && weapon.effect.highWoundDamageBonus && currentWounds >= (weapon.effect.woundThreshold || 8) && damage > 0 && !soulCutterWillExplode) {
       damage += weapon.effect.highWoundDamageBonus;
@@ -702,8 +705,13 @@ const CombatRules = {
       }
     } else if (greatswordResonance && weapon?.family === 'sword') {
       const loss = Math.max(0, greatswordResonance.effect?.momentumLossOnMiss || 0);
+      const collapseThreshold = Math.max(0, greatswordResonance.effect?.momentumCollapseThreshold || 0);
       const before = Math.max(0, attacker._greatswordMomentum || 0);
-      if (loss > 0 && before > 0) {
+      if (collapseThreshold > 0 && before >= collapseThreshold) {
+        const keepRate = Math.max(0, Math.min(1, greatswordResonance.effect?.momentumCollapseKeepRate ?? 0.5));
+        attacker._greatswordMomentum = Math.floor(before * keepRate);
+        logs.push(`${greatswordResonance.name}：氣勢過盛卻未打出重劍，氣勢崩落 ${before - attacker._greatswordMomentum}（${before} → ${attacker._greatswordMomentum}）。`);
+      } else if (loss > 0 && before > 0) {
         attacker._greatswordMomentum = Math.max(0, before - loss);
         logs.push(`${greatswordResonance.name}：未打出重劍，氣勢 -${before - attacker._greatswordMomentum}（${before} → ${attacker._greatswordMomentum}）。`);
       }
@@ -715,8 +723,12 @@ const CombatRules = {
       const chanceStep = Math.max(1, rapierRelic.effect?.chanceStep || 10);
       const minChance = Math.max(0, rapierRelic.effect?.minChance || 0);
       const maxFollowUps = Math.max(1, rapierRelic.effect?.maxFollowUps || 10);
-      const guaranteedFollowUps = Math.max(0, rapierResonance?.effect?.guaranteedFollowUps || 0);
+      const relicGuaranteedFollowUps = Math.max(0, rapierRelic.effect?.guaranteedFollowUps || 0);
+      const guaranteedFollowUps = relicGuaranteedFollowUps + Math.max(0, rapierResonance?.effect?.guaranteedFollowUps || 0);
       const followDamageStep = Math.max(0, rapierResonance?.effect?.followDamageStep || 0);
+      const followDamageMaxBonus = Number.isFinite(rapierResonance?.effect?.followDamageMaxBonus)
+        ? Math.max(0, rapierResonance.effect.followDamageMaxBonus)
+        : Infinity;
       let chanceAttempts = 0;
       logs.push(`${rapierRelic.name}：低骰 ${roll}，本擊視為刺劍。`);
       if (followBaseDamage > damage) {
@@ -736,7 +748,8 @@ const CombatRules = {
         } else {
           chanceAttempts++;
         }
-        const currentFollowDamage = followDamage + (followDamageStep * rapierFollowHits);
+        const followDamageBonus = Math.min(followDamageMaxBonus, followDamageStep * rapierFollowHits);
+        const currentFollowDamage = followDamage + followDamageBonus;
         const followHpBefore = enemy.hp;
         enemy.hp = Math.max(0, enemy.hp - currentFollowDamage);
         rapierDamageEvents.push({
@@ -762,7 +775,7 @@ const CombatRules = {
         damage += currentFollowDamage;
         rapierFollowHits++;
         logs.push(guaranteed
-          ? `${rapierResonance.name}：第 ${guaranteedUsed + 1} 次刺劍連擊必定成功，造成 ${currentFollowDamage} 傷害。`
+          ? `${rapierResonance?.name || rapierRelic.name}：第 ${guaranteedUsed + 1} 次刺劍連擊必定成功，造成 ${currentFollowDamage} 傷害。`
           : `${rapierRelic.name}：第 ${i} 次連擊成功（${chance}%），造成 ${currentFollowDamage} 傷害。`);
       }
     }
@@ -839,8 +852,12 @@ const CombatRules = {
             to: enemy.hp,
             hitEffect: 'wound-burst',
           });
-          enemy.wounds = 0;
-          logs.push(`${painResonanceActive ? '痛痕共鳴・爆發' : '痛苦面具融合'}：引爆並消耗 ${consumedWounds} 層傷口，每層 ${damagePerWound} 點，造成 ${explodeDamage} 點固定傷害`);
+          const retainedWounds = painResonanceActive
+            ? Math.floor(consumedWounds * Math.max(0, Math.min(1, painResonanceEffect.retainWoundRate ?? 0)))
+            : 0;
+          enemy.wounds = Math.min(woundMax, retainedWounds);
+          const retainedText = retainedWounds > 0 ? `，爆發後保留 ${retainedWounds} 層傷口` : '，傷口清空';
+          logs.push(`${painResonanceActive ? '痛痕共鳴・爆發' : '痛苦面具融合'}：引爆 ${consumedWounds} 層傷口，每層 ${damagePerWound} 點，造成 ${explodeDamage} 點固定傷害${retainedText}`);
           if (weapon?.effect?.explodeDamage) {
             const weaponExplodeBonus = weapon.effect.explodeDamage;
             const weaponExplodeHpBefore = enemy.hp;
@@ -949,6 +966,7 @@ const CombatRules = {
       fateSummary: null,
       bannerSummary: null,
       fateLuckyFace: null,
+      fateLuckyFaces: null,
       fateUnluckyFaces: null,
     };
     if (!enemyDead && !suppressEnemyAction && !stunned) {
@@ -1098,6 +1116,7 @@ const CombatRules = {
       fateSummary: enemyActionResult.fateSummary || null,
       bannerSummary: enemyActionResult.bannerSummary || null,
       fateLuckyFace: enemyActionResult.fateLuckyFace || null,
+      fateLuckyFaces: Array.isArray(enemyActionResult.fateLuckyFaces) ? enemyActionResult.fateLuckyFaces : [],
       fateUnluckyFaces: Array.isArray(enemyActionResult.fateUnluckyFaces) ? enemyActionResult.fateUnluckyFaces : [],
       enemyAttackFlow,
       enemyActionDeferred: !!deferEnemyAction && !enemyDead && !stunned,

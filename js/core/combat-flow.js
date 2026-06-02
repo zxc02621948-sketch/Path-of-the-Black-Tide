@@ -95,6 +95,8 @@ const GameCombatFlow = {
     const { enemy } = G.combat;
     const actableSquad = this._combatActableSquad();
     const shouldAutoSkip = this._combatShouldAutoSkipPlayerTurn();
+    const canTutorialAttack = this._combatTutorialAllows('attack');
+    const canTutorialGuard = this._combatTutorialAllows('guard');
 
     const modDesc = G.combatMods.length > 0 ? '\n\n戰鬥調整存在。' : '';
 
@@ -103,13 +105,13 @@ const GameCombatFlow = {
       desc: `${enemy.desc}\n\nHP ${enemy.hp}/${enemy.maxHp} / 攻擊 ${enemy.attack}${modDesc}`,
       combat: {
         ...this._buildCombatScene(enemy, null, shouldAutoSkip ? '震攝壓住最後的意志，無人能行動。' : this._combatStatusText()),
-        selectable: !shouldAutoSkip && actableSquad.length > 0 && !this._combatItemTargeting() && !G.combat.actionInProgress,
+        selectable: canTutorialAttack && !shouldAutoSkip && actableSquad.length > 0 && !this._combatItemTargeting() && !G.combat.actionInProgress,
         itemTargeting: this._combatItemTargeting(),
         guardTargeting: this._combatGuardTargeting(),
         showBag: !!G.combat.bagOpen,
         inventory: this._combatInventoryView(),
-        canUseBag: this._canUseCombatBag(),
-        canGuard: this._canUseCombatGuard(),
+        canUseBag: this._combatTutorialAllows('bag') && this._canUseCombatBag(),
+        canGuard: canTutorialGuard && this._canUseCombatGuard(),
         guardCooldown: this._combatGuardCooldown(),
         rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
       },
@@ -414,8 +416,8 @@ const GameCombatFlow = {
       : (combatResult.fateRoll
         ? {
           type: 'danger',
-          label: combatResult.fateLuckyFace
-            ? `命運骰（幸運 ${combatResult.fateLuckyFace} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
+          label: (combatResult.fateLuckyFaces?.length || combatResult.fateLuckyFace)
+            ? `命運骰（幸運 ${(combatResult.fateLuckyFaces?.length ? combatResult.fateLuckyFaces : [combatResult.fateLuckyFace]).join('、')} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
             : '命運骰',
           value: combatResult.fateRoll,
           sides: 6,
@@ -1135,6 +1137,7 @@ const GameCombatFlow = {
       fateSummary: null,
       bannerSummary: null,
       fateLuckyFace: null,
+      fateLuckyFaces: null,
       fateUnluckyFaces: null,
     };
 
@@ -1307,6 +1310,7 @@ const GameCombatFlow = {
     combatResult.fateSummary = enemyActionResult.fateSummary || null;
     combatResult.bannerSummary = enemyActionResult.bannerSummary || null;
     combatResult.fateLuckyFace = enemyActionResult.fateLuckyFace || null;
+    combatResult.fateLuckyFaces = Array.isArray(enemyActionResult.fateLuckyFaces) ? enemyActionResult.fateLuckyFaces : [];
     combatResult.fateUnluckyFaces = Array.isArray(enemyActionResult.fateUnluckyFaces) ? enemyActionResult.fateUnluckyFaces : [];
     combatResult.enemyAttackFlow = enemyAttackFlow;
     combatResult.enemyActionDeferred = false;
@@ -1447,8 +1451,8 @@ const GameCombatFlow = {
             : (combatResult.fateRoll
               ? {
                 type: 'danger',
-                label: combatResult.fateLuckyFace
-                  ? `命運骰（幸運 ${combatResult.fateLuckyFace} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
+                label: (combatResult.fateLuckyFaces?.length || combatResult.fateLuckyFace)
+                  ? `命運骰（幸運 ${(combatResult.fateLuckyFaces?.length ? combatResult.fateLuckyFaces : [combatResult.fateLuckyFace]).join('、')} / 厄運 ${(combatResult.fateUnluckyFaces || []).join('、')}）`
                   : '命運骰',
                 value: combatResult.fateRoll,
                 sides: 6,
@@ -1559,6 +1563,7 @@ const GameCombatFlow = {
 
   selectCombatAttacker(charId) {
     if (this._combatItemTargeting() || this._combatGuardTargeting() || G.combat?.actionInProgress) return;
+    if (!this._combatTutorialAllows('attack')) return;
     if (G.combat) G.combat.bagOpen = false;
     const char = G.squad.find(c => c.id === charId);
     if (!char || char.dead || char.hp <= 0) return;
@@ -1684,6 +1689,14 @@ const GameCombatFlow = {
         body: '點擊黑影蠕蟲的圖卡，可以查看牠的弱點與特性。這隻怪物會在你選定主戰者後優先攻擊。',
         cta: '點擊敵人圖卡',
       },
+      enemy_detail_close: {
+        step: 'enemy_detail_close',
+        target: 'popover_close',
+        hideCard: true,
+        title: '關閉敵人說明',
+        body: '你已經看過黑影蠕蟲的特性。先把這張說明卡關閉，接著再學習如何用格檔承受攻擊。',
+        cta: '點擊說明卡上的關閉',
+      },
       guard_button: {
         step: 'guard_button',
         target: 'guard',
@@ -1693,9 +1706,34 @@ const GameCombatFlow = {
       },
       guard_target: {
         step: 'guard_target',
-        target: 'ally',
+        target: G.combat?.intent?.targetId ? 'guard_ally' : 'ally',
+        targetId: G.combat?.intent?.targetId || null,
         title: '指定保護對象',
-        body: '選擇要上格檔的角色。擲出的骰數會變成他的格檔值，格檔會先吸收傷害，讓血量不會直接被打掉。',
+        body: G.combat?.intent?.targetName
+          ? `敵人現在準備攻擊 ${G.combat.intent.targetName}。點擊他來上格檔，擲出的骰數會變成格檔值，先吸收接下來的傷害。`
+          : '選擇要上格檔的角色。擲出的骰數會變成他的格檔值，格檔會先吸收傷害，讓血量不會直接被打掉。',
+        cta: G.combat?.intent?.targetName ? `點擊 ${G.combat.intent.targetName}` : '點擊一張角色圖卡',
+      },
+      item_bag: {
+        step: 'item_bag',
+        target: 'bag',
+        title: '使用戰鬥道具',
+        body: '補給也能扭轉戰局。這裡先給你一個磨刀石，它可以讓本場戰鬥的主戰攻擊 +1。',
+        cta: '點擊背包',
+      },
+      item_select: {
+        step: 'item_select',
+        target: 'bag_item',
+        hideCard: true,
+        title: '選擇道具',
+        body: '背包中會列出可在戰鬥使用的道具。選擇磨刀石，準備在這場戰鬥中強化攻勢。',
+        cta: '點擊磨刀石',
+      },
+      item_target: {
+        step: 'item_target',
+        target: 'item_ally',
+        title: '指定使用者',
+        body: '選擇任一名還能行動的角色來激活磨刀石。道具使用後，本回合仍可選擇主戰者攻擊。',
         cta: '點擊一張角色圖卡',
       },
       attack_role: {
@@ -1706,12 +1744,35 @@ const GameCombatFlow = {
         cta: '點擊角色圖卡攻擊',
       },
     };
+    if (step === 'guard_cooldown') {
+      return {
+        step: 'guard_cooldown',
+        target: 'guard',
+        title: '格檔會進入冷卻',
+        body: '格檔每兩回合只能使用一次。使用後會進入冷卻；善用格檔能幫隊伍穩住局勢，甚至扭轉危險的戰局。',
+        cta: '看完格檔說明後點擊下一步',
+      };
+    }
     return metas[step] || null;
   },
 
   _combatTutorialView() {
     if (!G.combatTutorial?.active || G.combatTutorial.completed) return null;
     return this._combatTutorialStepMeta(G.combatTutorial.step);
+  },
+
+  _combatTutorialAllows(action = '') {
+    if (!G.combatTutorial?.active || G.combatTutorial.completed) return true;
+    const step = G.combatTutorial.step;
+    if (step === 'enemy_detail') return action === 'enemy_detail';
+    if (step === 'enemy_detail_close') return action === 'enemy_detail_close';
+    if (step === 'guard_button') return action === 'guard';
+    if (step === 'guard_target') return action === 'guard_target';
+    if (step === 'guard_cooldown') return action === 'tutorial_next';
+    if (['item_bag', 'item_select'].includes(step)) return action === 'bag';
+    if (step === 'item_target') return action === 'item_target' || action === 'bag';
+    if (step === 'attack_role') return action === 'attack';
+    return true;
   },
 
   _advanceCombatTutorial(expectedStep, nextStep = null) {
@@ -1724,7 +1785,66 @@ const GameCombatFlow = {
       G.combatTutorial.active = false;
     }
     Render.updateCombatTutorialInline?.(this._combatTutorialView());
+    this._syncCombatTutorialDomLocks();
     return true;
+  },
+
+  _ensureCombatTutorialWhetstone() {
+    if (!G.combatTutorial?.active || G.combatTutorial.completed || G.combatTutorial.whetstoneGranted) return;
+    if (typeof getEquipById !== 'function') return;
+    const item = getEquipById('whetstone');
+    if (!item) return;
+    this._ensureInventory();
+    const hasWhetstone = (G.inventory || []).some(slot => this._inventoryItem(slot)?.id === 'whetstone');
+    if (!hasWhetstone) {
+      const result = this._addInventoryItem(item);
+      if (!result?.added && G.combat) {
+        G.combat.tutorialWhetstone = { item: { ...item }, count: 1 };
+      }
+      this._log('戰鬥教學：獲得道具「磨刀石」。', 'reward');
+    }
+    G.combatTutorial.whetstoneGranted = true;
+  },
+
+  _syncCombatTutorialDomLocks() {
+    if (!G.combat || typeof document === 'undefined') return;
+    if (!G.combatTutorial?.active || G.combatTutorial.completed) return;
+    const guardButton = document.querySelector('.combat-guard-button');
+    if (guardButton && !this._combatGuardTargeting()) {
+      const allowGuard = this._combatTutorialAllows('guard') && this._canUseCombatGuard();
+      guardButton.disabled = !allowGuard;
+      guardButton.classList.toggle('disabled', !allowGuard);
+      if (allowGuard) {
+        guardButton.setAttribute('onclick', 'Game.selectCombatGuard()');
+      } else {
+        guardButton.removeAttribute('onclick');
+      }
+    }
+    const bagButton = document.querySelector('.combat-bag-button');
+    if (bagButton) {
+      const allowBag = this._combatTutorialAllows('bag') && this._canUseCombatBag();
+      bagButton.disabled = !allowBag;
+      bagButton.classList.toggle('disabled', !allowBag);
+      if (allowBag) {
+        bagButton.setAttribute('onclick', 'Game.openCombatBag()');
+      } else {
+        bagButton.removeAttribute('onclick');
+      }
+    }
+    if (!this._combatTutorialAllows('attack') && !this._combatItemTargeting() && !this._combatGuardTargeting()) {
+      document.querySelectorAll('.combat-unit.ally.selectable').forEach(unit => {
+        unit.classList.remove('selectable');
+        unit.removeAttribute('onclick');
+      });
+    }
+  },
+
+  continueCombatTutorial() {
+    if (!this._combatTutorialAllows('tutorial_next')) return;
+    if (this._advanceCombatTutorial('guard_cooldown', 'item_bag')) {
+      this._ensureCombatTutorialWhetstone();
+      this._showCombatModal();
+    }
   },
 
   _combatActableSquad() {
@@ -1803,6 +1923,7 @@ const GameCombatFlow = {
 
   selectCombatGuard() {
     if (!G.combat || this._combatItemTargeting() || G.combat.actionInProgress) return;
+    if (!this._combatTutorialAllows('guard')) return;
     if (!this._canUseCombatGuard()) return;
     this._advanceCombatTutorial('guard_button', 'guard_target');
     G.combat.guardTargeting = true;
@@ -1813,12 +1934,18 @@ const GameCombatFlow = {
 
   selectCombatGuardTarget(charId) {
     if (!G.combat || !this._combatGuardTargeting() || G.combat.actionInProgress) return;
+    if (!this._combatTutorialAllows('guard_target')) return;
     const enemy = G.combat.enemy;
     if (!enemy || enemy.hp <= 0) return;
     const target = G.squad.find(c => c.id === charId);
     if (!target || target.dead || target.hp <= 0) return;
-    this._advanceCombatTutorial('guard_target', 'attack_role');
-
+    if (
+      G.combatTutorial?.active &&
+      !G.combatTutorial.completed &&
+      G.combatTutorial.step === 'guard_target' &&
+      G.combat.intent?.targetId &&
+      target.id !== G.combat.intent.targetId
+    ) return;
     const roundStart = this._applyRoundStartBannerDamageIfNeeded(target);
     if (roundStart?.victory) return;
     if (roundStart?.logs?.length) {
@@ -1840,6 +1967,7 @@ const GameCombatFlow = {
 
   cancelCombatGuardTargeting() {
     if (!G.combat || G.combat.actionInProgress) return;
+    if (G.combatTutorial?.active && !G.combatTutorial.completed) return;
     G.combat.guardTargeting = false;
     this._showCombatModal();
   },
@@ -1877,6 +2005,7 @@ const GameCombatFlow = {
       ...(G.combat._pendingRoundStartLogs || []),
       ...logs,
     ];
+    this._advanceCombatTutorial('guard_target', 'guard_cooldown');
 
     const combatScene = this._buildCombatScene(enemy, null, this._combatStatusText());
     combatScene.squad = combatScene.squad.map(char => ({
@@ -1890,13 +2019,13 @@ const GameCombatFlow = {
       combatLog: logs,
       combat: {
         ...combatScene,
-        selectable: true,
+        selectable: this._combatTutorialAllows('attack'),
         itemTargeting: false,
         guardTargeting: false,
         showBag: false,
         inventory: this._combatInventoryView(),
-        canUseBag: this._canUseCombatBag(),
-        canGuard: this._canUseCombatGuard(),
+        canUseBag: this._combatTutorialAllows('bag') && this._canUseCombatBag(),
+        canGuard: this._combatTutorialAllows('guard') && this._canUseCombatGuard(),
         guardCooldown: this._combatGuardCooldown(),
         rollItemBlocked: G.combat.rollItemUsedRound === G.combat.round,
       },
@@ -1930,6 +2059,7 @@ const GameCombatFlow = {
   },
 
   _combatActionChoices() {
+    if (G.combatTutorial?.active && !G.combatTutorial.completed) return [];
     if (!this._canRetreatCombat()) return [];
     return [{
       label: '撤退',
@@ -2177,7 +2307,9 @@ const GameCombatFlow = {
   _combatStatusText() {
     if (!G.combat) return '戰鬥尚未開始。';
     if (this._combatItemTargeting()) {
-      const item = this._inventoryItem(G.inventory[G.combat.pendingInventoryItemIndex]);
+      const idx = G.combat.pendingInventoryItemIndex;
+      const slot = String(idx) === 'tutorial_whetstone' ? G.combat.tutorialWhetstone : G.inventory[idx];
+      const item = this._inventoryItem(slot);
       return item ? `選擇 ${item.icon} ${item.name} 的目標。` : '選擇道具目標。';
     }
     if (this._combatGuardTargeting()) {
@@ -2195,10 +2327,20 @@ const GameCombatFlow = {
 
   _combatInventoryView() {
     this._ensureInventory();
-    return (G.inventory || []).map((slot, index) => {
+    const entries = (G.inventory || []).map((slot, index) => {
       const item = this._inventoryItem(slot);
       return { index, item, count: slot.count || 1 };
     }).filter(entry => entry.item);
+    const tutorialItem = G.combat?.tutorialWhetstone?.item;
+    if (tutorialItem) {
+      entries.push({
+        index: 'tutorial_whetstone',
+        item: tutorialItem,
+        count: G.combat.tutorialWhetstone.count || 1,
+        tutorialItem: true,
+      });
+    }
+    return entries;
   },
 
   _wagerDiceEffect(char) {
@@ -2229,7 +2371,7 @@ const GameCombatFlow = {
       faces: [...plan.faces],
       damageBonus: effect.damageBonus || 4,
       missPenaltyRate: effect.missPenaltyRate || 0.30,
-      maxMissStacks: effect.maxMissStacks || 3,
+      maxMissStacks: effect.maxMissStacks || 2,
     };
   },
 
@@ -2260,7 +2402,7 @@ const GameCombatFlow = {
       <div class="wager-dice-panel">
         <p>${attacker.name} 可以在主戰前押注 ${faceCount} 個骰面。弓的追加攻擊會沿用這次押注。</p>
         <div class="wager-face-grid">${faceButtons}</div>
-        <p class="wager-dice-hint">押中：該擊傷害 +${effect.damageBonus || 4}。沒押中：懊悔 +1 層，最多 ${effect.maxMissStacks || 3} 層。</p>
+        <p class="wager-dice-hint">押中：該擊傷害 +${effect.damageBonus || 4}。沒押中：懊悔 +1 層，最多 ${effect.maxMissStacks || 2} 層。</p>
       </div>
     `;
 
@@ -2557,6 +2699,9 @@ const GameCombatFlow = {
       intent: this._combatIntentView(intent, enemy),
       enemy: {
         id: enemy.id, name: enemy.name, icon: enemy.icon,
+        finalBoss: !!enemy.finalBoss,
+        darkMonster: !!enemy.darkMonster,
+        echoGuardian: !!enemy.echoGuardian,
         iconImage: enemy.iconImage || null,
         iconFlipX: !!enemy.iconFlipX,
         iconScale: enemy.iconScale || null,
@@ -2596,13 +2741,19 @@ const GameCombatFlow = {
         fateGamble: enemy.abilityState?.fateGamble
           ? {
             luckyFace: enemy.abilityState.fateGamble.luckyFace || null,
+            luckyFaces: Array.isArray(enemy.abilityState.fateGamble.luckyFaces)
+              ? [...enemy.abilityState.fateGamble.luckyFaces]
+              : (enemy.abilityState.fateGamble.luckyFace ? [enemy.abilityState.fateGamble.luckyFace] : []),
             unluckyFaces: Array.isArray(enemy.abilityState.fateGamble.unluckyFaces)
               ? [...enemy.abilityState.fateGamble.unluckyFaces]
               : [],
           }
           : null,
         bannerGuardian: enemy.abilityState?.bannerGuardian
-          ? { stance: enemy.abilityState.bannerGuardian.stance || 'wound' }
+          ? {
+            stance: enemy.abilityState.bannerGuardian.stance || 'wound',
+            interrupted: !!enemy.abilityState.bannerGuardian.interrupted,
+          }
           : null,
         executionCountdown: enemy.abilityState?.executionCountdown
           ? {
@@ -2749,12 +2900,27 @@ const GameCombatFlow = {
       };
     }
     if (type === 'pollute') {
+      const ability = Array.isArray(enemy.abilities)
+        ? enemy.abilities.find(item => item?.type === 'dice_pollution')
+        : null;
+      const pulseDamage = Math.max(0, ability?.pollutePulseDamage || 0);
+      const randomPollutions = 1 + Math.max(0, ability?.extraRandomPollutions || 0);
+      const activeText = ability?.polluteActiveAttacker ? '\u4e3b\u6230\u8005\u8207 ' : '';
+      if (pulseDamage > 0) {
+        return {
+          type,
+          ...target,
+          icon: 'assets/icons/intent-attack-all.png',
+          text: `\u5168${pulseDamage}`,
+          title: `\u6c61\u67d3\u8108\u885d\uff1a\u5168\u968a\u627f\u53d7 ${pulseDamage} \u50b7\u5bb3\uff0c\u4e26\u6c61\u67d3${activeText}${randomPollutions} \u540d\u96a8\u6a5f\u968a\u53cb\u7684\u9ab0\u9762`,
+        };
+      }
       return {
         type,
         ...target,
         icon: 'assets/icons/intent-attack-all.png',
-        text: '污染',
-        title: '污染 1 名隊友的骰面，不造成傷害',
+        text: '\u6c61\u67d3',
+        title: '\u6c61\u67d3 1 \u540d\u968a\u53cb\u7684\u9ab0\u9762\uff0c\u4e0d\u9020\u6210\u50b7\u5bb3',
       };
     }
     if (type === 'execution') {
@@ -2764,6 +2930,16 @@ const GameCombatFlow = {
         icon: 'assets/icons/intent-attack-single.png',
         text: '處刑',
         title: '處刑牢中的倖存者。本回合不攻擊隊伍，但救援會失敗。',
+      };
+    }
+    if (type === 'self_wound') {
+      const amount = Math.max(0, intent.amount || 0);
+      return {
+        type,
+        targetSelf: true,
+        icon: 'assets/icons/wound-icon.png',
+        text: `傷${amount}`,
+        title: `撕裂自身：本回合不攻擊，對自己施加 ${amount} 層傷口並自損`,
       };
     }
     if (type === 'dice_attack') {

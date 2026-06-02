@@ -114,33 +114,67 @@ const EnemyAbilities = {
     return enemy.abilityState.fateGamble;
   },
 
-  _rollFateGambleFaces(enemy) {
+  _fateFaceList(value, fallback = []) {
+    const list = Array.isArray(value) ? value : (value ? [value] : fallback);
+    return [...new Set(list.map(face => Math.floor(Number(face) || 0)).filter(face => face >= 1 && face <= 6))];
+  },
+
+  _rollFateGambleFaces(enemy, ability = {}, round = 1) {
     const state = this._fateGambleState(enemy);
-    if (state.luckyFace && Array.isArray(state.unluckyFaces) && state.unluckyFaces.length > 0) {
+    const interval = Math.max(1, ability.rerollEvery || 2);
+    const boardIndex = Math.floor((Math.max(1, round || 1) - 1) / interval);
+    if (
+      state.boardIndex === boardIndex &&
+      Array.isArray(state.luckyFaces) && state.luckyFaces.length > 0 &&
+      Array.isArray(state.unluckyFaces) && state.unluckyFaces.length > 0
+    ) {
       return state;
     }
-    const luckyFace = Math.ceil(Math.random() * 6);
-    let unluckyFace = Math.ceil(Math.random() * 6);
-    while (unluckyFace === luckyFace) unluckyFace = Math.ceil(Math.random() * 6);
-    state.luckyFace = luckyFace;
-    state.unluckyFaces = [unluckyFace];
+    const maxLucky = Math.max(1, ability.maxLuckyFaces || 3);
+    const maxUnlucky = Math.max(1, ability.maxUnluckyFaces || 3);
+    const luckyCount = Math.min(maxLucky, Math.max(1, this._fateFaceList(state.luckyFaces, [state.luckyFace]).length || 1));
+    const unluckyCount = Math.min(maxUnlucky, Math.max(1, this._fateFaceList(state.unluckyFaces, [state.unluckyFace]).length || 1));
+    const faces = [1, 2, 3, 4, 5, 6].sort(() => Math.random() - 0.5);
+    const luckyFaces = faces.slice(0, luckyCount).sort((a, b) => a - b);
+    const unluckyFaces = faces.slice(luckyCount, luckyCount + unluckyCount).sort((a, b) => a - b);
+    state.boardIndex = boardIndex;
+    state.luckyFaces = luckyFaces;
+    state.luckyFace = luckyFaces[0] || null;
+    state.unluckyFaces = unluckyFaces;
     return state;
   },
 
-  _addFateUnluckyFace(enemy) {
+  _addFateFace(enemy, kind = 'unlucky', ability = {}) {
     const state = this._fateGambleState(enemy);
-    const luckyFace = state.luckyFace || null;
-    const current = Array.isArray(state.unluckyFaces)
-      ? [...new Set(state.unluckyFaces.filter(face => face >= 1 && face <= 6))]
-      : (state.unluckyFace ? [state.unluckyFace] : []);
-    const available = [1, 2, 3, 4, 5, 6].filter(face => face !== luckyFace && !current.includes(face));
+    const isLucky = kind === 'lucky';
+    const ownKey = isLucky ? 'luckyFaces' : 'unluckyFaces';
+    const otherKey = isLucky ? 'unluckyFaces' : 'luckyFaces';
+    const max = Math.max(1, isLucky ? (ability.maxLuckyFaces || 3) : (ability.maxUnluckyFaces || 3));
+    const current = this._fateFaceList(state[ownKey], isLucky ? [state.luckyFace] : [state.unluckyFace]);
+    const other = this._fateFaceList(state[otherKey], isLucky ? [state.unluckyFace] : [state.luckyFace]);
+    if (current.length >= max) {
+      state[ownKey] = current;
+      if (isLucky) state.luckyFace = current[0] || null;
+      return null;
+    }
+    const available = [1, 2, 3, 4, 5, 6].filter(face => !other.includes(face) && !current.includes(face));
     if (available.length <= 0) {
-      state.unluckyFaces = current;
+      state[ownKey] = current;
+      if (isLucky) state.luckyFace = current[0] || null;
       return null;
     }
     const face = available[Math.floor(Math.random() * available.length)];
-    state.unluckyFaces = [...current, face].sort((a, b) => a - b);
+    state[ownKey] = [...current, face].sort((a, b) => a - b);
+    if (isLucky) state.luckyFace = state.luckyFaces[0] || null;
     return face;
+  },
+
+  _addFateUnluckyFace(enemy, ability = {}) {
+    return this._addFateFace(enemy, 'unlucky', ability);
+  },
+
+  _addFateLuckyFace(enemy, ability = {}) {
+    return this._addFateFace(enemy, 'lucky', ability);
   },
 
   _shellChargeState(enemy) {
@@ -434,18 +468,28 @@ const EnemyAbilities = {
     dice_pollution: {
       resolveIntent(ability, { combat }) {
         const round = combat?.round || 1;
-        if (round % 3 === 1) return { type: 'pollute', name: '污染孢子' };
+        if (round % 3 === 1) return { type: 'pollute', name: '\u6c61\u67d3\u8108\u885d' };
         if (round % 3 === 2) return { type: 'attack', polluteTarget: true };
         return { type: 'aoe', polluteRandom: true };
       },
 
-      beforeEnemyAction(ability, { enemy, intent, result, squad, logs }) {
+      beforeEnemyAction(ability, { attacker, enemy, intent, result, squad, logs }) {
         if (intent?.type === 'pollute') {
-          result.enemyAttackFlow = false;
+          const pulseDamage = Math.max(0, ability.pollutePulseDamage || 0);
+          result.enemyAttackFlow = pulseDamage > 0;
           result.counterDmg = 0;
-          result.aoeCounter = 0;
+          result.aoeCounter = pulseDamage;
+          if (ability.polluteActiveAttacker && attacker && !attacker.dead && attacker.hp > 0) {
+            EnemyAbilities.polluteCharacter(attacker, ability, logs);
+          }
           EnemyAbilities.polluteRandomCharacter(squad, ability, logs);
-          logs.push(`${enemy.name} 散出污染孢子，沒有攻擊。`);
+          const extra = Math.max(0, ability.extraRandomPollutions || 0);
+          for (let i = 0; i < extra; i++) EnemyAbilities.polluteRandomCharacter(squad, ability, logs);
+          if (pulseDamage > 0) {
+            logs.push(`${enemy.name} \u91cb\u653e\u6c61\u67d3\u8108\u885d\uff0c\u5168\u968a\u627f\u53d7 ${pulseDamage} \u50b7\u5bb3\u3002`);
+          } else {
+            logs.push(`${enemy.name} \u91cb\u653e\u6c61\u67d3\u5b62\u5b50\uff0c\u6c92\u6709\u76f4\u63a5\u653b\u64ca\u3002`);
+          }
           return;
         }
         if (intent?.polluteTarget && result.counterTarget) {
@@ -465,16 +509,18 @@ const EnemyAbilities = {
         result.damage = 0;
         result.pollutionTriggered = true;
         result.pollutionHeal = enemy.hp - beforeHp;
-        logs.push(`污染骰面 ${rollResult.pollutedFace} 觸發：本次傷害歸零，${enemy.name} 恢復 ${result.pollutionHeal} HP。`);
-        const selfDamage = Math.max(0, state.empowered || 0) * Math.max(0, ability.empoweredSelfDamage || 1);
+        state.faces = state.faces.filter(face => face !== Number(rollResult.pollutedFace));
+        logs.push(`\u6c61\u67d3\u9ab0\u9762 ${rollResult.pollutedFace} \u89f8\u767c\uff1a\u672c\u6b21\u50b7\u5bb3\u6b78\u96f6\uff0c${enemy.name} \u6062\u5fa9 ${result.pollutionHeal} HP\uff0c\u8a72\u6c61\u67d3\u9762\u6e05\u9664\u3002`);
+        const baseSelfDamage = Math.max(0, ability.pollutedFaceSelfDamage || 0);
+        const empoweredSelfDamage = Math.max(0, state.empowered || 0) * Math.max(0, ability.empoweredSelfDamage || 1);
+        const selfDamage = baseSelfDamage + empoweredSelfDamage;
         if (selfDamage > 0) {
           attacker.hp = Math.max(0, attacker.hp - selfDamage);
           result.pollutionSelfDamage = selfDamage;
-          logs.push(`強化污染反噬：${attacker.name} 受到 ${selfDamage} 傷害。`);
+          logs.push(`\u6c61\u67d3\u53cd\u566c\uff1a${attacker.name} \u53d7\u5230 ${selfDamage} \u50b7\u5bb3\u3002`);
         }
       },
     },
-
     block_thorns: {
       afterPlayerAttack(ability, { attacker, enemy, result, logs }) {
         if (!attacker || attacker.hp <= 0 || attacker.dead) return;
@@ -734,49 +780,55 @@ const EnemyAbilities = {
     },
 
     fate_gamble: {
-      onCombatStart(ability, { enemy }) {
-        EnemyAbilities._rollFateGambleFaces(enemy);
+      onCombatStart(ability, { enemy, combat }) {
+        EnemyAbilities._rollFateGambleFaces(enemy, ability, combat?.round || 1);
       },
 
-      resolveIntent(ability, { enemy, intent }) {
-        const state = EnemyAbilities._rollFateGambleFaces(enemy);
+      resolveIntent(ability, { enemy, combat, intent }) {
+        const state = EnemyAbilities._rollFateGambleFaces(enemy, ability, combat?.round || 1);
+        const luckyFaces = EnemyAbilities._fateFaceList(state.luckyFaces, [state.luckyFace]);
+        const unluckyFaces = EnemyAbilities._fateFaceList(state.unluckyFaces, [state.unluckyFace]);
         return {
           ...(intent || { type: 'attack', weight: 1 }),
-          fateLuckyFace: state.luckyFace,
-          fateUnluckyFaces: [...(state.unluckyFaces || [])],
+          fateLuckyFace: luckyFaces[0] || null,
+          fateLuckyFaces: luckyFaces,
+          fateUnluckyFaces: unluckyFaces,
         };
       },
 
       beforeEnemyAction(ability, { enemy, result, logs }) {
         if (result.counterDmg <= 0 || !result.counterTarget) return;
         const state = EnemyAbilities._fateGambleState(enemy);
-        const luckyFace = state.luckyFace || 1;
-        const unluckyFaces = Array.isArray(state.unluckyFaces) && state.unluckyFaces.length > 0
-          ? state.unluckyFaces
-          : [state.unluckyFace || (luckyFace === 1 ? 2 : 1)];
+        const luckyFaces = EnemyAbilities._fateFaceList(state.luckyFaces, [state.luckyFace || 1]);
+        const unluckyFaces = EnemyAbilities._fateFaceList(state.unluckyFaces, [state.unluckyFace || (luckyFaces[0] === 1 ? 2 : 1)]);
         const fateRoll = Math.ceil(Math.random() * 6);
         const multiplier = Math.max(1, ability.luckyMultiplier || 1);
         result.fateRoll = fateRoll;
-        result.fateLuckyFace = luckyFace;
+        result.fateLuckyFace = luckyFaces[0] || null;
+        result.fateLuckyFaces = [...luckyFaces];
         result.fateUnluckyFaces = [...unluckyFaces];
-        const fateBoardText = `本回合命運盤：幸運 ${luckyFace} / 厄運 ${unluckyFaces.join('、')}。`;
+        const fateBoardText = `本回合命運盤：幸運 ${luckyFaces.join('、')} / 厄運 ${unluckyFaces.join('、')}。`;
 
         if (unluckyFaces.includes(fateRoll)) {
           const beforeHp = Math.max(1, enemy.hp || 1);
-          enemy.hp = Math.max(1, Math.floor(beforeHp / 2));
-          result.enemyAttackFlow = false;
-          result.counterDmg = 0;
-          result.aoeCounter = 0;
-          result.fateSummary = `${fateBoardText}命運骰 ${fateRoll} 命中厄運面，${enemy.name} 剩餘生命減半且本回合不攻擊。`;
-          logs.push(`${enemy.name}命運骰 ${fateRoll} 命中厄運面：HP ${beforeHp} → ${enemy.hp}，本回合不攻擊。`);
+          const selfDamage = Math.max(1, Math.floor(beforeHp * (ability.unluckySelfDamageRate ?? 0.25)));
+          enemy.hp = Math.max(1, beforeHp - selfDamage);
+          const beforeSingle = result.counterDmg;
+          const beforeAoe = result.aoeCounter;
+          if (result.counterDmg > 0) result.counterDmg = Math.ceil(result.counterDmg / 2);
+          if (result.aoeCounter > 0) result.aoeCounter = Math.ceil(result.aoeCounter / 2);
+          result.fateSummary = `${fateBoardText}命運骰 ${fateRoll} 命中厄運面，${enemy.name} 失去 ${selfDamage} HP，且本回合攻擊減半。`;
+          logs.push(`${enemy.name}命運骰 ${fateRoll} 命中厄運面：HP ${beforeHp} → ${enemy.hp}，攻擊 ${beforeSingle || beforeAoe} → ${result.counterDmg || result.aoeCounter}。`);
           return;
         }
 
-        if (fateRoll === luckyFace) {
+        if (luckyFaces.includes(fateRoll)) {
           const before = result.counterDmg;
           result.counterDmg *= multiplier;
-          result.fateSummary = `${fateBoardText}命運骰 ${fateRoll} 命中幸運面，${result.counterTarget.name} 受到 x${multiplier} 傷害。`;
-          logs.push(`${enemy.name}命運骰 ${fateRoll} 命中幸運面：傷害 ${before} → ${result.counterDmg}。`);
+          const added = EnemyAbilities._addFateLuckyFace(enemy, ability);
+          const luckyGrowth = added ? `新增幸運面 ${added}。` : '幸運面已達上限。';
+          result.fateSummary = `${fateBoardText}命運骰 ${fateRoll} 命中幸運面，${result.counterTarget.name} 受到 x${multiplier} 傷害，${luckyGrowth}`;
+          logs.push(`${enemy.name}命運骰 ${fateRoll} 命中幸運面：傷害 ${before} → ${result.counterDmg}，${luckyGrowth}`);
           return;
         }
 
@@ -814,12 +866,19 @@ const EnemyAbilities = {
           const next = intent.toStance || (state.stance === 'wound' ? 'damage' : 'wound');
           const block = Math.max(0, ability.switchBlock ?? enemy.block ?? 0);
           state.stance = next;
+          state.interrupted = false;
           CombatStatus.raiseBlock(enemy, block);
           result.enemyAttackFlow = false;
           result.counterDmg = 0;
           result.aoeCounter = 0;
           result.bannerSummary = `${enemy.name} 換成${EnemyAbilities._bannerGuardianStanceName(next)}，並獲得 ${block} 格檔。`;
           logs.push(`${enemy.name}換旗：改為${EnemyAbilities._bannerGuardianStanceName(next)}，格檔 +${block}。`);
+          return;
+        }
+
+        if (state.interrupted) {
+          result.bannerSummary = `${enemy.name}的${EnemyAbilities._bannerGuardianStanceName(state.stance)}被中斷，本回合旗面效果不生效。`;
+          logs.push(`${enemy.name}的${EnemyAbilities._bannerGuardianStanceName(state.stance)}被中斷：旗面效果不生效。`);
           return;
         }
 
@@ -857,6 +916,7 @@ const EnemyAbilities = {
     if (!enemy.abilityState.bannerGuardian) {
       enemy.abilityState.bannerGuardian = {
         stance: ability.startStance || 'wound',
+        interrupted: false,
       };
     }
     return enemy.abilityState.bannerGuardian;

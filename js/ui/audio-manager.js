@@ -102,16 +102,16 @@ const AudioManager = {
 
   resolveTrackId() {
     if (typeof G === 'undefined') return 'exploreEarly';
-    const enemy = G.combat?.enemy || null;
+    if (G.phase === 'over') {
+      return ['lose', 'devoured'].includes(G.gameResult) ? 'gameOver' : '';
+    }
+    const enemy = G.combat?.enemy || G.modal?.combat?.enemy || null;
     const reward = G.combat?.reward || null;
     if (enemy) {
       if (enemy.finalBoss || reward === 'final_boss') return 'battleFinal';
       if (enemy.darkMonster) return 'battleDarkAvatar';
       if (enemy.echoGuardian) return 'battleGuardian';
       return 'battleNormal';
-    }
-    if (G.phase === 'over') {
-      return ['lose', 'devoured'].includes(G.gameResult) ? 'gameOver' : '';
     }
     return G.phase === 'night' ? 'exploreNight' : 'exploreEarly';
   },

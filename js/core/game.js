@@ -2,6 +2,12 @@
 let G = {};
 
 const GUIDE_QUEST_DISABLED_KEY = 'bbn_guide_quest_disabled';
+const CLASS_SIGNATURE_RELICS = {
+  warrior: ['pain_mask', 'iron_scabbard', 'silver_bee_pin', 'pain_splinter_badge'],
+  explorer: ['eagle_eye_feather', 'flaw_lens'],
+  scholar: ['wager_dice', 'lucky_star'],
+  support: ['war_banner', 'eagle_banner'],
+};
 
 const Game = {
 
@@ -102,6 +108,10 @@ const Game = {
       introShown: false,
       relicHintShown: hasRelic,
       altarTarget: null,
+      relicAmbushTarget: null,
+      delayedRelicChoice: false,
+      preFusionRelicHintShown: false,
+      freedomSkipShown: false,
       completed: false,
       firstCombatStarted: false,
     };
@@ -116,7 +126,7 @@ const Game = {
       title: hasRelic ? '指引任務：前往神壇' : '指引任務：尋找第一件聖物',
       desc: hasRelic
         ? '你已經帶著聖物踏上旅程。前往地圖上發光的神壇，可以融合聖物，讓它變得更強大。'
-        : '先讓小隊取得第一件聖物。\n\n你可以挑戰怪物，也可以前往森林、遺跡或洞穴等地形區域調查，事件中有機會找到聖物。',
+        : '先讓小隊取得第一件聖物。\n\n前往地圖上的怪物格，挑戰怪物並學會戰鬥流程。這場教學戰鬥勝利後，會留下第一件聖物。',
       resultFx: hasRelic ? 'event-discover' : 'event-scene',
       choices: [
         { label: '開始行動', action: () => { this._closeModal(); Render.fullRender(); } },
@@ -128,6 +138,7 @@ const Game = {
   _onGuideRelicAcquired(relic = null) {
     if (!G.guideQuest?.active || G.guideQuest.stage !== 'find_relic') return;
     G.guideQuest.stage = 'find_altar';
+    G.guideQuest.relicAmbushTarget = null;
     G.guideQuest.relicHintShown = true;
     const altar = this._revealGuideAltarTarget();
     const altarText = altar ? `\n\n神壇位置已標記在地圖上：(${altar.x},${altar.y})。` : '';
@@ -146,16 +157,100 @@ const Game = {
     });
   },
 
+  _pickGuideTutorialRelic(pool = []) {
+    const availableById = new Map(pool.filter(Boolean).map(relic => [relic.id, relic]));
+    const candidates = [];
+    const seen = new Set();
+    for (const char of this._aliveSquad()) {
+      for (const relicId of CLASS_SIGNATURE_RELICS[char.cls] || []) {
+        if (seen.has(relicId)) continue;
+        const relic = availableById.get(relicId);
+        if (!relic || !this._charMeetsRelicWeaponRequirement(char, relic)) continue;
+        seen.add(relicId);
+        candidates.push(relic);
+      }
+    }
+    return weightedRelicPick(candidates.length ? candidates : pool);
+  },
+
+  _isGuideRelicAssignmentRequired() {
+    return !!(G.guideQuest?.active && !G.guideQuest.completed && G.guideQuest.stage === 'find_relic');
+  },
+
+  _recommendedRelicCarrierId(relic, assignOptions = []) {
+    if (!relic) return null;
+    const candidateClasses = Object.entries(CLASS_SIGNATURE_RELICS)
+      .filter(([, relicIds]) => relicIds.includes(relic.id))
+      .map(([cls]) => cls);
+    for (const cls of candidateClasses) {
+      const emptyMatch = assignOptions.find(option => option.char?.cls === cls && !option.currentRelic);
+      if (emptyMatch) return emptyMatch.char.id;
+      const replaceMatch = assignOptions.find(option => option.char?.cls === cls);
+      if (replaceMatch) return replaceMatch.char.id;
+    }
+    if (relic.requiredWeaponFamilies?.length) {
+      const emptyMatch = assignOptions.find(option => !option.currentRelic);
+      if (emptyMatch) return emptyMatch.char.id;
+    }
+    return null;
+  },
+
   _onGuideAltarFusion() {
     if (!G.guideQuest?.active || G.guideQuest.completed) return;
     G.guideQuest.stage = 'complete';
     G.guideQuest.completed = true;
     this._queueSystemModal({
       title: '指引任務完成',
-      desc: '聖物已完成融合。\n\n接下來你可以繼續探索，尋找第二件能搭配的聖物。當聖物彼此呼應時，就可能啟動強大的共鳴效果。',
+      desc: '聖物已完成融合。\n\n接下來你可以繼續探索，尋找第二件能搭配的聖物。當聖物彼此呼應時，就可能啟動強大的共鳴效果。\n\n更多事件正等著你去體驗，請謹慎又小心地享受這場冒險。',
       resultFx: 'event-reward',
       choices: [{ label: '繼續探索', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
+  },
+
+  _maybeShowPreFusionRelicReminder(relic, clearRelic) {
+    const quest = G.guideQuest;
+    if (!quest?.active || quest.completed || quest.stage !== 'find_altar' || quest.preFusionRelicHintShown) return false;
+    if (!this._aliveSquad().some(char => char.relic)) return false;
+    quest.preFusionRelicHintShown = true;
+    this._openModal({
+      title: '聖物欄位提醒',
+      desc: [
+        '你的探險精神值得嘉獎，真的。',
+        '不過在完成融合之前，同一個人不能同時裝備第二件普通聖物；如果強制裝備，會替換掉目前攜帶的聖物。',
+        '請別擔心，被替換下來的聖物會留在原地。完成融合後，你可以回來把它取回。',
+      ].join('\n\n'),
+      resultFx: 'event-discover',
+      choices: [{
+        label: '知道了，分配聖物',
+        action: () => {
+          this._closeModal();
+          this._openRelicAssignTargetModal(relic, clearRelic);
+        },
+      }],
+    });
+    return true;
+  },
+
+  _maybeCompleteGuideQuestByFreedom() {
+    const quest = G.guideQuest;
+    if (!quest?.active || quest.completed || quest.stage !== 'find_altar' || quest.freedomSkipShown) return false;
+    if ((G.day || 1) < 9) return false;
+    quest.freedomSkipShown = true;
+    quest.active = false;
+    quest.completed = true;
+    quest.stage = 'complete';
+    this._queueSystemModal({
+      title: '指引任務：自由之魂',
+      desc: [
+        '看來你擁有崇尚自由的靈魂！那我們就長話短說，用文字幫你介紹完。',
+        '聖物可以在神壇融合。融合後，角色目前攜帶的普通聖物會變成融合聖物，普通聖物欄會空出來。',
+        '之後再取得第二件能搭配的聖物，就有機會形成共鳴。共鳴通常會大幅改變戰鬥節奏，是隊伍變強的重要路線。',
+        '從現在開始，指引不再標記神壇。是否追尋共鳴，就交給你決定。',
+      ].join('\n\n'),
+      resultFx: 'event-reward',
+      choices: [{ label: '我自由了', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+    return true;
   },
 
   _isGuideQuestDisabled() {
@@ -214,7 +309,10 @@ const Game = {
       return quest.altarTarget?.x === x && quest.altarTarget?.y === y;
     }
     if (quest.stage === 'find_relic') {
-      return !cell.cleared && ['enemy', 'relic', 'forest', 'ruins', 'cave'].includes(cell.type);
+      if (quest.relicAmbushTarget) {
+        return quest.relicAmbushTarget.x === x && quest.relicAmbushTarget.y === y && !cell.cleared && cell.type === 'enemy';
+      }
+      return !cell.cleared && cell.type === 'enemy';
     }
     return false;
   },
@@ -390,6 +488,7 @@ const Game = {
       this._triggerDawn(); return;
     }
 
+    this._maybeCompleteGuideQuestByFreedom();
     this._log(`第 ${G.day} 天開始。`, 'important');
     Render.fullRender();
   },
@@ -540,32 +639,38 @@ const Game = {
     }
 
     const lore = this._getFirstLore(relic.id);
+    const guideRelicRequired = this._isGuideRelicAssignmentRequired();
+    const choices = [
+      { label: '分配聖物', action: () => this._openRelicAssignTargetModal(relic, clearRelic) },
+    ];
+    if (!guideRelicRequired) {
+      choices.push({
+        label: '放棄聖物',
+        className: 'relic-abandon-choice',
+        action: () => {
+          this._relicAssignContext = null;
+          clearRelic();
+          this._log(`放棄聖物「${relic.name}」。`);
+          this._closeModal();
+        },
+      });
+    }
     this._openModal({
       title: `發現聖物：${relic.name}`,
       descHtml: this._relicRewardCardHtml(relic, lore),
       typeText: false,
       resultFx: 'event-discover',
-      choices: [
-        { label: '分配聖物', action: () => this._openRelicAssignTargetModal(relic, clearRelic) },
-        {
-          label: '放棄聖物',
-          className: 'relic-abandon-choice',
-          action: () => {
-            this._relicAssignContext = null;
-            clearRelic();
-            this._log(`放棄聖物「${relic.name}」。`);
-            this._closeModal();
-          },
-        },
-      ],
+      choices,
     });
 
   },
 
   _openRelicAssignTargetModal(relic, clearRelic) {
-    const carriers = relic.scholarOnly
+    if (this._maybeShowPreFusionRelicReminder(relic, clearRelic)) return;
+    const baseCarriers = relic.scholarOnly
       ? G.squad.filter(c => !c.dead && c.hp > 0 && c.cls === 'scholar')
       : G.squad.filter(c => !c.dead);
+    const carriers = baseCarriers.filter(char => this._charMeetsRelicWeaponRequirement(char, relic));
     const emptySlots = carriers.filter(c => !c.relic);
     const withRelic = carriers.filter(c => c.relic && c.relic.id !== relic.id);
     const assignOptions = [];
@@ -596,6 +701,11 @@ const Game = {
       });
     }
 
+    const recommendedCarrierId = this._recommendedRelicCarrierId(relic, assignOptions);
+    for (const option of assignOptions) {
+      option.recommended = !!recommendedCarrierId && option.char?.id === recommendedCarrierId;
+    }
+
     this._relicAssignContext = { relic, options: assignOptions };
 
     const choices = [];
@@ -608,17 +718,19 @@ const Game = {
         },
       });
     }
-    choices.push({
-      label: '放棄聖物',
-      className: 'relic-abandon-choice',
-      action: () => {
-        this._relicAssignContext = null;
-        G.eventRelicChoiceContext = null;
-        clearRelic();
-        this._log(`放棄聖物「${relic.name}」。`);
-        this._closeModal();
-      },
-    });
+    if (!this._isGuideRelicAssignmentRequired()) {
+      choices.push({
+        label: '放棄聖物',
+        className: 'relic-abandon-choice',
+        action: () => {
+          this._relicAssignContext = null;
+          G.eventRelicChoiceContext = null;
+          clearRelic();
+          this._log(`放棄聖物「${relic.name}」。`);
+          this._closeModal();
+        },
+      });
+    }
 
     this._openModal({
       title: `發現聖物：${relic.name}`,
@@ -637,9 +749,12 @@ const Game = {
     const assignCards = assignOptions.length
       ? assignOptions.map((option, index) => this._relicAssignTargetCardHtml(option, index)).join('')
       : '<div class="relic-assign-empty">沒有可持有這件聖物的角色。</div>';
+    const requirementText = this._relicRequirementText?.(this._relicAssignContext?.relic) || '';
+    const recommended = assignOptions.find(option => option.recommended)?.char || null;
+    const recommendText = recommended ? `建議交給 ${recommended.name}。` : '';
     return `
       <div class="relic-assign-panel">
-        <div class="relic-assign-instruction">選擇要交給哪位角色。</div>
+        <div class="relic-assign-instruction">選擇要交給哪位角色。${recommendText ? `<br>${this._escapeHtmlLocal(recommendText)}` : ''}${requirementText ? `<br>${this._escapeHtmlLocal(requirementText)}。` : ''}</div>
         <div class="relic-assign-target-grid">${assignCards}</div>
       </div>
     `;
@@ -673,7 +788,7 @@ const Game = {
     const battleArt = char.battleArt || (typeof CLASS_BATTLE_ART !== 'undefined' ? CLASS_BATTLE_ART[char.cls] : '');
     const art = battleArt ? `<span class="relic-assign-art"><img src="${this._escapeAttrLocal(battleArt)}" alt=""></span>` : '';
     return `
-      <button type="button" class="relic-assign-target-card${option.currentRelic ? ' replace' : ''}" onclick="Game.chooseRelicAssignTarget(${index})">
+      <button type="button" class="relic-assign-target-card${option.currentRelic ? ' replace' : ''}${option.recommended ? ' recommended' : ''}" onclick="Game.chooseRelicAssignTarget(${index})">
         ${art}
         <span class="relic-assign-head">
           <span class="relic-assign-class">${this._escapeHtmlLocal(cls.icon || '◆')}</span>

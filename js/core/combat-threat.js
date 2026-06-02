@@ -4,7 +4,8 @@ const GameCombatThreat = {
     const base = typeof resolveIntent === 'function'
       ? resolveIntent(enemy)
       : { type: 'attack', weight: 1 };
-    const resolved = EnemyAbilities.resolveIntent(enemy, G.combat, base) || base;
+    const tutorialIntent = this._combatTutorialForcedIntent(enemy);
+    const resolved = tutorialIntent || EnemyAbilities.resolveIntent(enemy, G.combat, base) || base;
     const intent = { ...resolved, targetId: null, targetName: null };
     if (['attack', 'block_attack', 'dice_attack'].includes(intent.type)) {
       const target = this._pickEnemyIntentTarget(intent, enemy);
@@ -12,6 +13,12 @@ const GameCombatThreat = {
       intent.targetName = target?.name || null;
     }
     return intent;
+  },
+
+  _combatTutorialForcedIntent(enemy) {
+    if (!enemy || enemy.id !== 'shadow_worm') return null;
+    if (!G.combatTutorial?.active || G.combatTutorial.completed) return null;
+    return { type: 'attack', weight: 1, tutorialForced: true };
   },
 
   _pickEnemyIntentTarget(intent = null, enemy = null) {
@@ -83,13 +90,18 @@ const GameCombatThreat = {
       : null;
     if (!ability || intent?.type !== 'attack') return '';
     const state = enemy?.abilityState?.fateGamble || {};
-    const luckyFace = intent?.fateLuckyFace || state.luckyFace;
+    const luckyFaces = [...new Set([
+      ...(Array.isArray(intent?.fateLuckyFaces) ? intent.fateLuckyFaces : []),
+      ...(intent?.fateLuckyFace ? [intent.fateLuckyFace] : []),
+      ...(Array.isArray(state.luckyFaces) ? state.luckyFaces : []),
+      ...(state.luckyFace ? [state.luckyFace] : []),
+    ])].filter(face => face >= 1 && face <= 6).sort((a, b) => a - b);
     const unluckyFaces = [...new Set([
       ...(Array.isArray(intent?.fateUnluckyFaces) ? intent.fateUnluckyFaces : []),
       ...(Array.isArray(state.unluckyFaces) ? state.unluckyFaces : []),
     ])].filter(face => face >= 1 && face <= 6).sort((a, b) => a - b);
-    if (!luckyFace || unluckyFaces.length <= 0) return '';
-    return `（幸運 ${luckyFace} / 厄運 ${unluckyFaces.join('、')}）`;
+    if (luckyFaces.length <= 0 || unluckyFaces.length <= 0) return '';
+    return `（幸運 ${luckyFaces.join('、')} / 厄運 ${unluckyFaces.join('、')}）`;
   },
 
   _combatIntentDamageLabel(intent, enemy) {
@@ -133,6 +145,9 @@ const GameCombatThreat = {
       return { damageBonus: 0, woundText: '' };
     }
     const stance = intent?.bannerStance || enemy?.abilityState?.bannerGuardian?.stance || ability.startStance || 'wound';
+    if (enemy?.abilityState?.bannerGuardian?.interrupted) {
+      return { damageBonus: 0, woundText: '旗面中斷' };
+    }
     if (stance === 'damage') return { damageBonus: Math.max(0, ability.damageBonus || 0), woundText: '' };
     const stacks = Math.max(0, ability.woundStacks || 0);
     return { damageBonus: 0, woundText: stacks > 0 ? `創傷旗：全隊傷口 +${stacks}` : '' };

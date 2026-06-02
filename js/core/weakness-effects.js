@@ -32,6 +32,13 @@ const WeaknessEffects = {
       logs.push(`${prefix}：本次無視格檔。`);
     }
 
+    if (effect.type === 'banner_interrupt') {
+      if (!enemy.abilityState) enemy.abilityState = {};
+      if (!enemy.abilityState.bannerGuardian) enemy.abilityState.bannerGuardian = { stance: 'wound' };
+      enemy.abilityState.bannerGuardian.interrupted = true;
+      logs.push(`${prefix}：旗勢被打斷，當前旗面效果暫時失效，直到下一次換旗。`);
+    }
+
     if (effect.type === 'weaken_next_attack') {
       const amount = Math.max(1, effect.amount || 1);
       CombatStatus.clearBlock(enemy);
@@ -69,10 +76,13 @@ const WeaknessEffects = {
     }
 
     if (effect.type === 'add_fate_unlucky') {
-      const added = EnemyAbilities._addFateUnluckyFace(enemy);
+      const fateAbility = Array.isArray(enemy?.abilities)
+        ? enemy.abilities.find(ability => ability?.type === 'fate_gamble')
+        : null;
+      const added = EnemyAbilities._addFateUnluckyFace(enemy, fateAbility || {});
       logs.push(added
         ? `${prefix}：命運偏折，擲命守衛新增厄運面 ${added}。`
-        : `${prefix}：命運偏折，但擲命守衛已沒有可新增的厄運面。`);
+        : `${prefix}：命運偏折，但擲命守衛的厄運面已達上限。`);
     }
 
     if (effect.type === 'clear_dice_pollution') {

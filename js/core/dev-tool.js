@@ -61,6 +61,10 @@ const GameDevTool = {
     if (!char || !relic) return null;
     if (slot === 'fusedRelic') {
       if (char.fusedRelic) this._removeFusionBonus(char, char.fusedRelic);
+      if (char.relic?.id === relic.id) {
+        this._removeRelicEffect(char, char.relic);
+        char.relic = null;
+      }
       const fusedRelic = { ...relic };
       if (fusedRelic.fusedEffect) fusedRelic.effect = { ...fusedRelic.fusedEffect };
       char.fusedRelic = fusedRelic;
@@ -68,6 +72,7 @@ const GameDevTool = {
       this._unlockNote(fusedRelic.id, true);
       return fusedRelic;
     }
+    if (char.fusedRelic?.id === relic.id) return char.fusedRelic;
     if (char.relic) this._removeRelicEffect(char, char.relic);
     char.relic = { ...relic };
     this._applyRelicEquip(char, char.relic);

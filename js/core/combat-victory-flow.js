@@ -41,6 +41,9 @@ const GameCombatVictoryFlow = {
       const weaknessRewardLine = darkResult.nativeBonus > 0
         ? '本場命中並擊破原生弱點，額外壓制黑暗 -1。'
         : '若主動討伐時命中並擊破原生弱點，可額外壓制黑暗 -1。';
+      const levelRewardLine = darkResult.levelBonus > 0
+        ? `黑暗化身 Lv.${darkResult.monsterLevel} 達到 Lv.10+，主動追擊額外壓制黑暗 -1。`
+        : 'Lv.10 以上的黑暗化身主動討伐成功時，會再額外壓制黑暗 -1。';
       const enemyName = enemy.name;
       this._clearSquadCombatCarryover();
       G.combat = null;
@@ -56,7 +59,7 @@ const GameCombatVictoryFlow = {
         dice: this._combatVictoryDice(attacker, roll, rollResult),
         choices: [{
           label: '繼續',
-          action: () => this._openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, underlyingCell),
+          action: () => this._openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, levelRewardLine, underlyingCell),
         }],
       });
       return true;
@@ -170,7 +173,7 @@ const GameCombatVictoryFlow = {
     });
   },
 
-  _openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, underlyingCell) {
+  _openActiveDarkMonsterVictoryEvent(enemyName, darkResult, weaknessRewardLine, levelRewardLine, underlyingCell) {
     this._openModal({
       title: '主動討伐成功',
       desc: [
@@ -178,6 +181,7 @@ const GameCombatVictoryFlow = {
         '你們沒有等黑暗逼近，而是反過來撕開它的形體。',
         `黑暗 ${darkResult.before} → ${darkResult.after}（-${darkResult.reduction}）。`,
         weaknessRewardLine,
+        levelRewardLine,
         '其他黑暗化身追殺倒數延後 1 天。',
       ].join('\n\n'),
       resultFx: 'event-quiet',
@@ -264,16 +268,19 @@ const GameCombatVictoryFlow = {
     let droppedRelic = null;
     const combatAnims = this._combatResultAnims(attacker, combatResult, 250);
     const canDropRelic = this._canCombatDropRelic(enemy, combatReward);
-    const pool = canDropRelic
+    const tutorialDrop = this._shouldGuaranteeCombatTutorialRelic(enemy, combatReward);
+    const pool = canDropRelic || tutorialDrop
       ? this._getAvailableRelics(this._relicRewardPoolForPhase())
       : [];
     const dropChance = this._combatRelicDropChance(enemy);
-    if (pool.length > 0 && Math.random() < dropChance) {
-      droppedRelic = weightedRelicPick(pool);
+    if (pool.length > 0 && (tutorialDrop || Math.random() < dropChance)) {
+      droppedRelic = tutorialDrop ? this._pickGuideTutorialRelic(pool) : weightedRelicPick(pool);
       cell.content = { relic: { ...droppedRelic } };
       cell.cleared = false;
       cell.type = 'relic';
-      this._log(`${enemy.name} 掉落聖物「${droppedRelic.name}」。`, 'reward');
+      if (tutorialDrop && G.combatTutorial) G.combatTutorial.guaranteedRelicDropped = true;
+      const dropPrefix = tutorialDrop ? '教學戰鬥獎勵' : `${enemy.name} 掉落聖物`;
+      this._log(`${dropPrefix}「${droppedRelic.name}」。`, 'reward');
     }
 
     const isEventDrop = droppedRelic?.eventOnly;
@@ -287,7 +294,9 @@ const GameCombatVictoryFlow = {
         dice: this._combatVictoryDice(attacker, roll, rollResult),
         choices: [],
       });
-      setTimeout(() => this._triggerRelic(cell), this._combatAnimWaitMs(combatAnims));
+      setTimeout(() => {
+        this._openCombatVictoryTutorialIfNeeded(() => this._triggerRelic(cell));
+      }, this._combatAnimWaitMs(combatAnims));
       return;
     }
     const dropDesc = droppedRelic
@@ -309,11 +318,48 @@ const GameCombatVictoryFlow = {
       choices: [{
         label: '繼續',
         action: () => {
-          this._closeModal();
-          Render.fullRender();
+          this._openCombatVictoryTutorialIfNeeded(() => {
+            this._closeModal();
+            Render.fullRender();
+          });
         },
       }],
     });
+  },
+
+  _openCombatVictoryTutorialIfNeeded(onDone = null) {
+    const tutorial = G.combatTutorial || null;
+    if (!tutorial?.firstCombatStarted || tutorial.victoryHintShown) {
+      if (typeof onDone === 'function') onDone();
+      return false;
+    }
+    tutorial.victoryHintShown = true;
+    const relicLine = tutorial.guaranteedRelicDropped
+      ? '這場教學戰鬥留下了一件聖物。聖物能大幅改變或強化隊伍能力，是變強與形成流派的關鍵。'
+      : '戰鬥結束後，有機會取得能大幅改變或強化隊伍能力的聖物。聖物是變強與形成流派的關鍵。';
+    this._openModal({
+      title: '戰鬥教學：勝利與聖物',
+      desc: [
+        '恭喜你打贏了這場戰鬥。',
+        `${relicLine}想讓隊伍成長，就勇敢挑戰怪物吧。`,
+        '除了戰鬥，森林、遺跡、洞穴等地形事件也可能找到聖物。',
+      ].join('\n\n'),
+      tutorialModal: true,
+      choices: [{
+        label: '繼續',
+        action: () => {
+          if (typeof onDone === 'function') onDone();
+        },
+      }],
+    });
+    return true;
+  },
+
+  _shouldGuaranteeCombatTutorialRelic(enemy, combatReward = null) {
+    const tutorial = G.combatTutorial || null;
+    if (!tutorial?.firstCombatStarted || tutorial.victoryHintShown || tutorial.guaranteedRelicDropped) return false;
+    if (enemy?.id !== 'shadow_worm') return false;
+    return this._canCombatDropRelic(enemy, combatReward);
   },
 
   _canCombatDropRelic(enemy, combatReward = null) {

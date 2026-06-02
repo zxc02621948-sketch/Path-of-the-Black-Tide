@@ -265,9 +265,10 @@ const GameEventEncounters = {
 
     if (rewardType === 'gear') {
       const gear = randomGear(G.day);
-      const desc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}${eventInfo}`;
+      const baseDesc = `${this._eventDiceText(ev)}${ev.desc || ''}${eventInfo}`;
+      const desc = `${baseDesc}\n\n發現角色裝備：${gear.icon} ${gear.name}\n${gear.desc}`;
       const descHtml = `${this._modalTextHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}<br><br>發現角色裝備：${this._equipmentRewardLabelHtml(gear, '', 'equipment-inline-icon gear-reward-inline-icon')}<br>${this._modalTextHtml(gear.desc)}${this._modalTextHtml(eventInfo)}`;
-      this._openSupplyGearRewardModal(ev, gear, desc, nextDesc => this._manualProgressChoices(ev, nextDesc), descHtml);
+      this._openSupplyGearRewardModal(ev, gear, desc, nextDesc => this._manualProgressChoices(ev, nextDesc), descHtml, baseDesc);
       return;
     }
 
@@ -410,7 +411,7 @@ const GameEventEncounters = {
     });
   },
 
-  _openSupplyGearRewardModal(ev, gear, desc, nextChoices = null, descHtml = '') {
+  _openSupplyGearRewardModal(ev, gear, desc, nextChoices = null, descHtml = '', nextBaseDesc = '') {
     const choices = this._aliveSquad().map(char => ({
       label: `${char.name}${char.gear ? `（替換 ${char.gear.name}）` : ''}`,
       action: () => {
@@ -419,7 +420,7 @@ const GameEventEncounters = {
         const equipLine = `${char.name} 裝備「${gear.name}」${current ? `，替換「${current.name}」` : ''}。`;
         this._log(`${ev.name}：${equipLine}`, 'reward');
         if (typeof nextChoices === 'function') {
-          const nextDesc = `${desc}\n\n${equipLine}`;
+          const nextDesc = nextBaseDesc || desc;
           this._openModal({
             title: ev.name,
             desc: nextDesc,
@@ -438,7 +439,7 @@ const GameEventEncounters = {
       action: () => {
         this._log(`${ev.name}：放棄角色裝備「${gear.name}」。`, 'dim');
         if (typeof nextChoices === 'function') {
-          const nextDesc = `${desc}\n\n你們放棄了這件裝備。`;
+          const nextDesc = `${nextBaseDesc || desc}\n\n你們放棄了這件裝備。`;
           this._openModal({
             title: ev.name,
             desc: nextDesc,
