@@ -1,4 +1,4 @@
-// 敵人定義
+﻿// 敵人定義
 // 弱/中型敵人使用 tiers 陣列，依天數自動升階
 // 強型（boss）使用平坦數值，不升階
 //
@@ -21,7 +21,7 @@ const ENEMIES = [
 
   {
     id: 'shadow_worm',
-    icon: '🪱',
+    icon: '蟲',
     iconImage: 'assets/enemies/shadow-worm.png',
     iconFlipX: true,
     iconScale: 'large',
@@ -52,7 +52,7 @@ const ENEMIES = [
 
   {
     id: 'rot_crawler',
-    icon: '🦂',
+    icon: '蟲',
     iconImage: 'assets/enemies/rot-crawler.png',
     iconScale: 'large',
     spawnSfx: 'rotCrawlerSpawnHiss',
@@ -80,7 +80,7 @@ const ENEMIES = [
 
   {
     id: 'plague_moth',
-    icon: '🦋',
+    icon: '蛾',
     iconImage: 'assets/enemies/plague-moth.png',
     iconScale: 'large',
     spawnSfx: 'plagueMothSpawn',
@@ -110,7 +110,7 @@ const ENEMIES = [
 
   {
     id: 'rot_knight',
-    icon: '💀',
+    icon: '骸',
     iconImage: 'assets/enemies/rot-knight.png',
     iconFlipX: true,
     iconScale: 'large',
@@ -140,7 +140,7 @@ const ENEMIES = [
 
   {
     id: 'shadow_hunter',
-    icon: '👁️',
+    icon: '眼',
     iconImage: 'assets/enemies/shadow-hunter.png',
     iconFlipX: true,
     iconScale: 'large',
@@ -175,7 +175,7 @@ const ENEMIES = [
   {
     id: 'dice_corruptor',
     name: '深污腐骰宿主',
-    icon: '☣️',
+    icon: '腐',
     cardBgImage: 'assets/enemies/dice-corruptor-bg.png',
     hideIconInCombat: true,
     spawnSfx: 'diceCorruptorSpawn',
@@ -200,7 +200,7 @@ const ENEMIES = [
   {
     id: 'cage_warden',
     name: '囚籠看守',
-    icon: '🗝️',
+    icon: '守',
     cardBgImage: 'assets/enemies/cage-warden.png',
     mapIconImage: 'assets/ui/cage-warden-map.png',
     hideIconInCombat: true,
@@ -224,7 +224,7 @@ const ENEMIES = [
   {
     id: 'abyss_warden',
     name: '黑暗化身',
-    icon: '🌑',
+    icon: '夜',
     iconImage: 'assets/enemies/dark-avatar-combat.png',
     cardBgImage: 'assets/enemies/dark-avatar-card-bg.png',
     iconScale: 'large',
@@ -311,7 +311,7 @@ const ENEMIES = [
   {
     id: 'echo_guardian_wound',
     name: '痛痕守護者',
-    icon: '🩸',
+    icon: '血',
     cardBgImage: 'assets/enemies/wound-guardian-bg.png',
     hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，身上纏滿不會癒合的黑色傷痕。',
@@ -337,7 +337,7 @@ const ENEMIES = [
   {
     id: 'echo_guardian_eagle',
     name: '裂隙凝視者',
-    icon: '🔍',
+    icon: '鏡',
     cardBgImage: 'assets/enemies/rift-gazer-bg.png',
     hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，眼中浮著細碎裂光，像在等待破綻張開。',
@@ -363,7 +363,7 @@ const ENEMIES = [
   {
     id: 'echo_guardian_fate',
     name: '擲命守衛',
-    icon: '🎲',
+    icon: '骰',
     cardBgImage: 'assets/enemies/fate-guardian-bg.png',
     hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，掌心反覆滾動著沒有落點的黑骰。',
@@ -388,7 +388,7 @@ const ENEMIES = [
   {
     id: 'echo_guardian_banner',
     name: '殘旗守衛',
-    icon: '⚑',
+    icon: '旗',
     cardBgImage: 'assets/enemies/banner-guardian-bg.png',
     hideIconInCombat: true,
     desc: '共鳴遺址中的守護者，背後殘旗無風自揚，像仍在號令早已消失的軍勢。',
@@ -413,7 +413,7 @@ const ENEMIES = [
   {
     id: 'night_heart',
     name: '夜幕之瞳',
-    icon: '🌑',
+    icon: '夜',
     cardBgImage: 'assets/enemies/night-eye-bg.png',
     hideIconInCombat: true,
     desc: '第 20 天黎明前，夜幕之瞳在黑霧深處睜開。它閉眼時遮蔽自身弱點並凝成格檔，開眼時露出一瞬破綻，隨後降下足以奪命的黑光。',
@@ -507,15 +507,15 @@ function intentLabel(intent, enemy) {
   const attackText = weakDie ? `${atk}+骰` : `${atk}`;
   const diceText = weakDie ? `${atk > 0 ? `${atk}+` : ''}骰 傷害（三面骰）` : '骰數傷害';
   switch (intent.type) {
-    case 'attack':       return `⚔️ 攻擊主戰者　${attackText} 傷`;
-    case 'block':        return `🛡️ 格檔　+${blk}`;
-    case 'block_attack': return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${attackText} 傷`;
-    case 'aoe':          return `🌊 全體攻擊　各 ${aoe} 傷`;
-    case 'dice_attack':  return `🎲 擲骰攻擊　${diceText}`;
-    case 'worm_coil':    return '🛡️ 蜷縮蓄勢　格檔 +2，下次攻擊 +1';
-    case 'pollute':      return '☣️ 污染 1 名隊友的骰面';
+    case 'attack':       return `攻擊主戰者　${attackText} 傷`;
+    case 'block':        return `格檔　+${blk}`;
+    case 'block_attack': return `格檔 +${blk}，攻擊主戰者 ${attackText} 傷`;
+    case 'aoe':          return `全體攻擊　各 ${aoe} 傷`;
+    case 'dice_attack':  return `擲骰攻擊　${diceText}`;
+    case 'worm_coil':    return '蜷縮蓄勢　格檔 +2，下次攻擊 +1';
+    case 'pollute':      return '污染 1 名隊友的骰面';
     case 'idle':         return '… 不攻擊';
-    default:             return '❓ 未知意圖';
+    default:             return '未知意圖';
   }
 }
 

@@ -19,12 +19,14 @@ const RenderModal = {
       this._modalFxCleanup();
       this._modalFxCleanup = null;
     }
-    contentEl.querySelectorAll(':scope > .combat-tools, :scope > .combat-bag-panel, :scope > .combat-log-open, :scope > .event-fx-layer').forEach(el => el.remove());
+    contentEl.querySelectorAll(':scope > .combat-tools, :scope > .combat-bag-panel, :scope > .combat-log-open, :scope > .event-fx-layer, :scope > .modal-extra').forEach(el => el.remove());
     contentEl.classList.toggle('combat-modal', !!cfg.combat);
     contentEl.classList.toggle('narrative-modal', !cfg.combat && (cfg.desc || '').length > 900);
     contentEl.classList.toggle('character-detail-content', !!cfg.characterDetail);
     contentEl.classList.toggle('wager-modal-content', !!cfg.wagerModal);
     contentEl.classList.toggle('tutorial-modal', !!cfg.tutorialModal);
+    contentEl.classList.toggle('tutorial-backdrop-modal', !!cfg.tutorialBackdrop);
+    contentEl.classList.toggle('dark-avatar-intro-modal', !!cfg.darkAvatarIntro);
     contentEl.classList.toggle('event-backdrop-modal', !!cfg.eventBackdrop);
     contentEl.classList.remove(
       'fate-roll-success',
@@ -208,7 +210,7 @@ const RenderModal = {
         let tip = document.getElementById('combat-float-tip');
         if (!tip) { tip = document.createElement('div'); tip.id = 'combat-float-tip'; document.body.appendChild(tip); }
         const enemyHtml = `
-          <div class="cct-name">${e.icon || '⚔️'} ${e.name}</div>
+          <div class="cct-name">${e.iconImage ? `<img class="equipment-inline-icon enemy-tooltip-icon" src="${e.iconImage}" alt="${e.name || ''}">` : ''}${e.name}</div>
           ${e.desc ? `<div class="cct-row" style="margin-bottom:7px;color:var(--text)">${e.desc}</div>` : ''}
           <div class="cct-row"><span class="cct-label">格檔</span>${e.block}</div>
           <div class="cct-row"><span class="cct-label">攻擊</span>${e.attack}</div>
@@ -242,7 +244,7 @@ const RenderModal = {
         let tip = document.getElementById('combat-float-tip');
         if (!tip) { tip = document.createElement('div'); tip.id = 'combat-float-tip'; document.body.appendChild(tip); }
         const fateHtml = `
-          <div class="cct-name">🎲 命運盤</div>
+          <div class="cct-name"><img class="equipment-inline-icon enemy-tooltip-icon" src="assets/icons/fate-guardian-dice.png" alt="">命運盤</div>
           <div class="cct-row"><span class="cct-label">幸運</span>${luckyFaces.join('、')}</div>
           <div class="cct-row"><span class="cct-label">厄運</span>${unluckyFaces.join('、')}</div>
           <div class="cct-row">擲命守衛攻擊前會擲命運骰。命中幸運面會提高本次傷害並新增幸運面；命中厄運面會讓牠自損並使本回合攻擊減半。</div>
@@ -374,12 +376,12 @@ const RenderModal = {
 
     if (cfg.eventBackdrop) {
       const backdrop = document.createElement('div');
-      backdrop.className = 'modal-extra event-backdrop-img';
+      backdrop.className = `modal-extra event-backdrop-img ${cfg.eventBackdropClass || ''}`.trim();
       backdrop.style.backgroundImage = `url("${String(cfg.eventBackdrop).replace(/"/g, '%22')}")`;
       contentEl.prepend(backdrop);
     } else if (cfg.eventImage) {
       const image = document.createElement('img');
-      image.className = 'modal-extra event-illustration-img';
+      image.className = `modal-extra event-illustration-img ${cfg.eventImageClass || ''}`.trim();
       image.src = cfg.eventImage;
       image.alt = cfg.eventImageAlt || '';
       contentEl.appendChild(image);
@@ -1914,7 +1916,7 @@ const RenderModal = {
     const enemyHpClass = enemyHpPct <= 25 ? 'critical' : enemyHpPct <= 50 ? 'low' : '';
     const nativeInfo = this._activeEnemyNativeWeaknesses(combat.enemy);
     const weaknessDescHtml = nativeInfo.main && combat.enemy.weaknessDesc
-      ? `<div class="combat-weakness-effect">⚡ ${combat.enemy.weaknessDesc}</div>`
+      ? `<div class="combat-weakness-effect">原生弱點：${combat.enemy.weaknessDesc}</div>`
       : '';
     const fateGamble = combat.enemy.fateGamble || null;
     const fateLuckyFaces = Array.isArray(fateGamble?.luckyFaces) && fateGamble.luckyFaces.length > 0
@@ -1988,7 +1990,7 @@ const RenderModal = {
         <button type="button" class="combat-status-badge dice-pollution"
           onclick="event.stopPropagation()"
           title="污染骰面：${pollutionFaces.join('、')}${pollutionEmpowered > 0 ? `；強化污染 ${pollutionEmpowered} 層` : ''}">
-          <span>☣️</span>
+          <img src="assets/enemies/dark-monster-icon.png" alt="污染">
           <strong>${pollutionFaces.join('.')}${pollutionEmpowered > 0 ? `+${pollutionEmpowered}` : ''}</strong>
         </button>
       ` : '';
@@ -2015,7 +2017,7 @@ const RenderModal = {
           class="combat-wager-toggle${wagerActive ? ' active' : ''}"
           onclick="event.stopPropagation(); Game.toggleCombatWagerDice('${char.id}')"
           title="${wagerActive ? `取消押注：${wagerFaces.join('、')}` : '設定賭命骰子押注'}">
-          <span class="wager-icon">🎲</span>
+          <span class="wager-icon"><img src="assets/relics/wager-dice.png" alt=""></span>
           ${wagerActive ? `<small>${wagerFaces.join(' ')}</small>` : '<span class="wager-state">押注</span>'}
         </button>
       ` : '';
@@ -2024,7 +2026,7 @@ const RenderModal = {
           <button type="button"
             class="combat-banner-badge"
             onclick="event.stopPropagation(); Game.showCombatBannerDetail('${char.id}', '${banner.relicId}', '${banner.faceId}', event)">
-            <span class="banner-icon">🚩</span>
+            <span class="banner-icon"><img src="assets/relics/war-banner.png" alt=""></span>
             <span>${banner.shortName || banner.faceName}</span>
             <strong>${banner.level}階</strong>
           </button>
@@ -2051,7 +2053,7 @@ const RenderModal = {
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           ${isDown ? this._combatBloodSplatterHtml(char.id || char.name, 'ally') : ''}
           <div class="combat-unit-main">
-            <span class="combat-sprite">${cls.icon}</span>
+            <span class="combat-sprite">${this._combatClassIconHtml(char.cls, cls)}</span>
             <span class="combat-name">${char.name}</span>
             ${gazeBadgeHtml}
             ${woundBadgeHtml}
@@ -2568,12 +2570,12 @@ const RenderModal = {
   _combatCharInfoHtml(char) {
     const cls = CHARACTER_CLASSES[char.cls];
     const rows = [];
-    rows.push(`<div class="cct-name">${cls.icon} ${char.name}（${cls.name}）</div>`);
+    rows.push(`<div class="cct-name">${this._combatClassIconHtml(char.cls, cls)} ${char.name}（${cls.name}）</div>`);
     rows.push(`<div class="cct-row"><span class="cct-label">被動</span>${cls.passiveDesc}</div>`);
     if (char.weapon) rows.push(`<div class="cct-row"><span class="cct-label">武器</span>${EquipmentIcon.label(char.weapon, 'equipment-inline-icon weapon-tooltip-icon')}：${char.weapon.desc}</div>`);
     if (char.gear)   rows.push(`<div class="cct-row"><span class="cct-label">裝備</span>${EquipmentIcon.label(char.gear, 'equipment-inline-icon gear-tooltip-icon')}：${char.gear.desc}</div>`);
     if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.relic, false) : char.relic.desc}</div>`);
-    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>✨ ${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.fusedRelic, true) : char.fusedRelic.desc}</div>`);
+    if (char.fusedRelic) rows.push(`<div class="cct-row"><span class="cct-label">融合聖物</span>${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.fusedRelic, true) : char.fusedRelic.desc}</div>`);
     const resonances = (G.activeResonances || []).filter(res => res.isBody && res.bodyChar?.id === char.id);
     for (const res of resonances) {
       rows.push(`<div class="cct-row"><span class="cct-label">共鳴</span>${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}</div>`);
@@ -2582,6 +2584,14 @@ const RenderModal = {
     if (char.gamblerBacklashStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">反噬</span>${char.gamblerBacklashStacks} 層，下次受擊流程受到的傷害提高 ${char.gamblerBacklashStacks * 20}%</div>`);
     if (char.threat > 0) rows.push(`<div class="cct-row"><span class="cct-label">仇恨</span>${char.threat}/10，單體意圖更容易鎖定此角色；被單體攻擊命中後仇恨減半</div>`);
     return rows.join('');
+  },
+
+  _combatClassIconHtml(clsId, cls = null) {
+    const src = typeof CLASS_AVATARS !== 'undefined' ? CLASS_AVATARS[clsId] : '';
+    const label = cls?.name || clsId || '';
+    return src
+      ? `<img class="equipment-inline-icon class-tooltip-icon" src="${src}" alt="${this._escapeHtml(label)}">`
+      : '<span class="class-tooltip-icon fallback"></span>';
   },
 
   hideModal() {

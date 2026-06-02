@@ -1,6 +1,7 @@
 // 入口：頁面載入後初始化
 document.addEventListener('DOMContentLoaded', () => {
   AudioManager?.init?.();
+  AssetPreloader?.init?.();
   const startScreen  = document.getElementById('start-screen');
   const gameScreen   = document.getElementById('game-screen');
   const gameoverScr  = document.getElementById('gameover-screen');
@@ -174,6 +175,7 @@ document.addEventListener('DOMContentLoaded', () => {
     gameScreen.style.display = 'flex';
     gameScreen.classList.add('active');
     Game.init(classes, startingLibraryRelicId, startingLibraryCarrierCls);
+    AssetPreloader?.preloadGameAssets?.();
     AudioManager?.sync?.();
   }
 

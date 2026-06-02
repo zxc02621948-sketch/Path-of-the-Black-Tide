@@ -74,7 +74,7 @@ const GameCombatThreat = {
     if (intent.type === 'self_wound') return `${intent.name || '撕裂自身'}　傷口 +${intent.amount || 0}`;
     if (intent.type === 'banner_switch') {
       const next = intent.toStance === 'damage' ? '戰吼旗' : '創傷旗';
-      return `🚩 換旗　切換為${next}，格檔 +${enemy?.block || 0}`;
+      return `換旗　切換為${next}，格檔 +${enemy?.block || 0}`;
     }
     const base = this._combatIntentDamageLabel(intent, enemy) || intentLabel(intent, enemy);
     const fateText = this._combatIntentFateText(intent, enemy);
@@ -125,13 +125,13 @@ const GameCombatThreat = {
     const bonusText = bonusParts.length > 0 ? `（${bonusParts.join('，')}）` : '';
     switch (intent?.type) {
       case 'attack':
-        return `⚔️ 攻擊主戰者　${attackText} 傷${bonusText}`;
+        return `攻擊主戰者　${attackText} 傷${bonusText}`;
       case 'block_attack':
-        return `🛡️⚔️ 格檔 +${blk}，攻擊主戰者 ${attackText} 傷${bonusText}`;
+        return `格檔 +${blk}，攻擊主戰者 ${attackText} 傷${bonusText}`;
       case 'aoe':
-        return `🌊 全體攻擊　各 ${Math.max(1, atk - 2) + totalBonus} 傷${bonusText}`;
+        return `全體攻擊　各 ${Math.max(1, atk - 2) + totalBonus} 傷${bonusText}`;
       case 'dice_attack':
-        return `🎲 擲骰攻擊　${diceText} 傷${bonusText}`;
+        return `擲骰攻擊　${diceText} 傷${bonusText}`;
       default:
         return null;
     }

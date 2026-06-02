@@ -3,7 +3,7 @@ const CHARACTER_CLASSES = {
   warrior: {
     id: 'warrior',
     name: '戰士',
-    icon: '⚔️',
+    icon: '戰',
     desc: '血厚且擅長正面戰鬥，戰鬥骰有較高下限。',
     maxHp: 26,
     attack: 5,
@@ -13,7 +13,7 @@ const CHARACTER_CLASSES = {
   explorer: {
     id: 'explorer',
     name: '探索者',
-    icon: '🧭',
+    icon: '探',
     desc: '善於觀察敵人的破綻，能把一次失手轉成下一次機會。',
     maxHp: 20,
     attack: 3,
@@ -23,7 +23,7 @@ const CHARACTER_CLASSES = {
   scholar: {
     id: 'scholar',
     name: '搏命者',
-    icon: '🎲',
+    icon: '命',
     desc: '以命運為賭注，能用骰面改寫敵人的破綻。',
     maxHp: 20,
     attack: 4,
@@ -33,7 +33,7 @@ const CHARACTER_CLASSES = {
   support: {
     id: 'support',
     name: '輔助',
-    icon: '✚',
+    icon: '輔',
     desc: '維持隊伍生存，在戰鬥中替傷勢最危急的隊友穩住局面。',
     maxHp: 18,
     attack: 2,

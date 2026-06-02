@@ -211,7 +211,11 @@ const Render = {
           const iconImage = this._cellIconImage(cell, isPlayer);
           const label = this._cellLabel(cell, isPlayer);
 
-          if (iconImage) {
+          if (isPlayer) {
+            el.appendChild(this._cellPlayerMarker());
+          } else if (cell.content?.reward === 'echo_site') {
+            el.appendChild(this._cellEchoSiteMarker(cell));
+          } else if (iconImage) {
             const iconEl = document.createElement('img');
             iconEl.className = `cell-icon cell-icon-img ${iconImage.className || ''}`.trim();
             iconEl.src = iconImage.src;
@@ -235,7 +239,13 @@ const Render = {
           if (cell.droppedRelics?.length > 0) {
             const dropBadge = document.createElement('div');
             dropBadge.className = 'cell-drop-badge';
-            dropBadge.textContent = cell.droppedRelics.some(relic => relic?._droppedBy) ? '📦' : '💎';
+            const isDeathDrop = cell.droppedRelics.some(relic => relic?._droppedBy);
+            const dropImg = document.createElement('img');
+            dropImg.src = isDeathDrop
+              ? 'assets/ui/treasure-chest-map.png'
+              : (cell.droppedRelics.find(relic => relic?.iconImage)?.iconImage || 'assets/site-thumbnail.png');
+            dropImg.alt = '';
+            dropBadge.appendChild(dropImg);
             dropBadge.title = cell.droppedRelics.some(relic => relic?._droppedBy) ? '此處有遺落物' : '此處有掉落聖物';
             el.appendChild(dropBadge);
           }
@@ -490,7 +500,7 @@ const Render = {
     const toRect = toCell.getBoundingClientRect();
     const runner = document.createElement('div');
     runner.className = 'map-player-runner';
-    runner.textContent = (G.squad || []).slice(0, 3).map(c => CHARACTER_CLASSES[c.cls]?.icon || '●').join('');
+    runner.innerHTML = this._cellPlayerMarkerHtml();
     runner.style.left = `${fromRect.left + fromRect.width / 2}px`;
     runner.style.top = `${fromRect.top + fromRect.height / 2}px`;
     document.body.appendChild(runner);
@@ -599,22 +609,20 @@ const Render = {
   },
 
   _cellIcon(cell, isPlayer) {
-    if (isPlayer) {
-      return (G.squad || []).slice(0, 3).map(c => CHARACTER_CLASSES[c.cls]?.icon || '●').join('');
-    }
+    if (isPlayer) return '';
     if (cell.cleared) {
-      if (cell.droppedRelics?.length > 0) return cell.droppedRelics.some(relic => relic?._droppedBy) ? '📦' : '💎';
-      const clearedIcons = { enemy: '☠️', altar: '', rest: '', forest: '', ruins: '', cave: '' };
+      if (cell.droppedRelics?.length > 0) return '';
+      const clearedIcons = { enemy: '', altar: '', rest: '', forest: '', ruins: '', cave: '' };
       return clearedIcons[cell.type] || '';
     }
-    if (cell.droppedRelics?.length > 0 && cell.type === 'empty') return cell.droppedRelics.some(relic => relic?._droppedBy) ? '📦' : '💎';
-    if (cell.corrupted) return '☣️';
-    if (cell.content?.uniqueStrong) return '☣️';
-    if (cell.content?.reward === 'rescue') return '🗝️';
+    if (cell.droppedRelics?.length > 0 && cell.type === 'empty') return '';
+    if (cell.corrupted) return '';
+    if (cell.content?.uniqueStrong) return '';
+    if (cell.content?.reward === 'rescue') return '';
     if (cell.content?.reward === 'echo_site') return '◆';
-    if (cell.type === 'enemy')  return '⚔️';
+    if (cell.type === 'enemy')  return '';
     if (cell.type === 'chest')  return '';
-    if (cell.type === 'relic')  return '💎';
+    if (cell.type === 'relic')  return '';
     if (cell.type === 'rest')   return '';
     if (cell.type === 'altar')  return '';
     if (cell.type === 'forest') return '';
@@ -624,7 +632,27 @@ const Render = {
   },
 
   _cellIconImage(cell, isPlayer) {
-    if (isPlayer || cell.cleared) return null;
+    if (isPlayer) return null;
+    if (cell.droppedRelics?.length > 0) {
+      const isDeathDrop = cell.droppedRelics.some(relic => relic?._droppedBy);
+      const relic = cell.droppedRelics.find(item => item?.iconImage) || cell.droppedRelics[0] || null;
+      return {
+        src: isDeathDrop ? 'assets/ui/treasure-chest-map.png' : (relic?.iconImage || 'assets/site-thumbnail.png'),
+        alt: isDeathDrop ? '遺落物' : '掉落聖物',
+        className: isDeathDrop ? 'dropped-relic-map-icon dropped-relic-death' : 'dropped-relic-map-icon',
+      };
+    }
+    if (cell.cleared) return null;
+    if (cell.content?.reward === 'rescue') {
+      return { src: 'assets/ui/cage-warden-map.png', alt: '救援頭目', className: 'rescue-map-icon' };
+    }
+    if (cell.corrupted || cell.content?.uniqueStrong) {
+      return {
+        src: cell.content?.enemy?.mapIconImage || cell.content?.enemy?.iconImage || 'assets/enemies/dark-monster-icon.png',
+        alt: cell.content?.enemy?.name || '特殊敵人',
+        className: cell.content?.uniqueStrong ? 'unique-strong-map-icon' : 'corrupted-map-icon',
+      };
+    }
     if (cell.type === 'chest' && cell.content?.chestKind === 'dark_gift') {
       return { src: 'assets/ui/dark-gift-chest-map.png', alt: '黑暗贈禮', className: 'dark-gift-map-icon' };
     }
@@ -648,6 +676,14 @@ const Render = {
         src: 'assets/ui/battle-map-icon.png',
         alt: '敵人',
         className: 'battle-map-icon',
+      };
+    }
+    if (cell.type === 'relic') {
+      const relic = cell.content?.relic || null;
+      return {
+        src: relic?.iconImage || 'assets/site-thumbnail.png',
+        alt: relic?.name || '聖物',
+        className: 'relic-map-icon',
       };
     }
     return null;
@@ -700,9 +736,62 @@ const Render = {
   },
 
   _cellEchoLabel(cell) {
+    const systemId = cell?.content?.echoSystemId || '';
+    const displayNames = {
+      wound: '痛痕系',
+      eagle: '鷹眼系',
+      fate: '命運系',
+      banner: '戰旗系',
+    };
+    if (displayNames[systemId]) return displayNames[systemId];
     const name = cell?.content?.echoSystemName || '';
     const shortName = name.replace(/體系$/, '系').trim();
     return shortName || '共鳴';
+  },
+
+  _cellEchoSiteMarker(cell) {
+    const systemId = cell?.content?.echoSystemId || 'site';
+    const names = {
+      wound: '痛痕',
+      eagle: '鷹眼',
+      fate: '命運',
+      banner: '戰旗',
+    };
+    const marker = document.createElement('div');
+    marker.className = `cell-icon echo-site-marker echo-site-marker-${systemId}`;
+    marker.setAttribute('aria-label', `${names[systemId] || '共鳴'}系聖物守護者`);
+    marker.innerHTML = `
+      <span class="echo-site-marker-diamond" aria-hidden="true"></span>
+      <span class="echo-site-marker-text">${names[systemId] || '共鳴'}</span>
+    `;
+    return marker;
+  },
+
+  _cellPlayerMarker() {
+    const marker = document.createElement('div');
+    marker.className = `map-player-marker ${this._cellPlayerCountClass()} cell-icon`;
+    marker.innerHTML = this._cellPlayerAvatarHtml();
+    return marker;
+  },
+
+  _cellPlayerMarkerHtml() {
+    return `<div class="map-player-marker ${this._cellPlayerCountClass()}">${this._cellPlayerAvatarHtml()}</div>`;
+  },
+
+  _cellPlayerCountClass() {
+    const count = Math.min(3, Math.max(1, (G.squad || []).length));
+    return `map-player-count-${count}`;
+  },
+
+  _cellPlayerAvatarHtml() {
+    const members = (G.squad || []).slice(0, 3);
+    return members.map(char => {
+      const src = char?.avatar || (typeof CLASS_AVATARS !== 'undefined' ? CLASS_AVATARS[char?.cls] : '') || '';
+      const name = this._escapeHtml(char?.name || '');
+      return src
+        ? `<span class="map-player-avatar"><img src="${src}" alt="${name}"></span>`
+        : '<span class="map-player-avatar fallback"></span>';
+    }).join('');
   },
 
   // Section.
@@ -798,7 +887,7 @@ const Render = {
       const softClass = enemy.iconSoftEdge ? ' soft-edge' : '';
       return `<img class="combat-enemy-img${flipClass}${scaleClass}${softClass}" src="${enemy.iconImage}" alt="${enemy.name}">`;
     }
-    return enemy?.icon || '⚔️';
+    return enemy?.icon || '敵';
   },
 
   renderSquad() {
@@ -818,7 +907,7 @@ const Render = {
         if (!char.relic && !char.fusedRelic) return `<span class="card-val dim">無</span>`;
         const parts = [];
         if (char.fusedRelic) {
-          parts.push(`<span class="card-relic-name fused">🔮 ${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-card-icon')}</span>
+          parts.push(`<span class="card-relic-name fused">${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-card-icon')}</span>
             <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','fusedRelic')">查看</button>`);
         }
         if (char.relic) {
@@ -977,7 +1066,7 @@ const Render = {
     for (const res of G.activeResonances) {
       const item = document.createElement('div');
       item.className = 'resonance-item';
-      item.innerHTML = `🔮 <b>${res.name}</b>（${res.isBody ? '同身' : '隊伍'}）<br><span class="resonance-desc">${res.effect.desc}</span>`;
+      item.innerHTML = `<b>${res.name}</b>（${res.isBody ? '同身' : '隊伍'}）<br><span class="resonance-desc">${res.effect.desc}</span>`;
       el.appendChild(item);
     }
     el.style.display = G.activeResonances.length > 0 ? 'block' : 'none';

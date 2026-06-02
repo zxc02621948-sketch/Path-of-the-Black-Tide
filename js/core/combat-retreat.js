@@ -4,6 +4,7 @@ const GameCombatRetreat = {
     const combat = G.combat;
     const enemy = combat?.enemy;
     if (!combat || !enemy) return false;
+    if (combat.tutorialCombat || (G.combatTutorial?.active && !G.combatTutorial?.completed)) return false;
     if (enemy.canRetreat) return true;
     if (enemy.darkMonster || enemy.boss || enemy.rescueBoss || enemy.noRetreat || enemy.tier === 'strong') return false;
     if (combat.source === 'darkMonsterPassive' || combat.source === 'darkMonsterActive') return false;

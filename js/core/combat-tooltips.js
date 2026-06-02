@@ -67,7 +67,7 @@ const GameCombatTooltips = {
     const maxLucky = Math.max(1, ability.maxLuckyFaces || 3);
     const maxUnlucky = Math.max(1, ability.maxUnluckyFaces || 3);
     const unluckyRate = Math.round(Math.max(0, ability.unluckySelfDamageRate ?? 0.25) * 100);
-    const titleText = '🎲 命運盤';
+    const titleText = '命運盤';
     const descText = [
       `幸運骰面：${luckyFaces.join('、') || '無'}`,
       `厄運骰面：${unluckyFaces.join('、') || '無'}`,

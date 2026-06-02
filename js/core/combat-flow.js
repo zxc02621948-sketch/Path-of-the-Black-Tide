@@ -4,11 +4,13 @@ const GameCombatFlow = {
   // Section.
   // Section.
   _triggerCombat(cell, opts = {}) {
+    let tutorialCombat = false;
     if (this._shouldUseCombatTutorialEnemy(opts)) {
       const tutorialEnemy = typeof getEnemyById === 'function' ? getEnemyById('shadow_worm') : null;
       if (tutorialEnemy) {
         cell.content = { ...(cell.content || {}), enemy: tutorialEnemy };
         G.combatTutorial = { active: true, step: 'enemy_detail', completed: false, firstCombatStarted: true };
+        tutorialCombat = true;
         if (G.guideQuest) G.guideQuest.firstCombatStarted = true;
       }
     }
@@ -40,6 +42,7 @@ const GameCombatFlow = {
       enemy: { ...enemy, maxHp: enemy.hp, blockBroken: false, blockBrokenUntilRound: null, exposed: false, exposedUntilRound: null, _block: 0, woundMax: enemy.woundMax || 15, wounds: Math.max(0, Math.min(enemy.woundMax || 15, enemy.wounds || 0)), gamblerTempWeakness: null, gamblerTempWeaknesses: [], gamblerNativeWeakness: null, eagleTempWeakness: null, eagleNativeWeakness: null, extraWeaknesses: [], disabledNativeWeaknesses: [], suspiciousFlaw: false, suspiciousFlawMarkedRound: 0 },
       cell,
       reward: cell.content?.reward || (enemy.rescueBoss ? 'rescue' : null),
+      tutorialCombat,
       source: opts.source || null,
       darkMonsterId: opts.darkMonsterId || null,
       darkMonsterRef: opts.darkMonsterRef || null,

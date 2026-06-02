@@ -1,8 +1,8 @@
-const RELICS = [
+﻿const RELICS = [
   {
     id: 'war_banner',
     name: '戰爭旗',
-    icon: '⚑',
+    icon: '旗',
     iconImage: 'assets/relics/war-banner.png?v=2',
     rarity: 'rare',
     fusable: true,
@@ -36,7 +36,7 @@ const RELICS = [
   {
     id: 'eagle_banner',
     name: '鷹眼旗',
-    icon: '⚑',
+    icon: '旗',
     iconImage: 'assets/relics/eagle-banner.png?v=2',
     rarity: 'rare',
     fusable: true,
@@ -70,7 +70,7 @@ const RELICS = [
   {
     id: 'wager_dice',
     name: '賭命骰子',
-    icon: '🎲',
+    icon: '骰',
     iconImage: 'assets/relics/wager-dice.png?v=2',
     rarity: 'rare',
     poolWeight: 0.25,
@@ -88,7 +88,7 @@ const RELICS = [
   {
     id: 'lucky_star',
     name: '幸運星',
-    icon: '⭐',
+    icon: '星',
     iconImage: 'assets/relics/lucky-star.png',
     rarity: 'legendary',
     fusable: true,
@@ -105,7 +105,7 @@ const RELICS = [
   {
     id: 'exorcism_ring',
     name: '驅邪戒',
-    icon: '💍',
+    icon: '戒',
     iconImage: 'assets/relics/exorcism-ring.png',
     rarity: 'rare',
     fusable: true,
@@ -159,7 +159,7 @@ const RELICS = [
   {
     id: 'eagle_eye_feather',
     name: '鷹眼羽飾',
-    icon: '🪶',
+    icon: '羽',
     iconImage: 'assets/relics/eagle-eye-feather.png?v=2',
     rarity: 'rare',
     fusable: true,
@@ -177,7 +177,7 @@ const RELICS = [
   {
     id: 'flaw_lens',
     name: '鷹眼透鏡',
-    icon: '🔍',
+    icon: '鏡',
     iconImage: 'assets/relics/flaw-lens.png',
     rarity: 'rare',
     fusable: true,
@@ -194,7 +194,7 @@ const RELICS = [
   {
     id: 'pain_mask',
     name: '痛苦面具',
-    icon: '🎭',
+    icon: '面',
     iconImage: 'assets/relics/pain-mask.png?v=2',
     rarity: 'rare',
     fusable: true,
@@ -211,7 +211,7 @@ const RELICS = [
   {
     id: 'pain_splinter_badge',
     name: '痛苦徽記',
-    icon: '🩸',
+    icon: '血',
     iconImage: 'assets/relics/pain-splinter-badge.png',
     rarity: 'rare',
     fusable: true,
@@ -228,7 +228,7 @@ const RELICS = [
   {
     id: 'black_iron_crown',
     name: '黑鐵王冠',
-    icon: '👑',
+    icon: '冠',
     iconImage: 'assets/relics/black-iron-crown.png',
     rarity: 'legendary',
     fusable: true,

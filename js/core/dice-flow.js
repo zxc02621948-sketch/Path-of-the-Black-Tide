@@ -143,7 +143,7 @@ const GameDiceFlow = {
         rollResult.floored = true;
       }
       rollResult.exorcismRing = 'success';
-      this._log(`💍 ${holder.name} 的驅邪戒發光，今天第一次探索骰視為成功。`, 'reward');
+      this._log(`${holder.name} 的驅邪戒發光，今天第一次探索骰視為成功。`, 'reward');
       return rollResult;
     }
 
@@ -155,7 +155,7 @@ const GameDiceFlow = {
     rollResult.value = second.value;
     rollResult.floored = second.floored;
     rollResult.exorcismRing = 'reroll';
-    this._log(`💍 ${holder.name} 的驅邪戒觸發，探索失敗自動重擲為 ${Dice.face(second.value)}（${second.value}）。`, 'reward');
+    this._log(`${holder.name} 的驅邪戒觸發，探索失敗自動重擲為 ${Dice.face(second.value)}（${second.value}）。`, 'reward');
     return rollResult;
   },
 

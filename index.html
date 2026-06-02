@@ -15,6 +15,10 @@
   <meta name="twitter:image" content="assets/title-logo.png">
   <link rel="icon" type="image/png" href="assets/site-thumbnail.png">
   <link rel="apple-touch-icon" href="assets/site-thumbnail.png">
+  <link rel="preload" as="image" href="assets/start-bg.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/title-logo.png" fetchpriority="high">
+  <link rel="preload" as="image" href="assets/ui/modal-panel-frame.png">
+  <link rel="preload" as="image" href="assets/ui/choice-button-frame.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/0.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/1.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/2.png">
@@ -25,7 +29,7 @@
   <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
-<link rel="stylesheet" href="style.css?v=mobile-enemy-detail-popover1">
+<link rel="stylesheet" href="style.css?v=guide-dark-avatar-tokens-mobile-left2">
 </head>
 <body>
 <div id="app">
@@ -190,7 +194,7 @@
   <!-- ═══════════════ 筆記 Modal ═══════════════ -->
   <div id="notes-modal" class="modal hidden">
     <div class="modal-content wide">
-      <h2>📖 探險筆記</h2>
+      <h2>探險筆記</h2>
       <div id="notes-content"></div>
       <button id="btn-close-notes" class="btn-secondary" style="margin-top:16px">關閉</button>
     </div>
@@ -215,13 +219,13 @@
 
 <!-- Scripts（順序不可改） -->
 <script src="js/config.js?v=reserve-cleanup1"></script>
-<script src="js/data/equipment.js?v=leather-patch-once1"></script>
-<script src="js/data/characters.js?v=warrior-passive-desc1"></script>
-<script src="js/data/relics.js?v=fate-guardian-board1"></script>
-<script src="js/data/enemies.js?v=full-card-atmosphere-bg1"></script>
+<script src="js/data/equipment.js?v=formal-icons1"></script>
+<script src="js/data/characters.js?v=formal-icons1"></script>
+<script src="js/data/relics.js?v=formal-icons1"></script>
+<script src="js/data/enemies.js?v=formal-icons1"></script>
 <script src="js/data/events.js?v=forest-forage1"></script>
 <script src="js/data/resonances.js?v=silver-bee-no-guarantee1"></script>
-<script src="js/core/dice.js?v=rulesnotes2"></script>
+<script src="js/core/dice.js?v=formal-icons1"></script>
 <script src="js/core/map.js?v=reserve-cleanup1"></script>
 <script src="js/core/combat-status.js?v=gambler-pain-block1"></script>
   <script src="js/core/enemy-abilities.js?v=banner-guardian-tune1"></script>
@@ -233,15 +237,15 @@
 <script src="js/core/inventory.js?v=reward-icons1"></script>
 <script src="js/ui/icon-render.js?v=weapon-icons1"></script>
 <script src="js/core/character-details.js?v=relic-title-icons1"></script>
-<script src="js/core/dice-flow.js?v=dark-gift1"></script>
+<script src="js/core/dice-flow.js?v=formal-icons1"></script>
 <script src="js/core/relic-resonance.js?v=resonance-compact1"></script>
-<script src="js/core/game-state.js?v=dark-monster-spawn-intro1"></script>
-  <script src="js/core/combat-flow.js?v=combat-modal-audio-flags1"></script>
-  <script src="js/core/combat-victory-flow.js?v=darkhunt-level-bonus1"></script>
-  <script src="js/core/combat-tooltips.js?v=combat-tutorial-close-detail1"></script>
+<script src="js/core/game-state.js?v=dark-avatar-intro-event-art1"></script>
+  <script src="js/core/combat-flow.js?v=guide-combat-no-retreat1"></script>
+  <script src="js/core/combat-victory-flow.js?v=guide-night-pressure1"></script>
+  <script src="js/core/combat-tooltips.js?v=formal-icons1"></script>
   <script src="js/core/combat-inventory-flow.js?v=guide-item-target-fix1"></script>
-  <script src="js/core/combat-threat.js?v=combat-tutorial-force-attack1"></script>
-  <script src="js/core/combat-retreat.js?v=enemy-three-sided-die-label1"></script>
+  <script src="js/core/combat-threat.js?v=formal-icons1"></script>
+  <script src="js/core/combat-retreat.js?v=guide-combat-no-retreat1"></script>
 <script src="js/core/site-actions.js?v=field-rest-confirm1"></script>
 <script src="js/core/echo-sites.js?v=echo-site-backdrops1"></script>
 <script src="js/core/event-handlers.js?v=guide-ambush-target1"></script>
@@ -253,10 +257,11 @@
 <script src="js/ui/fx-player.js?v=fx-player-ambush1"></script>
 <script src="js/core/dev-tool.js?v=silver-bee-fast-red1"></script>
 <script src="js/ui/audio-manager.js?v=damage-tier-sfx1"></script>
-<script src="js/ui/render.js?v=guide-combat-target1"></script>
-  <script src="js/ui/modal-render.js?v=choice-detail-no-replay1"></script>
-<script src="js/ui/notes-render.js?v=leather-patch-once1"></script>
-<script src="js/ui/tutorial-render.js?v=ruins-tile-final1"></script>
-<script src="js/main.js?v=library-modal1"></script>
+<script src="js/ui/render.js?v=player-marker-align1"></script>
+  <script src="js/ui/modal-render.js?v=guide-explore-clue-style1"></script>
+<script src="js/ui/notes-render.js?v=formal-icons1"></script>
+<script src="js/ui/tutorial-render.js?v=guide-dark-avatar-tokens2"></script>
+<script src="js/ui/asset-preloader.js?v=guide-dark-avatar-clue-style1"></script>
+<script src="js/main.js?v=image-preload1"></script>
 </body>
 </html>

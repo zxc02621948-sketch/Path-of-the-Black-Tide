@@ -55,10 +55,15 @@ const GameStateHelpers = {
   _showDarknessMilestoneOnce(value) {
     if (!G.darknessMilestones) G.darknessMilestones = {};
     if (G.darknessMilestones[value]) return;
+    if (value === 5) {
+      G.darknessMilestones[value] = true;
+      G.darknessMilestones.darkMonsterSpawnIntro = true;
+      this._queueSystemModal(this._darkMonsterIntroModalConfig(0, () => Render.fullRender()));
+      return;
+    }
     const info = this._darknessMilestoneInfo(value);
     if (!info) return;
     G.darknessMilestones[value] = true;
-    if (value === 5) G.darknessMilestones.darkMonsterSpawnIntro = true;
     this._queueSystemModal({
       title: info.title,
       desc: info.desc,
@@ -69,15 +74,6 @@ const GameStateHelpers = {
   _darknessMilestoneInfo(value) {
     const devourAt = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
     const infos = {
-      5: {
-        title: '黑暗化身已出現',
-        desc: [
-          '黑暗凝成了化身。從現在開始，黑暗化身會在地圖上出現並朝小隊移動。',
-          '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
-          '黑暗化身本體固定，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後即使黑暗繼續上升，已存在的黑暗化身不會跟著即時變強。',
-          '擊敗追殺而來的黑暗化身只會移除該化身，不會降低黑暗；主動討伐黑暗化身可使黑暗 -2，若目標為 Lv.10 以上再額外黑暗 -1，並震懾其他黑暗化身，使牠們的追殺延後 1 天。主動討伐中若本場曾命中並擊破原生弱點，額外黑暗 -1，每場最多一次。',
-        ].join('\n\n'),
-      },
       10: {
         title: '黑暗正在壯大',
         desc: [
@@ -107,14 +103,119 @@ const GameStateHelpers = {
       G.darknessMilestones.darkMonsterSpawnIntro = true;
       return;
     }
-    const info = this._darknessMilestoneInfo(5);
-    if (!info) return;
     G.darknessMilestones.darkMonsterSpawnIntro = true;
-    this._queueSystemModal({
-      title: info.title,
-      desc: info.desc,
-      choices: [{ label: '知道了', action: () => { this._closeModal(); Render.fullRender(); } }],
-    });
+    this._queueSystemModal(this._darkMonsterIntroModalConfig(0, () => Render.fullRender()));
+  },
+
+  _darkMonsterIntroPages() {
+    return [
+      {
+        title: '黑暗化身已出現',
+        layout: 'tokens',
+        body: [
+          '黑暗凝成了化身。從現在開始，黑暗化身會在地圖上出現並朝小隊移動。',
+          '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。',
+          '倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
+        ],
+      },
+      {
+        title: '黑暗會決定牠的強度',
+        layout: 'combat',
+        eventImage: 'assets/enemies/dark-avatar-combat.png',
+        eventImageClass: 'dark-avatar-intro-art dark-avatar-intro-art-combat',
+        body: [
+          '黑暗化身本體固定，生成時會依當下黑暗層數決定強度。',
+          '每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。',
+          '生成後即使黑暗繼續上升，已存在的黑暗化身不會跟著即時變強。',
+        ],
+      },
+      {
+        title: '主動討伐能壓低黑暗',
+        layout: 'hunt',
+        eventImage: 'assets/events/dark-avatar-hunt-bound.png',
+        eventImageClass: 'dark-avatar-intro-art dark-avatar-intro-art-hunt',
+        body: [
+          '擊敗追殺而來的黑暗化身只會移除該化身，不會降低黑暗。',
+          '主動討伐黑暗化身可使黑暗 -2；若目標為 Lv.10 以上，再額外黑暗 -1。',
+          '主動討伐勝利後會震懾其他黑暗化身，使牠們的追殺延後 1 天。',
+          '主動討伐中若本場曾擊破原生弱點，額外黑暗 -1，每場最多一次。',
+        ],
+      },
+    ];
+  },
+
+  _darkMonsterIntroModalConfig(pageIndex = 0, onDone = null) {
+    const pages = this._darkMonsterIntroPages();
+    const page = pages[Math.max(0, Math.min(pageIndex, pages.length - 1))] || pages[0];
+    const choices = [];
+    if (pageIndex > 0) {
+      choices.push({ label: '上一頁', action: () => this._openDarkMonsterIntroPage(pageIndex - 1, onDone) });
+    }
+    if (pageIndex < pages.length - 1) {
+      choices.push({ label: '下一頁', action: () => this._openDarkMonsterIntroPage(pageIndex + 1, onDone) });
+    } else {
+      choices.push({
+        label: '知道了',
+        action: () => {
+          this._closeModal();
+          if (typeof onDone === 'function') onDone();
+        },
+      });
+    }
+    return {
+      title: page.title,
+      descHtml: this._darkMonsterIntroPageHtml(page, pageIndex, pages.length),
+      tutorialModal: true,
+      darkAvatarIntro: true,
+      eventImage: page.eventImage || '',
+      eventImageClass: page.eventImageClass || '',
+      eventImageAlt: page.title || '',
+      eventSfx: pageIndex === 0 ? 'darkMonsterGrowl' : '',
+      eventSfxVolume: 0.45,
+      typeText: false,
+      choices,
+    };
+  },
+
+  _openDarkMonsterIntroPage(pageIndex, onDone = null) {
+    this._openModal(this._darkMonsterIntroModalConfig(pageIndex, onDone));
+  },
+
+  _darkMonsterIntroPageHtml(page, pageIndex, totalPages) {
+    const escape = value => this._escapeHtmlLocal ? this._escapeHtmlLocal(value) : String(value ?? '');
+    const visual = {
+      tokens: this._darkMonsterIntroTokensHtml(),
+    }[page.layout] || '';
+    return `
+      <section class="dark-avatar-guide dark-avatar-guide-page-${escape(page.layout)}">
+        <div class="dark-avatar-guide-page">${pageIndex + 1} / ${totalPages}</div>
+        <div class="dark-avatar-guide-visual">${visual}</div>
+        <div class="dark-avatar-guide-copy">
+          ${page.body.map(text => `<p>${escape(text)}</p>`).join('')}
+        </div>
+      </section>
+    `;
+  },
+
+  _darkMonsterIntroTokensHtml() {
+    const tokens = [
+      ['timer-green', '3', '綠色還有 3 天'],
+      ['timer-yellow', '2', '黃色還有 2 天'],
+      ['timer-red', '1', '紅色是最後 1 天'],
+    ];
+    return `
+      <div class="dark-avatar-guide-tokens">
+        ${tokens.map(([cls, count, label]) => `
+          <div class="dark-avatar-guide-token">
+            <div class="tutorial-dark-token ${cls}">
+              <img src="assets/enemies/dark-monster-icon.png" alt="">
+              <span>${count}</span>
+            </div>
+            <strong>${label}</strong>
+          </div>
+        `).join('')}
+      </div>
+    `;
   },
 
   _showNightIntroOnce() {
