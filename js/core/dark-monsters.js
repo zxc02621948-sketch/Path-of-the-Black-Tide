@@ -236,6 +236,7 @@ const GameDarkMonsters = {
       y: cell.y,
       chaseTimer: 3,
     });
+    this._showDarkMonsterSpawnIntroOnce?.();
     AudioManager?.playSfx?.('darkMonsterGrowl', 0.62);
     return true;
   },

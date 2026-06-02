@@ -58,6 +58,7 @@ const GameStateHelpers = {
     const info = this._darknessMilestoneInfo(value);
     if (!info) return;
     G.darknessMilestones[value] = true;
+    if (value === 5) G.darknessMilestones.darkMonsterSpawnIntro = true;
     this._queueSystemModal({
       title: info.title,
       desc: info.desc,
@@ -93,6 +94,27 @@ const GameStateHelpers = {
       },
     };
     return infos[value] || null;
+  },
+
+  _showDarkMonsterSpawnIntroOnce() {
+    if (!G.darknessMilestones) G.darknessMilestones = {};
+    if (G.darknessMilestones.darkMonsterSpawnIntro) return;
+    const title = '黑暗化身已出現';
+    const pending = Array.isArray(G.pendingSystemModals)
+      ? G.pendingSystemModals.some(cfg => cfg?.title === title)
+      : false;
+    if (G.modal?.title === title || pending) {
+      G.darknessMilestones.darkMonsterSpawnIntro = true;
+      return;
+    }
+    const info = this._darknessMilestoneInfo(5);
+    if (!info) return;
+    G.darknessMilestones.darkMonsterSpawnIntro = true;
+    this._queueSystemModal({
+      title: info.title,
+      desc: info.desc,
+      choices: [{ label: '知道了', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
   },
 
   _showNightIntroOnce() {

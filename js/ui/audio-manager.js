@@ -4,7 +4,7 @@ const AudioManager = {
     exploreNight: 'assets/audio/explore-night.mp3',
     battleNormal: 'assets/audio/battle-normal.mp3',
     battleGuardian: 'assets/audio/battle-final.mp3',
-    battleDarkAvatar: 'assets/audio/battle-dark-avatar.mp3',
+    battleDarkAvatar: 'assets/audio/battle-dark-avatar.wav',
     battleFinal: 'assets/audio/battle-guardian.mp3',
     gameOver: 'assets/audio/game-over.wav',
   },
