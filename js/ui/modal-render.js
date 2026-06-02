@@ -1402,7 +1402,7 @@ const RenderModal = {
     const distance = Math.max(120, Math.hypot(dx, dy));
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const mobileTargetHitAngle = fixedTargetTrail && stackedCombat
-      ? (opts.side === 'enemy' ? 0 : 90)
+      ? (opts.side === 'enemy' ? 180 : 90)
       : angle;
     const trailAngle = stackedCombat && darkAvatar && opts.side === 'ally'
       ? 90
