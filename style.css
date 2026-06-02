@@ -4003,22 +4003,63 @@ html, body {
   cursor: default;
 }
 .combat-bag-panel {
-  position: absolute;
-  left: 50%;
-  bottom: 118px;
-  transform: translateX(-50%);
-  z-index: 45;
-  width: min(260px, calc(100% - 16px));
-  max-height: min(260px, calc(100% - 118px));
+  position: fixed;
+  inset: 0;
+  z-index: 260;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom));
+  background: rgba(0, 0, 0, .46);
+  backdrop-filter: blur(2px);
+  pointer-events: auto;
+}
+
+.combat-bag-dialog {
+  width: min(360px, calc(100vw - 24px));
+  max-height: min(58dvh, 360px);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid rgba(201,145,47,.45);
+  border-radius: 8px;
+  background: rgba(16,14,12,.98);
+  box-shadow: 0 16px 42px rgba(0,0,0,.58), 0 0 18px rgba(201,145,47,.1);
+}
+
+.combat-bag-header {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 10px 8px 12px;
+  border-bottom: 1px solid rgba(201,145,47,.24);
+  color: var(--text-bright);
+}
+
+.combat-bag-close {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid rgba(201,145,47,.36);
+  background: rgba(201,145,47,.08);
+  color: var(--text-bright);
+  font: inherit;
+  font-size: 1.2em;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.combat-bag-list {
   display: flex;
   flex-direction: column;
   gap: 8px;
   overflow-y: auto;
   padding: 12px;
-  border: 1px solid rgba(201,145,47,.45);
-  border-radius: 8px;
-  background: rgba(16,14,12,.98);
-  box-shadow: 0 16px 42px rgba(0,0,0,.58), 0 0 18px rgba(201,145,47,.1);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .combat-bag-item {
   text-align: left;
@@ -10803,14 +10844,17 @@ body::before {
   }
 
   .combat-bag-panel {
-    position: relative;
-    order: 3;
-    left: auto;
-    bottom: auto;
+    position: fixed;
+    inset: 0;
     transform: none;
-    width: 100%;
-    max-height: 180px;
-    z-index: 3;
+    width: auto;
+    max-height: none;
+    z-index: 260;
+  }
+
+  .combat-bag-dialog {
+    width: min(360px, calc(100vw - 20px));
+    max-height: min(58dvh, 330px);
   }
 
   .combat-squad-card {

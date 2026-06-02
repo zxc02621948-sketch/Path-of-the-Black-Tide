@@ -1908,17 +1908,25 @@ const RenderModal = {
     const intentArrowHtml = this._combatIntentArrowHtml(combat);
     const bagHtml = combat.showBag ? `
       <div class="combat-bag-panel">
-        ${bagItems.length > 0 ? bagItems.map(entry => {
-          const item = entry.item;
-          const blocked = item.useType === 'roll_mod' && combat.rollItemBlocked;
-          const countText = entry.count > 1 ? ` x${entry.count}` : '';
-          const tutorialItemClass = tutorialTarget === 'bag_item' && item.id === 'whetstone' ? ' combat-tutorial-highlight' : '';
-          const indexArg = JSON.stringify(entry.index);
-          return `<button class="combat-bag-item${tutorialItemClass}" data-item-id="${this._escapeAttr(item.id || '')}" ${blocked ? 'disabled' : ''} onclick="Game.selectCombatBagItem(${this._escapeAttr(indexArg)})">
-            <span>${EquipmentIcon.label(item, 'equipment-inline-icon item-combat-icon')}${countText}</span>
-            <small>${blocked ? '本次攻擊已使用擲骰道具' : item.desc}</small>
-          </button>`;
-        }).join('') : '<div class="combat-bag-empty">背包沒有可在戰鬥中使用的道具</div>'}
+        <div class="combat-bag-dialog" role="dialog" aria-label="小隊背包">
+          <div class="combat-bag-header">
+            <strong>小隊背包</strong>
+            <button type="button" class="combat-bag-close" onclick="Game.openCombatBag()" aria-label="關閉背包">×</button>
+          </div>
+          <div class="combat-bag-list">
+            ${bagItems.length > 0 ? bagItems.map(entry => {
+              const item = entry.item;
+              const blocked = item.useType === 'roll_mod' && combat.rollItemBlocked;
+              const countText = entry.count > 1 ? ` x${entry.count}` : '';
+              const tutorialItemClass = tutorialTarget === 'bag_item' && item.id === 'whetstone' ? ' combat-tutorial-highlight' : '';
+              const indexArg = JSON.stringify(entry.index);
+              return `<button class="combat-bag-item${tutorialItemClass}" data-item-id="${this._escapeAttr(item.id || '')}" ${blocked ? 'disabled' : ''} onclick="Game.selectCombatBagItem(${this._escapeAttr(indexArg)})">
+                <span>${EquipmentIcon.label(item, 'equipment-inline-icon item-combat-icon')}${countText}</span>
+                <small>${blocked ? '本次攻擊已使用擲骰道具' : item.desc}</small>
+              </button>`;
+            }).join('') : '<div class="combat-bag-empty">背包沒有可在戰鬥中使用的道具</div>'}
+          </div>
+        </div>
       </div>
     ` : '';
 
