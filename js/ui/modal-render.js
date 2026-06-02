@@ -1368,8 +1368,8 @@ const RenderModal = {
     if (darkAvatar) {
       sourceRect = opts.sourceEl?.querySelector?.('.combat-enemy-sprite')?.getBoundingClientRect?.() || sourceRect;
     }
-    const sourceX = sourceRect.left + sourceRect.width / 2;
-    const sourceY = sourceRect.top + sourceRect.height / 2;
+    let sourceX = sourceRect.left + sourceRect.width / 2;
+    let sourceY = sourceRect.top + sourceRect.height / 2;
     const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker || shellImpact || jawBite || poisonCloud;
     const enemyFigureRect = fixedTargetTrail && opts.side === 'enemy'
       ? targetEl.querySelector('.combat-enemy-figure')?.getBoundingClientRect?.()
@@ -1390,10 +1390,23 @@ const RenderModal = {
       : targetEl.classList.contains('has-card-bg') && fixedTargetTrail
       ? targetRect.top + 118
       : (impactRect === targetRect ? targetRect.top + (opts.side === 'ally' ? 54 : 72) : impactRect.top + impactRect.height / 2);
+    const stackedCombat = sceneRect.width <= 820;
+    if (stackedCombat && darkAvatar && opts.side === 'ally') {
+      sourceX = targetX;
+      if (sourceY > targetY - 80) {
+        sourceY = targetY - Math.max(160, Math.min(240, sceneRect.height * 0.32));
+      }
+    }
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
     const distance = Math.max(120, Math.hypot(dx, dy));
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
+    const mobileTargetHitAngle = fixedTargetTrail && stackedCombat
+      ? (opts.side === 'enemy' ? 0 : 90)
+      : angle;
+    const trailAngle = stackedCombat && darkAvatar && opts.side === 'ally'
+      ? 90
+      : mobileTargetHitAngle;
     const fx = document.createElement('div');
     const trailClass = String(trail).replace(/_/g, '-');
     fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}`;
@@ -1402,11 +1415,11 @@ const RenderModal = {
       fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
       fx.style.top = `${Math.round(sourceY - sceneRect.top)}px`;
       fx.style.width = `${Math.round(distance)}px`;
-      fx.style.setProperty('--trail-angle', `${angle}deg`);
+      fx.style.setProperty('--trail-angle', `${trailAngle}deg`);
     } else if (fixedTargetTrail) {
       fx.style.left = `${Math.round(targetX - sceneRect.left)}px`;
       fx.style.top = `${Math.round(targetY - sceneRect.top)}px`;
-      fx.style.setProperty('--trail-angle', `${angle}deg`);
+      fx.style.setProperty('--trail-angle', `${trailAngle}deg`);
     } else {
       fx.style.left = `${Math.round(targetX - sceneRect.left)}px`;
       fx.style.top = `${Math.round(targetY - sceneRect.top)}px`;
