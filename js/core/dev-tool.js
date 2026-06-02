@@ -456,11 +456,27 @@ const GameDevTool = {
       title: '測試工具：戰鬥演出',
       desc: '選擇要在假戰鬥畫面中播放的效果。',
       typeText: false,
-      choices: options.map(option => ({
+      choices: [
+        { label: '傷害分級演出', detail: '用 8 / 15 / 25 / 45 / 75 / 110 傷害預覽分段震動與放大。', action: () => this._devChooseDamageTierEffect() },
+      ].concat(options.map(option => ({
         label: option.name,
         detail: option.detail || '',
         action: () => this._devPreviewCombatEffect(option.id),
-      })).concat([{ label: '返回', action: () => this._devOpenEffectTool() }]),
+      }))).concat([{ label: '返回', action: () => this._devOpenEffectTool() }]),
+    });
+  },
+
+  _devChooseDamageTierEffect() {
+    const options = this._devDamageTierEffectOptions();
+    this._openModal({
+      title: '測試工具：傷害分級演出',
+      desc: '選擇傷害值預覽階級演出。預設使用裂星破滅，方便看特效放大、圖卡震動與畫面震動。',
+      typeText: false,
+      choices: options.map(option => ({
+        label: option.name,
+        detail: option.detail || '',
+        action: () => this._devPreviewDamageTierEffect(option.id),
+      })).concat([{ label: '返回', action: () => this._devChooseCombatEffect() }]),
     });
   },
 
@@ -469,7 +485,7 @@ const GameDevTool = {
       { id: 'bow', name: '弓射擊', detail: '一般弓箭飛行與命中。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', damage: 5 },
       { id: 'sword', name: '劍攻擊', detail: '劍系斬擊 sprite。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', damage: 6 },
       { id: 'dagger', name: '匕首攻擊', detail: '匕首斬擊 sprite。', weaponFamily: 'dagger', attackTrail: 'slash', hitEffect: 'slash', damage: 5 },
-      { id: 'silver_bee_pin', name: '銀蜂針', detail: '銀蜂針共鳴射擊。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'silver_bee_pin', damage: 6 },
+      { id: 'silver_bee_pin', name: '銀蜂針', detail: '銀蜂針共鳴射擊。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'silver_bee_pin', damage: 6, previewHits: 5, followDelayMs: [320, 278, 236, 194, 152] },
       { id: 'iron_scabbard', name: '沉鐵劍鞘', detail: '重擊命中與持有者強化。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'iron_scabbard', damage: 8 },
       { id: 'star_hunter_eye', name: '獵星之眼', detail: '弓箭先命中，準星再啟動。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_hunter_eye', damage: 7 },
       { id: 'star_breaker', name: '裂星破滅', detail: '弓箭命中後觸發裂星爆破與重擊。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_breaker', damage: 12 },
@@ -478,22 +494,69 @@ const GameDevTool = {
     ];
   },
 
+  _devDamageTierEffectOptions() {
+    return [
+      { id: 'tier_light', name: '8 傷：輕擊', detail: '特效偏小，只晃敵人本體。', damage: 8, sfxVolume: 0.3, relicSfxVolume: 0.28 },
+      { id: 'tier_solid', name: '15 傷：普通命中', detail: '特效回到標準尺寸，圖卡小晃。', damage: 15, sfxVolume: 0.36, relicSfxVolume: 0.34 },
+      { id: 'tier_heavy', name: '25 傷：重擊', detail: '特效放大，圖卡大晃並短紅閃。', damage: 25, sfxVolume: 0.44, relicSfxVolume: 0.44 },
+      { id: 'tier_burst', name: '45 傷：高爆發', detail: '特效更大，戰鬥區輕震並短曝光。', damage: 45, sfxVolume: 0.5, relicSfxVolume: 0.52 },
+      { id: 'tier_surge', name: '75 傷：超爆發', detail: '戰鬥區明顯震動，紅白/黑白曝光更強。', damage: 75, sfxVolume: 0.56, relicSfxVolume: 0.62 },
+      { id: 'tier_finisher', name: '110 傷：斬殺級', detail: '最大特效、短暫停頓、大震與強曝光。', damage: 110, sfxVolume: 0.62, relicSfxVolume: 0.72 },
+    ];
+  },
+
   _devPreviewCombatEffect(effectId) {
     const option = this._devCombatEffectOptions().find(item => item.id === effectId);
     if (!option) return;
+    this._devPreviewCombatEffectOption(option, () => this._devPreviewCombatEffect(effectId), () => this._devChooseCombatEffect());
+  },
+
+  _devPreviewDamageTierEffect(effectId) {
+    const tierOption = this._devDamageTierEffectOptions().find(item => item.id === effectId);
+    if (!tierOption) return;
+    const option = {
+      id: tierOption.id,
+      name: tierOption.name,
+      detail: tierOption.detail,
+      weaponFamily: 'bow',
+      attackTrail: 'pierce',
+      hitEffect: 'pierce',
+      relicFx: 'star_breaker',
+      damage: tierOption.damage,
+      sfx: 'bowShot',
+      sfxVolume: tierOption.sfxVolume,
+      relicSfx: 'ironScabbardSlice',
+      relicSfxVolume: tierOption.relicSfxVolume,
+    };
+    this._devPreviewCombatEffectOption(option, () => this._devPreviewDamageTierEffect(effectId), () => this._devChooseDamageTierEffect());
+  },
+
+  _devPreviewCombatEffectOption(option, replayAction, backAction) {
     const combat = this._devEffectCombatScene(option);
     const attackerId = combat.attackerId;
     const damage = Math.max(1, option.damage || 6);
     const enemyHp = combat.enemy.hp;
-    const damageEvent = {
+    const previewHits = option.previewHits || 1;
+    const damageEvents = [];
+    let hpCursor = enemyHp;
+    for (let i = 0; i < previewHits; i++) {
+      const from = hpCursor;
+      hpCursor = Math.max(0, hpCursor - damage);
+      damageEvents.push({
       type: 'primary',
       damage,
-      from: enemyHp,
-      to: Math.max(0, enemyHp - damage),
+      from,
+      to: hpCursor,
       attackTrail: option.attackTrail || option.hitEffect || 'strike',
       hitEffect: option.hitEffect || option.attackTrail || 'strike',
       relicFx: option.relicFx || '',
-    };
+      sfx: option.sfx || this._devCombatEffectSfx(option),
+      sfxVolume: option.sfxVolume ?? 0.44,
+      relicSfx: option.relicSfx || (['star_hunter_eye', 'star_breaker'].includes(option.relicFx || '') ? 'ironScabbardSlice' : ''),
+      relicSfxVolume: option.relicSfxVolume ?? 0.48,
+      followDelayMs: option.followDelayMs?.[i] || null,
+      });
+    }
     this._openModal({
       title: `效果演出：${option.name}`,
       desc: option.detail || '戰鬥演出預覽。',
@@ -503,15 +566,24 @@ const GameDevTool = {
         delay: 120,
         lockActions: false,
         playerAttacker: attackerId,
-        playerFollowHits: 1,
-        playerDamageEvents: [damageEvent],
+        playerFollowHits: damageEvents.length,
+        playerDamageEvents: damageEvents,
       },
       choices: [
-        { label: '重播', action: () => this._devReplayEffectPreview(() => this._devPreviewCombatEffect(effectId)) },
-        { label: '返回', action: () => this._devChooseCombatEffect() },
+        { label: '重播', action: () => this._devReplayEffectPreview(replayAction) },
+        { label: '返回', action: backAction },
         { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
       ],
     });
+  },
+
+  _devCombatEffectSfx(option = {}) {
+    if (option.relicFx === 'iron_scabbard') return 'ironScabbardSlice';
+    if (option.relicFx === 'silver_bee_pin') return 'silverBeePinCut';
+    if (option.weaponFamily === 'bow') return 'bowShot';
+    if (option.weaponFamily === 'dagger') return 'daggerWoosh';
+    if (option.weaponFamily === 'sword') return 'swordWoosh';
+    return '';
   },
 
   _devEffectCombatScene(option = {}) {

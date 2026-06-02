@@ -761,6 +761,7 @@ const CombatRules = {
           attackTrail: 'pierce',
           sfx: rapierRelic?.id === 'silver_bee_pin' ? 'silverBeePinCut' : '',
           relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
+          followDelayMs: rapierRelic?.id === 'silver_bee_pin' ? Math.max(150, 320 - rapierFollowHits * 42) : null,
         });
         playerDamageEvents.push({
           type: 'rapier',
@@ -771,6 +772,7 @@ const CombatRules = {
           attackTrail: 'pierce',
           sfx: rapierRelic?.id === 'silver_bee_pin' ? 'silverBeePinCut' : '',
           relicFx: rapierRelic?.id === 'silver_bee_pin' ? 'silver_bee_pin' : '',
+          followDelayMs: rapierRelic?.id === 'silver_bee_pin' ? Math.max(150, 320 - rapierFollowHits * 42) : null,
         });
         damage += currentFollowDamage;
         rapierFollowHits++;

@@ -19,6 +19,8 @@ const AudioManager = {
     daggerWoosh: 'assets/audio/sfx/dagger-woosh.wav',
     silverBeePinCut: 'assets/audio/sfx/silver-bee-pin-cut.mp3',
     ironScabbardSlice: 'assets/audio/sfx/iron-scabbard-slice.mp3',
+    damageTierSurgeElectric: 'assets/audio/sfx/damage-tier-surge-electric.mp3',
+    damageTierFinisherRumble: 'assets/audio/sfx/damage-tier-finisher-rumble.wav',
     darkMonsterGrowl: 'assets/audio/sfx/dark-monster-growl.mp3',
     shadowWormSpawnGrowl: 'assets/audio/sfx/shadow-worm-spawn-growl.wav',
     rotCrawlerSpawnHiss: 'assets/audio/sfx/rot-crawler-spawn-hiss.wav',

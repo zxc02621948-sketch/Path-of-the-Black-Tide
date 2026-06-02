@@ -458,21 +458,22 @@ const RenderModal = {
       const healEvents = Array.isArray(cfg.combatAnims.healEvents) ? cfg.combatAnims.healEvents : [];
       const playerFollowHits = Math.max(0, cfg.combatAnims.playerFollowHits || 0, playerDamageEvents.length);
       const playerFollowStepMs = 380;
+      const playerFollowTotalMs = this._combatPlayerFollowTotalMs(playerDamageEvents, playerFollowHits, playerFollowStepMs);
       const guardBlock = Math.max(0, cfg.combatAnims.guardBlock || 0);
       const hasEnemyBlockChange = Number.isFinite(cfg.combatAnims.enemyBlockBefore) || Number.isFinite(cfg.combatAnims.enemyBlockAfter);
       const hasNextRoundEvasion = cfg.combatAnims.nextRoundEvasionByChar && Object.keys(cfg.combatAnims.nextRoundEvasionByChar).length > 0;
       const hasCombatAnim = playerFollowHits > 0 || incomingDamageEvents.length > 0 || healEvents.length > 0 || guardBlock > 0 || hasEnemyBlockChange || hasNextRoundEvasion || !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe || cfg.combatAnims.enemyBlock);
       const hasEnemyAttack = !!(cfg.combatAnims.counterTarget || cfg.combatAnims.aoe);
       const enemyDiceWindup = hasEnemyAttack && cfg.enemyDice && cfg.enemyDice.animate !== false ? 760 : 0;
-      const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowHits * playerFollowStepMs + (incomingDamageEvents.length > 0 ? 520 : 0) + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
+      const lockMs = delay + (guardBlock > 0 ? 260 : 0) + playerFollowTotalMs + (incomingDamageEvents.length > 0 ? 520 : 0) + (cfg.combatAnims.enemyBlock ? 220 : 0) + enemyDiceWindup + (healEvents.length > 0 ? 520 : 0) + 720;
       if (cfg.combat?.enemy?.defeated) {
         const defeatDelay = playerDamageEvents.length > 0
-          ? delay + playerFollowHits * playerFollowStepMs + 120
+          ? delay + playerFollowTotalMs + 120
           : delay + 240;
         this._scheduleCombatEnemyDefeatState(combatSceneEl, defeatDelay, cfg.combat.enemy);
       }
       if (playerDamageEvents.length > 0) {
-        this._deferCombatResultText(descEl, delay + playerFollowHits * playerFollowStepMs + 120);
+        this._deferCombatResultText(descEl, delay + playerFollowTotalMs + 120);
       }
       if (hasCombatAnim && combatActionsEl && cfg.combatAnims.lockActions !== false) {
         const buttons = [...new Set([
@@ -577,6 +578,9 @@ const RenderModal = {
   },
 
   _openChoiceDetailModal(parentCfg, choice) {
+    const replaySafeParentCfg = parentCfg?.combatAnims
+      ? { ...parentCfg, combatAnims: null }
+      : parentCfg;
     const detailCfg = {
       title: choice.detailTitle || choice.label,
       desc: String(choice.detail || ''),
@@ -590,8 +594,8 @@ const RenderModal = {
         {
           label: choice.backLabel || '返回',
           action: () => {
-            if (typeof G !== 'undefined') G.modal = parentCfg;
-            this.showModal(parentCfg);
+            if (typeof G !== 'undefined') G.modal = replaySafeParentCfg;
+            this.showModal(replaySafeParentCfg);
           },
         },
       ],
@@ -1289,15 +1293,26 @@ const RenderModal = {
     }
   },
 
+  _combatPlayerFollowTotalMs(damageEvents = [], followHits = 0, defaultStep = 380) {
+    const step = Math.max(260, defaultStep || 380);
+    let total = 0;
+    for (let i = 0; i < followHits; i++) {
+      const customStep = Number(damageEvents[i]?.followDelayMs);
+      total += Number.isFinite(customStep) && customStep > 0 ? Math.max(120, customStep) : step;
+    }
+    return total;
+  },
+
   _showCombatDamageNumber(targetEl, damage, opts = {}) {
     if (!targetEl || !Number.isFinite(damage) || damage <= 0) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     if (!sceneEl) return;
+    const tier = opts.tier || this._combatDamageFxTier(damage);
     const targetRect = targetEl.getBoundingClientRect();
     const sceneRect = sceneEl.getBoundingClientRect();
     const pop = document.createElement('div');
     const kindClass = opts.kind ? ` ${opts.kind}` : '';
-    pop.className = `combat-damage-pop ${opts.side === 'ally' ? 'ally' : 'enemy'}${kindClass}`;
+    pop.className = `combat-damage-pop ${opts.side === 'ally' ? 'ally' : 'enemy'}${kindClass} damage-tier-${tier}`;
     pop.setAttribute('aria-hidden', 'true');
     const digits = String(Math.round(damage)).split('');
     if (opts.kind === 'heal') {
@@ -1326,11 +1341,12 @@ const RenderModal = {
     if (!targetEl || !effect) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     if (!sceneEl) return;
+    const tier = opts.tier || this._combatDamageFxTier(opts.damage || 0);
     const targetRect = targetEl.getBoundingClientRect();
     const sceneRect = sceneEl.getBoundingClientRect();
     const sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     const fx = document.createElement('div');
-    fx.className = `combat-hit-effect hit-${effect}`;
+    fx.className = `combat-hit-effect hit-${effect} fx-tier-${tier}`;
     fx.setAttribute('aria-hidden', 'true');
     const x = targetRect.left - sceneRect.left + targetRect.width / 2;
     const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 54 : 72);
@@ -1353,6 +1369,7 @@ const RenderModal = {
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     let sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     if (!sceneEl || !sourceRect) return;
+    const tier = opts.tier || this._combatDamageFxTier(opts.damage || 0);
     const targetRect = targetEl.getBoundingClientRect();
     const sceneRect = sceneEl.getBoundingClientRect();
     const sourceWeaponFamily = opts.weaponFamily || opts.sourceEl?.dataset?.weaponFamily || '';
@@ -1384,12 +1401,19 @@ const RenderModal = {
       ? targetEl.querySelector('.combat-unit-main')?.getBoundingClientRect?.()
       : null;
     const impactRect = allyArtRect || allyMainRect || enemySpriteRect || enemyFigureRect || targetRect;
-    const targetX = impactRect.left + impactRect.width / 2;
-    const targetY = darkAvatar && opts.side === 'ally'
+    let targetX = impactRect.left + impactRect.width / 2;
+    let targetY = darkAvatar && opts.side === 'ally'
       ? impactRect.top + impactRect.height * 0.42
       : targetEl.classList.contains('has-card-bg') && fixedTargetTrail
       ? targetRect.top + 118
       : (impactRect === targetRect ? targetRect.top + (opts.side === 'ally' ? 54 : 72) : impactRect.top + impactRect.height / 2);
+    const wanderingHitTrail = opts.side === 'enemy' && ['pierce', 'silver_bee_pin', 'star_hunter_eye'].includes(trail);
+    if (wanderingHitTrail) {
+      const spotRect = this._combatEnemyImageImpactRect(targetEl, impactRect);
+      const spot = this._combatWanderingHitSpot(targetEl, spotRect, trail);
+      targetX = spot.x;
+      targetY = spot.y;
+    }
     const stackedCombat = sceneRect.width <= 820;
     if (stackedCombat && darkAvatar && opts.side === 'ally') {
       sourceX = targetX;
@@ -1409,7 +1433,8 @@ const RenderModal = {
       : mobileTargetHitAngle;
     const fx = document.createElement('div');
     const trailClass = String(trail).replace(/_/g, '-');
-    fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}`;
+    const silverBeeSpeedClass = trail === 'silver_bee_pin' ? ` combo-speed-${this._combatSilverBeeComboSpeed(targetEl)}` : '';
+    fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}${silverBeeSpeedClass} fx-tier-${tier}`;
     fx.setAttribute('aria-hidden', 'true');
     if (trail === 'pierce' || trail === 'silver_bee_pin' || darkAvatar) {
       fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
@@ -1442,11 +1467,137 @@ const RenderModal = {
     FxPlayer.removeAfter(fx, durationByTrail[trail] || 620);
   },
 
+  _combatWanderingHitSpot(targetEl, impactRect, trail = '') {
+    const defaultSpots = [
+      { id: 'top', x: .5, y: .25 },
+      { id: 'midLeft', x: .32, y: .48 },
+      { id: 'midRight', x: .68, y: .48 },
+      { id: 'lowLeft', x: .38, y: .72 },
+      { id: 'lowRight', x: .62, y: .72 },
+    ];
+    const silverBeeSpots = [
+      { id: 'center', x: .5, y: .48 },
+      { id: 'nearLeft', x: .44, y: .43 },
+      { id: 'nearRight', x: .56, y: .43 },
+      { id: 'nearLowLeft', x: .46, y: .57 },
+      { id: 'nearLowRight', x: .54, y: .57 },
+    ];
+    const spots = trail === 'silver_bee_pin' ? silverBeeSpots : defaultSpots;
+    if (!this._combatHitSpotHistory) this._combatHitSpotHistory = new WeakMap();
+    const state = this._combatHitSpotHistory.get(targetEl) || { recent: [], cursor: -1 };
+    const blocked = new Set(state.recent.slice(-2));
+    const seed = trail === 'silver_bee_pin' ? 2 : (trail === 'star_hunter_eye' ? 3 : 1);
+    let nextIndex = (state.cursor + seed) % spots.length;
+    for (let tries = 0; tries < spots.length; tries++) {
+      const candidate = spots[nextIndex];
+      if (!blocked.has(candidate.id)) break;
+      nextIndex = (nextIndex + 1) % spots.length;
+    }
+    const spot = spots[nextIndex] || spots[0];
+    state.cursor = nextIndex;
+    state.recent = [...state.recent.slice(-1), spot.id];
+    this._combatHitSpotHistory.set(targetEl, state);
+    return {
+      x: impactRect.left + impactRect.width * spot.x,
+      y: impactRect.top + impactRect.height * spot.y,
+    };
+  },
+
+  _combatEnemyImageImpactRect(targetEl, fallbackRect) {
+    const imgRect = targetEl?.querySelector?.('.combat-enemy-img')?.getBoundingClientRect?.();
+    if (imgRect?.width > 8 && imgRect?.height > 8) return imgRect;
+    const spriteRect = targetEl?.querySelector?.('.combat-enemy-sprite')?.getBoundingClientRect?.();
+    if (spriteRect?.width > 8 && spriteRect?.height > 8) return spriteRect;
+    return fallbackRect;
+  },
+
+  _combatSilverBeeComboSpeed(targetEl) {
+    if (!targetEl) return 1;
+    if (!this._combatSilverBeeComboState) this._combatSilverBeeComboState = new WeakMap();
+    const now = performance.now();
+    const state = this._combatSilverBeeComboState.get(targetEl) || { count: 0, at: 0 };
+    const count = now - state.at < 1400 ? state.count + 1 : 1;
+    this._combatSilverBeeComboState.set(targetEl, { count, at: now });
+    return Math.min(4, count);
+  },
+
   _pulseCombatImpact(sceneEl, damage = 0, opts = {}) {
     if (!sceneEl) return;
-    const cls = opts.crushing ? 'combat-impact-crushing' : (damage >= 8 ? 'combat-impact-heavy' : 'combat-impact-light');
-    sceneEl.classList.remove('combat-impact-light', 'combat-impact-heavy', 'combat-impact-crushing');
-    FxPlayer.restartClass(sceneEl, cls, opts.crushing ? 430 : (damage >= 8 ? 280 : 210));
+    const tier = opts.tier || this._combatDamageFxTier(damage);
+    const sceneClassByTier = {
+      light: '',
+      solid: '',
+      heavy: '',
+      burst: 'combat-impact-burst',
+      surge: 'combat-impact-surge',
+      finisher: 'combat-impact-finisher',
+    };
+    sceneEl.classList.remove('combat-impact-light', 'combat-impact-heavy', 'combat-impact-crushing', 'combat-impact-burst', 'combat-impact-surge', 'combat-impact-finisher', 'combat-hit-stop');
+    const cls = sceneClassByTier[tier] || '';
+    if (cls) FxPlayer.restartClass(sceneEl, cls, tier === 'finisher' ? 560 : (tier === 'surge' ? 460 : 360));
+    if (tier === 'surge' || tier === 'finisher') {
+      this._playCombatTierImpactSfx(tier);
+      this._pulseCombatWorldImpact(tier);
+    }
+    if (tier === 'finisher') {
+      sceneEl.classList.add('combat-hit-stop');
+      setTimeout(() => sceneEl.classList.remove('combat-hit-stop'), 110);
+    }
+  },
+
+  _pulseCombatWorldImpact(tier = '') {
+    const body = document.body;
+    if (!body) return;
+    const classes = ['combat-world-impact-surge', 'combat-world-impact-finisher'];
+    body.classList.remove(...classes);
+    const cls = tier === 'finisher' ? 'combat-world-impact-finisher' : (tier === 'surge' ? 'combat-world-impact-surge' : '');
+    if (!cls) return;
+    FxPlayer.restartClass(body, cls, tier === 'finisher' ? 560 : 460);
+  },
+
+  _playCombatTierImpactSfx(tier = '') {
+    const sfx = tier === 'finisher'
+      ? { id: 'damageTierSurgeElectric', volume: 0.68 }
+      : (tier === 'surge' ? { id: 'damageTierFinisherRumble', volume: 0.54 } : null);
+    if (!sfx) return;
+    const now = performance.now();
+    if (this._lastCombatTierImpactSfx?.id === sfx.id && now - this._lastCombatTierImpactSfx.at < 220) return;
+    this._lastCombatTierImpactSfx = { id: sfx.id, at: now };
+    AudioManager?.playSfx?.(sfx.id, sfx.volume);
+  },
+
+  _combatPreImpactDelay(tier = '') {
+    if (tier === 'finisher') return 260;
+    if (tier === 'surge') return 160;
+    return 0;
+  },
+
+  _playCombatPreImpact(sceneEl, tier = '') {
+    if (!sceneEl || !['surge', 'finisher'].includes(tier)) return;
+    const cls = tier === 'finisher' ? 'combat-preimpact-finisher' : 'combat-preimpact-surge';
+    sceneEl.classList.remove('combat-preimpact-surge', 'combat-preimpact-finisher');
+    FxPlayer.restartClass(sceneEl, cls, tier === 'finisher' ? 260 : 160);
+    document.body?.classList?.remove?.('combat-preimpact-world-surge', 'combat-preimpact-world-finisher');
+    FxPlayer.restartClass(document.body, tier === 'finisher' ? 'combat-preimpact-world-finisher' : 'combat-preimpact-world-surge', tier === 'finisher' ? 260 : 160);
+  },
+
+  _combatDamageFxTier(damage = 0) {
+    const value = Math.max(0, Number(damage) || 0);
+    if (value >= 90) return 'finisher';
+    if (value >= 60) return 'surge';
+    if (value >= 35) return 'burst';
+    if (value >= 20) return 'heavy';
+    if (value >= 10) return 'solid';
+    return 'light';
+  },
+
+  _playCombatDamageReaction(targetEl, damage = 0, opts = {}) {
+    if (!targetEl) return this._combatDamageFxTier(damage);
+    const tier = opts.tier || this._combatDamageFxTier(damage);
+    const classes = ['combat-damage-react-light', 'combat-damage-react-solid', 'combat-damage-react-heavy', 'combat-damage-react-burst', 'combat-damage-react-surge', 'combat-damage-react-finisher'];
+    targetEl.classList.remove(...classes);
+    FxPlayer.restartClass(targetEl, `combat-damage-react-${tier}`, tier === 'finisher' ? 620 : (tier === 'surge' ? 540 : 430));
+    return tier;
   },
 
   _preloadCombatDamageDigits() {
@@ -1475,12 +1626,23 @@ const RenderModal = {
     const damageEvents = Array.isArray(playerDamageEvents) ? playerDamageEvents : [];
     const incomingEvents = Array.isArray(incomingDamageEvents) ? incomingDamageEvents : [];
     const healingEvents = Array.isArray(healEvents) ? healEvents : [];
+    const maxIncomingDamage = incomingEvents.reduce((max, event) => Math.max(max, Number(event?.damage) || 0), 0);
     const remainingBlocks = guardRemainingBlockByChar && typeof guardRemainingBlockByChar === 'object' ? guardRemainingBlockByChar : null;
     const nextRoundBlocks = nextRoundBlockByChar && typeof nextRoundBlockByChar === 'object' ? nextRoundBlockByChar : null;
     const nextRoundEvasions = nextRoundEvasionByChar && typeof nextRoundEvasionByChar === 'object' ? nextRoundEvasionByChar : null;
     const shouldShowGuard = Math.max(0, guardBlock || 0) > 0;
     const followHits = Math.max(0, playerFollowHits || 0, damageEvents.length);
     const followStep = Math.max(260, playerFollowStepMs || 380);
+    let accumulatedFollowDelay = 0;
+    const followDelays = Array.from({ length: followHits }, (_, index) => {
+      const delay = accumulatedFollowDelay;
+      const customStep = Number(damageEvents[index]?.followDelayMs);
+      accumulatedFollowDelay += Number.isFinite(customStep) && customStep > 0
+        ? Math.max(120, customStep)
+        : followStep;
+      return delay;
+    });
+    const totalFollowDelay = followDelays.length ? accumulatedFollowDelay : 0;
     if (!followHits && !incomingEvents.length && !healingEvents.length && !shouldShowGuard && !counterTarget && !aoe && !enemyBlock && !remainingBlocks && !nextRoundBlocks && !nextRoundEvasions) return;
     let lastBlockUpSfxAt = 0;
     const playBlockUpSfx = () => {
@@ -1561,61 +1723,73 @@ const RenderModal = {
         }
         if (enemyCard) {
           setTimeout(() => {
-            FxPlayer.restartClass(enemyCard, 'anim-hit', 300);
             const damageEvent = damageEvents[i];
             if (damageEvent) {
-              const relicFx = damageEvent.relicFx || '';
-              const delayedRelicFx = ['star_hunter_eye', 'star_breaker'].includes(relicFx);
-              const attackTrail = delayedRelicFx
-                ? (damageEvent.attackTrail || damageEvent.hitEffect)
-                : (relicFx || damageEvent.attackTrail || damageEvent.hitEffect);
-              const hitEffect = damageEvent.hitEffect || '';
-              const layeredWeaponHit = ['slash', 'strike', 'pierce', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(attackTrail);
-              const visualHitEffect = relicFx ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
-              const heavyRelicImpact = ['iron_scabbard', 'star_breaker'].includes(relicFx);
-              this._pulseCombatImpact(combatScene, damageEvent.damage, { crushing: heavyRelicImpact });
-              if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, 0.44);
-              this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
-              if (Number.isFinite(damageEvent.enemyBlockAfter)) {
-                this._setDisplayedEnemyBlock(damageEvent.enemyBlockAfter);
-                if (damageEvent.enemyBlockAbsorbed > 0 && damageEvent.damage <= 0) playFullBlockSfx();
-              }
-              if (delayedRelicFx) {
-                setTimeout(() => {
-                  this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
-                }, 180);
-              }
-              if (heavyRelicImpact) {
-                setTimeout(() => {
-                  FxPlayer.restartClass(enemyCard, 'anim-heavy-relic-hit', 620);
-                }, delayedRelicFx ? 180 : 0);
-              }
-              if (relicFx === 'iron_scabbard' && attackerEl) {
-                setTimeout(() => {
-                  FxPlayer.restartClass(attackerEl, 'anim-iron-scabbard-empower', 760);
-                }, 160);
-              }
-              if (visualHitEffect && (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail)) {
-                this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl });
-              }
-              const showDamageNumber = () => this._showCombatDamageNumber(enemyCard, damageEvent.damage, {
-                side: 'enemy',
-                scene: combatScene,
-                offsetY: relicFx ? -24 : 0,
-              });
-              setTimeout(showDamageNumber, delayedRelicFx ? 300 : (relicFx ? 220 : 140));
+              const fxTier = this._combatDamageFxTier(damageEvent.damage);
+              const preImpactDelay = this._combatPreImpactDelay(fxTier);
+              if (preImpactDelay) this._playCombatPreImpact(combatScene, fxTier);
+              const playHit = () => {
+                this._playCombatDamageReaction(enemyCard, damageEvent.damage, { tier: fxTier });
+                const relicFx = damageEvent.relicFx || '';
+                const delayedRelicFx = ['star_hunter_eye', 'star_breaker'].includes(relicFx);
+                const attackTrail = delayedRelicFx
+                  ? (damageEvent.attackTrail || damageEvent.hitEffect)
+                  : (relicFx || damageEvent.attackTrail || damageEvent.hitEffect);
+                const hitEffect = damageEvent.hitEffect || '';
+                const layeredWeaponHit = ['slash', 'strike', 'pierce', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(attackTrail);
+                const visualHitEffect = relicFx ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
+                const heavyRelicImpact = ['iron_scabbard', 'star_breaker'].includes(relicFx);
+                this._pulseCombatImpact(combatScene, damageEvent.damage, { tier: fxTier });
+                if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, damageEvent.sfxVolume ?? 0.44);
+                this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                if (Number.isFinite(damageEvent.enemyBlockAfter)) {
+                  this._setDisplayedEnemyBlock(damageEvent.enemyBlockAfter);
+                  if (damageEvent.enemyBlockAbsorbed > 0 && damageEvent.damage <= 0) playFullBlockSfx();
+                }
+                if (delayedRelicFx) {
+                  setTimeout(() => {
+                    if (damageEvent.relicSfx) AudioManager?.playSfx?.(damageEvent.relicSfx, damageEvent.relicSfxVolume ?? 0.48);
+                    this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                  }, 180);
+                }
+                if (heavyRelicImpact) {
+                  setTimeout(() => {
+                    FxPlayer.restartClass(enemyCard, 'anim-heavy-relic-hit', 620);
+                  }, delayedRelicFx ? 180 : 0);
+                }
+                if (relicFx === 'iron_scabbard' && attackerEl) {
+                  setTimeout(() => {
+                    FxPlayer.restartClass(attackerEl, 'anim-iron-scabbard-empower', 760);
+                  }, 160);
+                }
+                if (visualHitEffect && (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail)) {
+                  this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                }
+                const showDamageNumber = () => this._showCombatDamageNumber(enemyCard, damageEvent.damage, {
+                  side: 'enemy',
+                  scene: combatScene,
+                  offsetY: relicFx ? -24 : 0,
+                  tier: fxTier,
+                });
+                const damageNumberDelay = delayedRelicFx ? 300 : (relicFx ? 220 : 140);
+                setTimeout(showDamageNumber, damageNumberDelay + (fxTier === 'finisher' ? 120 : 0));
+              };
+              setTimeout(playHit, preImpactDelay);
+            } else {
+              FxPlayer.restartClass(enemyCard, 'anim-hit', 300);
             }
           }, 120);
         }
         const damageEvent = damageEvents[i];
         if (damageEvent && Number.isFinite(damageEvent.to)) {
-          setTimeout(() => this._setDisplayedEnemyHp(damageEvent.to), 170);
+          const hpDelay = 170 + this._combatPreImpactDelay(this._combatDamageFxTier(damageEvent.damage));
+          setTimeout(() => this._setDisplayedEnemyHp(damageEvent.to), hpDelay);
         }
-      }, i * followStep);
+      }, followDelays[i] || 0);
     }
 
     // 敵方攻擊前先晃動提示
-    const followDelay = (shouldShowGuard ? 260 : 0) + followHits * followStep;
+    const followDelay = (shouldShowGuard ? 260 : 0) + totalFollowDelay;
     if (enemyBlock && enemyCard) {
       setTimeout(() => {
         playBlockUpSfx();
@@ -1645,16 +1819,16 @@ const RenderModal = {
       if (aoe) {
         if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, enemyAttackSfxVolume ?? 0.42);
         combatScene?.querySelectorAll('.combat-unit.ally:not(.empty-slot)').forEach(el => {
-          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily });
-          FxPlayer.restartClass(el, 'anim-hit', 420);
+          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily, damage: maxIncomingDamage });
         });
         for (const event of incomingEvents) {
           if (!event?.targetId) continue;
           const targetEl = findAllyUnit(event.targetId);
-          if (targetEl) this._pulseCombatImpact(combatScene, event.damage);
+          const fxTier = targetEl ? this._playCombatDamageReaction(targetEl, event.damage) : this._combatDamageFxTier(event.damage);
+          if (targetEl) this._pulseCombatImpact(combatScene, event.damage, { tier: fxTier });
           if (Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
           if (event.fullBlock) playFullBlockSfx();
-          if (targetEl) setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene }), 140);
+          if (targetEl) setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, { side: 'ally', scene: combatScene, tier: fxTier }), 140);
           if (Number.isFinite(event.to)) this._setDisplayedAllyHp(event.targetId, event.to);
           if (Number.isFinite(event.to) && event.to <= 0) playAllyDeathSfxOnce(event);
         }
@@ -1662,14 +1836,13 @@ const RenderModal = {
         const el = findAllyUnit(counterTarget);
         if (el) {
           if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, enemyAttackSfxVolume ?? 0.42);
-          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily });
-          el.classList.add('anim-hit');
           const event = incomingEvents.find(item => item?.targetId === counterTarget);
-          if (event) this._pulseCombatImpact(combatScene, event.damage);
+          const fxTier = event ? this._playCombatDamageReaction(el, event.damage) : 'light';
+          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily, damage: event?.damage || 0, tier: fxTier });
+          if (event) this._pulseCombatImpact(combatScene, event.damage, { tier: fxTier });
           if (event && Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
           if (event?.fullBlock) playFullBlockSfx();
-          if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene }), 140);
-          setTimeout(() => el.classList.remove('anim-hit'), 420);
+          if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene, tier: fxTier }), 140);
         }
         const event = incomingEvents.find(item => item?.targetId === counterTarget);
         if (event && Number.isFinite(event.to)) {
@@ -1696,13 +1869,14 @@ const RenderModal = {
           if (!event?.targetId) continue;
           const targetEl = findAllyUnit(event.targetId);
           if (!targetEl) continue;
-          this._pulseCombatImpact(combatScene, event.damage);
-          FxPlayer.restartClass(targetEl, 'anim-hit', 420);
+          const fxTier = this._playCombatDamageReaction(targetEl, event.damage);
+          this._pulseCombatImpact(combatScene, event.damage, { tier: fxTier });
           if (Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
           if (event.fullBlock) playFullBlockSfx();
           setTimeout(() => this._showCombatDamageNumber(targetEl, event.damage, {
             side: 'ally',
             scene: combatScene,
+            tier: fxTier,
           }), 120);
           if (Number.isFinite(event.to)) {
             setTimeout(() => this._setDisplayedAllyHp(event.targetId, event.to), 160);
