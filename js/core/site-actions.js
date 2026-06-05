@@ -1,7 +1,7 @@
 // Extracted from js/core/game.js. Keeps the original Game API while making this system easier to maintain.
 const GameSiteActions = {
   _canFieldRest() {
-    if (G.modal || G.phase !== 'day' || G.actionsLeft <= 0 || G.phase === 'over') return false;
+    if (this._isWorldInteractionLocked?.() || G.phase !== 'day' || G.actionsLeft <= 0 || G.phase === 'over') return false;
     return this._aliveSquad().some(char => char.hp < char.maxHp);
   },
 

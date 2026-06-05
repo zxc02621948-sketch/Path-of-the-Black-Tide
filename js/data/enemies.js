@@ -231,7 +231,7 @@ const ENEMIES = [
     attackTrail: 'dark_avatar',
     attackSfx: 'darkMonsterGrowl',
     attackSfxVolume: 0.36,
-    desc: '只在黑夜中現身的追獵者。牠會隨黑暗層數強化，但本體不再依天數升階。',
+    desc: '只在黑夜中現身的黑暗化身。牠會隨黑暗層數強化，但生成後不再依天數升階。',
     hp: 30,
     block: 4,
     attack: 3,
@@ -240,7 +240,7 @@ const ENEMIES = [
     weaknessEffect: { type: 'weaken_next_attack', amount: 1, desc: '黑霧裂解，此擊無視格檔，且黑暗化身下一次攻擊 -1' },
     nightOnly: true,
     darkMonsterBase: true,
-    lore: '沒有人知道它來自哪裡。有人說黑夜本身就是它的家。黑暗化身生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%；每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。',
+    lore: '沒有人知道它來自哪裡。有人說黑夜本身就是它的家。黑暗化身生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%；每 6 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。',
     intents: [
       { type: 'attack', weight: 4 },
       { type: 'block',  weight: 1 },

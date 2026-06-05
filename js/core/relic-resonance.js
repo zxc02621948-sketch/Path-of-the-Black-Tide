@@ -113,19 +113,46 @@ const GameRelicResonance = {
     const lead = resonances.length > 1
       ? '多股聖物氣息同時交疊，隊伍的戰鬥方式被重新改寫。'
       : '聖物彼此回應，沉睡的力量在這一刻成形。';
+    const visualRes = resonances.find(res => res?.iconImage) || null;
+    const sfxRes = resonances.find(res => res?.activateSfx) || visualRes || resonances[0] || null;
     this._openModal({
       title: resonances.length > 1 ? '聖物共鳴啟動' : `聖物共鳴啟動：${resonances[0]?.name || ''}`,
       descHtml: `
+        ${this._resonanceAwakenIconSceneHtml(visualRes)}
         <div class="resonance-awaken-copy compact">
           <p class="resonance-awaken-lead">${escape(lead)}</p>
           <div class="resonance-awaken-list compact">${rows}</div>
         </div>
       `,
       resultFx: 'resonance-awaken',
-      eventSfx: 'swordWoosh',
-      eventSfxVolume: 0.32,
+      eventSfx: sfxRes?.activateSfx || 'swordWoosh',
+      eventSfxVolume: Number.isFinite(sfxRes?.activateSfxVolume) ? sfxRes.activateSfxVolume : 0.32,
       choices: [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
+  },
+
+  _resonanceAwakenIconSceneHtml(res) {
+    if (!res?.iconImage) return '';
+    const escapeAttr = value => this._escapeAttrLocal
+      ? this._escapeAttrLocal(value)
+      : String(value ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const theme = this._resonanceAwakenTheme(res);
+    const style = [
+      `--res-primary:${theme.primary}`,
+      `--res-secondary:${theme.secondary}`,
+      `--res-shadow:${theme.shadow}`,
+    ].join(';');
+    const src = escapeAttr(res.iconImage);
+    const alt = escapeAttr(res.name || '共鳴');
+    return `
+      <div class="resonance-awaken-scene resonance-awaken-icon-scene resonance-theme-${escapeAttr(theme.key)}" style="${style}">
+        <span class="resonance-awaken-icon-burst resonance-awaken-icon-burst-a"></span>
+        <span class="resonance-awaken-icon-burst resonance-awaken-icon-burst-b"></span>
+        <span class="resonance-awaken-icon-ghost resonance-awaken-icon-ghost-a"><img src="${src}" alt=""></span>
+        <span class="resonance-awaken-icon-ghost resonance-awaken-icon-ghost-b"><img src="${src}" alt=""></span>
+        <span class="resonance-awaken-icon-core-img"><img src="${src}" alt="${alt}"></span>
+      </div>
+    `;
   },
 
   _resonanceAwakenTheme(res) {
@@ -178,6 +205,13 @@ const GameRelicResonance = {
         primary: 'rgba(92, 214, 255, .92)',
         secondary: 'rgba(255, 248, 172, .8)',
         shadow: 'rgba(18, 42, 96, .5)',
+      },
+      star_breaker_eye: {
+        key: 'breaker',
+        sigil: '破',
+        primary: 'rgba(255, 70, 54, .9)',
+        secondary: 'rgba(255, 214, 90, .78)',
+        shadow: 'rgba(96, 10, 10, .52)',
       },
     };
     return themes[res?.id] || {
@@ -261,6 +295,7 @@ const GameRelicResonance = {
         active.push({
           id: 'dodeca_fate_dice',
           name: '十二面命運骰',
+          iconImage: 'assets/relics/dodeca-fate-dice-resonance.png',
           isBody: true,
           bodyChar: char,
           effect: {
@@ -273,6 +308,7 @@ const GameRelicResonance = {
         active.push({
           id: 'dodeca_lucky_dice',
           name: '十二面幸運骰',
+          iconImage: 'assets/relics/dodeca-lucky-dice-resonance.png',
           isBody: true,
           bodyChar: char,
           effect: {
@@ -285,6 +321,7 @@ const GameRelicResonance = {
         active.push({
           id: 'star_hunter_eye',
           name: '獵星之眼',
+          iconImage: 'assets/relics/star-hunter-eye-resonance.png',
           isBody: true,
           bodyChar: char,
           effect: {
@@ -297,6 +334,7 @@ const GameRelicResonance = {
         active.push({
           id: 'star_breaker_eye',
           name: '裂星破滅',
+          iconImage: 'assets/relics/star-breaker-eye-resonance.png',
           isBody: true,
           bodyChar: char,
           effect: {
@@ -309,6 +347,7 @@ const GameRelicResonance = {
         active.push({
           id: 'dual_banner_formation',
           name: '雙旗戰陣',
+          iconImage: 'assets/relics/dual-banner-formation-resonance.png',
           isBody: true,
           bodyChar: char,
           relics: ['war_banner', 'eagle_banner'],

@@ -1,10 +1,13 @@
 // Extracted from js/core/game.js. Keeps the original object API while making this system easier to maintain.
 const GameDarkMonsters = {
   _triggerPendingDarkMonsterChase() {
-    if (G.modal || G.phase === 'over' || G.combat || G.nightTransitionActive) return false;
+    if (this._isWorldInteractionLocked?.() || G.nightTransitionActive) return false;
+    const limit = CONFIG.DARK_MONSTER_DAILY_PASSIVE_CHASE_LIMIT ?? 2;
+    if (limit > 0 && (G.darkMonsterChasesToday || 0) >= limit) return false;
     const monster = this._nextPendingDarkMonster();
     if (!monster) return false;
 
+    G.darkMonsterChasesToday = (G.darkMonsterChasesToday || 0) + 1;
     this._openPendingDarkMonsterChaseModal(monster);
     return true;
   },
@@ -20,6 +23,8 @@ const GameDarkMonsters = {
         '你們避無可避，無處可逃，只能被動迎戰。',
       ].join('\n\n'),
       resultFx: 'event-ambush',
+      eventBackdrop: 'assets/events/dark-avatar-chase-backdrop.png',
+      eventBackdropClass: 'dark-avatar-chase-backdrop',
       eventSfx: 'darkMonsterGrowl',
       eventSfxVolume: 0.62,
       choices: [{
@@ -148,7 +153,7 @@ const GameDarkMonsters = {
       attackTrail: 'dark_avatar',
       attackSfx: 'darkMonsterGrowl',
       attackSfxVolume: 0.36,
-      desc: `從黑暗 ${originalLevel} 中凝結出的化身。牠的強度由生成當下的黑暗層數決定：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。${crownNote}`,
+      desc: `從黑暗 ${originalLevel} 中凝結出的化身。牠的強度由生成當下的黑暗層數決定：每 1 層黑暗使生命 +10%，每 6 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。${crownNote}`,
       darkMonster: true,
       darkMonsterOriginalLevel: originalLevel,
       darkMonsterCombatLevel: combatLevel,
@@ -174,6 +179,10 @@ const GameDarkMonsters = {
   },
   _settleDarkMonsterPassiveVictory(monsterId, monsterRef = null) {
     const before = Math.max(0, Number(G.darkness) || 0);
+    const monsterLevel = Math.max(
+      0,
+      Math.floor(monsterRef?.level || G.combat?.enemy?.darkMonsterOriginalLevel || G.combat?.enemy?.darkMonsterCombatLevel || before)
+    );
     const beforeCount = Array.isArray(G.darkMonsters) ? G.darkMonsters.length : 0;
     if (Array.isArray(G.darkMonsters)) {
       G.darkMonsters = G.darkMonsters.filter(monster =>
@@ -182,8 +191,12 @@ const GameDarkMonsters = {
     }
     G.darkness = before;
     const removed = Array.isArray(G.darkMonsters) && G.darkMonsters.length < beforeCount;
-    this._log(`被動追殺勝利：黑暗維持 ${before}。`, 'reward');
-    return { before, after: G.darkness, reduction: 0, removed };
+    if (removed) {
+      if (!Array.isArray(G.darkMonsterRespawns)) G.darkMonsterRespawns = [];
+      G.darkMonsterRespawns.push({ level: monsterLevel });
+    }
+    this._log(`被動追殺勝利：黑暗化身潛伏，黑暗維持 ${before}。`, 'reward');
+    return { before, after: G.darkness, reduction: 0, removed, monsterLevel, willRespawn: removed };
   },
 
   _settleDarkMonsterActiveVictory(monsterId, monsterRef = null, opts = {}) {
@@ -239,6 +252,34 @@ const GameDarkMonsters = {
     this._showDarkMonsterSpawnIntroOnce?.();
     AudioManager?.playSfx?.('darkMonsterGrowl', 0.62);
     return true;
+  },
+
+  _respawnRoutedDarkMonsters() {
+    if (!Array.isArray(G.darkMonsterRespawns) || G.darkMonsterRespawns.length === 0) return 0;
+    if (!Array.isArray(G.darkMonsters)) G.darkMonsters = [];
+    const pending = G.darkMonsterRespawns.splice(0);
+    let spawned = 0;
+    for (const entry of pending) {
+      const cell = this._pickDarkMonsterSpawnCell();
+      if (!cell) {
+        G.darkMonsterRespawns.push(entry);
+        continue;
+      }
+      const level = Math.max(0, Math.floor(Number(entry?.level) || Number(G.darkness) || 0));
+      G.darkMonsters.push({
+        id: `dark_respawn_${G.day}_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+        level,
+        x: cell.x,
+        y: cell.y,
+        chaseTimer: 3,
+      });
+      spawned++;
+    }
+    if (spawned > 0) {
+      this._log('被擊退的黑暗化身在別處重新潛伏，追殺倒數重新開始。', 'danger');
+      AudioManager?.playSfx?.('darkMonsterGrowl', 0.46);
+    }
+    return spawned;
   },
 
   _maybeSpawnUniqueStrongEnemy() {

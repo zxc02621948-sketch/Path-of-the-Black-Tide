@@ -700,20 +700,16 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
     var(--c-rest);
 }
 #game-screen.night-mode .map-cell.type-rest:not(.cleared) {
-  border-color: rgba(116, 168, 255, .68);
+  border-color: rgba(122, 220, 255, .76);
   background:
-    radial-gradient(circle at 50% 48%, rgba(102, 158, 255, .28), rgba(8, 16, 38, .44) 68%),
-    linear-gradient(180deg, rgba(42, 70, 132, .18), rgba(7, 8, 24, .34)),
+    radial-gradient(circle at 50% 42%, rgba(116, 236, 255, .38), rgba(34, 104, 188, .26) 42%, rgba(5, 12, 34, .54) 78%),
+    linear-gradient(180deg, rgba(80, 170, 255, .32), rgba(8, 12, 34, .52)),
     url("assets/terrain/rest-tile.png") center / 116% 116% no-repeat,
     var(--c-rest);
   box-shadow:
-    inset 0 0 16px rgba(122, 178, 255, .18),
-    0 0 12px rgba(84, 132, 255, .3);
-}
-#game-screen.night-mode .map-cell.type-rest:not(.cleared) .cell-label {
-  color: #b9d6ff;
-  font-weight: 800;
-  text-shadow: 0 0 8px rgba(84, 132, 255, .52);
+    inset 0 0 18px rgba(118, 230, 255, .26),
+    inset 0 0 34px rgba(42, 82, 210, .20),
+    0 0 14px rgba(78, 178, 255, .36);
 }
 .map-cell.type-rest.cleared {
   background:
@@ -1609,6 +1605,32 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   text-shadow: 0 2px 8px rgba(0, 0, 0, .92);
 }
 
+.modal-content.event-backdrop-modal .event-backdrop-img.dark-avatar-chase-backdrop {
+  background-position: 50% 42%;
+}
+
+.modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop) {
+  width: min(900px, calc(100vw - 32px));
+  max-width: 900px;
+  min-height: min(620px, calc(100dvh - 44px));
+}
+
+.modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop)::after {
+  background:
+    radial-gradient(circle at 50% 42%, rgba(0, 0, 0, .04), rgba(0, 0, 0, .42) 62%, rgba(0, 0, 0, .72) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, .16) 0%, rgba(0, 0, 0, .5) 58%, rgba(0, 0, 0, .82) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, .52) 0%, rgba(0, 0, 0, .12) 46%, rgba(0, 0, 0, .46) 100%);
+}
+
+.modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop) #modal-desc {
+  max-width: min(560px, 72%);
+}
+
+.modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop) #modal-choices {
+  position: relative;
+  z-index: 1;
+}
+
 .modal-content.tutorial-backdrop-modal {
   width: min(900px, calc(100vw - 32px));
   max-width: 900px;
@@ -2294,6 +2316,88 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   pointer-events: none;
 }
 
+.resonance-awaken-icon-scene {
+  height: 176px;
+  margin-top: -2px;
+  margin-bottom: 12px;
+  isolation: isolate;
+}
+
+.resonance-awaken-icon-core-img,
+.resonance-awaken-icon-ghost,
+.resonance-awaken-icon-burst {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  pointer-events: none;
+}
+
+.resonance-awaken-icon-core-img,
+.resonance-awaken-icon-ghost {
+  width: min(168px, 40vw);
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+}
+
+.resonance-awaken-icon-core-img {
+  z-index: 3;
+  filter:
+    drop-shadow(0 0 12px var(--res-primary, rgba(230, 54, 42, .72)))
+    drop-shadow(0 0 30px var(--res-shadow, rgba(130, 0, 0, .52)));
+  animation: resonance-awaken-icon-core 1.36s cubic-bezier(.16, .78, .24, 1) both;
+}
+
+.resonance-awaken-icon-core-img img,
+.resonance-awaken-icon-ghost img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+.resonance-awaken-icon-ghost {
+  z-index: 2;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    saturate(1.35)
+    brightness(1.18)
+    drop-shadow(0 0 22px var(--res-primary, rgba(230, 54, 42, .72)));
+}
+
+.resonance-awaken-icon-ghost-a {
+  animation: resonance-awaken-icon-ghost-a .92s ease-out .08s both;
+}
+
+.resonance-awaken-icon-ghost-b {
+  animation: resonance-awaken-icon-ghost-b 1.18s ease-out .2s both;
+}
+
+.resonance-awaken-icon-burst {
+  z-index: 1;
+  width: min(250px, 56vw);
+  height: min(250px, 56vw);
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  background:
+    repeating-conic-gradient(from 10deg, transparent 0 8deg, var(--res-primary, rgba(230, 54, 42, .58)) 9deg 12deg, transparent 13deg 22deg),
+    radial-gradient(circle, rgba(255, 222, 176, .24), var(--res-primary, rgba(230, 54, 42, .18)) 32%, transparent 68%);
+  opacity: 0;
+  filter: blur(.2px) drop-shadow(0 0 22px var(--res-primary, rgba(230, 54, 42, .58)));
+  mix-blend-mode: screen;
+}
+
+.resonance-awaken-icon-burst-a {
+  animation: resonance-awaken-icon-burst .82s ease-out .04s both;
+}
+
+.resonance-awaken-icon-burst-b {
+  width: min(310px, 64vw);
+  height: min(310px, 64vw);
+  transform: translate(-50%, -50%) rotate(18deg);
+  animation: resonance-awaken-icon-burst 1.08s ease-out .16s both reverse;
+}
+
 .resonance-awaken-echo {
   position: absolute;
   left: 50%;
@@ -2653,6 +2757,31 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   100% { opacity: .92; transform: translate(-50%, -50%) scale(1); }
 }
 
+@keyframes resonance-awaken-icon-core {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.48); filter: blur(6px) drop-shadow(0 0 10px var(--res-primary, rgba(230, 54, 42, .72))); }
+  38% { opacity: 1; transform: translate(-50%, -50%) scale(1.14); filter: blur(0) drop-shadow(0 0 20px var(--res-primary, rgba(230, 54, 42, .82))); }
+  66% { transform: translate(-50%, -50%) scale(.98); }
+  100% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+}
+
+@keyframes resonance-awaken-icon-ghost-a {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.86); }
+  18% { opacity: .5; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.48); }
+}
+
+@keyframes resonance-awaken-icon-ghost-b {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.96) rotate(0deg); }
+  22% { opacity: .28; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.82) rotate(3deg); }
+}
+
+@keyframes resonance-awaken-icon-burst {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.42) rotate(-10deg); }
+  28% { opacity: .75; }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.18) rotate(24deg); }
+}
+
 @keyframes resonance-awaken-echo {
   0% { opacity: 0; transform: translate(-50%, -50%) scale(.32) rotate(-9deg); filter: blur(6px); }
   28% { opacity: .82; transform: translate(-50%, -50%) scale(1) rotate(0deg); filter: blur(0); }
@@ -2689,9 +2818,9 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 @keyframes event-intro-image-focus {
-  0% { opacity: 0; transform: scale(1.055); filter: brightness(.56) saturate(.86) blur(2px); }
+  0% { opacity: 0; filter: brightness(.56) saturate(.86) blur(2px); }
   26% { opacity: 1; }
-  100% { opacity: 1; transform: scale(1); filter: brightness(.9) saturate(1) blur(0); }
+  100% { opacity: 1; filter: brightness(.9) saturate(1) blur(0); }
 }
 
 @keyframes event-intro-illustration-focus {
@@ -3689,6 +3818,19 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
     saturate(1.12)
     drop-shadow(0 0 20px rgba(82, 220, 255, .36))
     drop-shadow(0 0 28px rgba(118, 48, 255, .48));
+}
+
+.combat-enemy-card.reel-combat-enemy .combat-enemy-figure {
+  min-height: 176px;
+  height: 176px;
+  margin-top: -14px;
+  margin-bottom: -8px;
+}
+
+.combat-enemy-card.reel-combat-enemy .combat-enemy-img.large {
+  width: calc(228px * var(--dark-avatar-scale, 1));
+  height: calc(228px * var(--dark-avatar-scale, 1));
+  margin: -54px -68px -72px;
 }
 
 .combat-enemy-card.enemy-abyss_warden .combat-enemy-sprite,
@@ -6238,6 +6380,21 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   filter: drop-shadow(0 8px 14px rgba(0, 0, 0, .9)) drop-shadow(0 0 30px rgba(255, 38, 28, .86)) drop-shadow(0 0 22px rgba(255, 250, 224, .58));
 }
 
+.combat-damage-pop.critical::after {
+  content: "爆擊";
+  position: absolute;
+  right: -1.8em;
+  top: -.48em;
+  color: #fff0b8;
+  font: 900 .34em/1 var(--font-sans);
+  letter-spacing: 0;
+  text-shadow:
+    0 1px 0 rgba(92, 16, 10, .96),
+    0 0 10px rgba(255, 42, 26, .88),
+    0 0 18px rgba(255, 230, 130, .72);
+  white-space: nowrap;
+}
+
 .combat-damage-pop.heal {
   min-width: 38px;
   color: #a9f0b0;
@@ -6548,6 +6705,127 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 
 .combat-attack-trail.trail-star-breaker::after {
   display: none;
+}
+
+.combat-attack-trail.trail-fate-d12-weakness {
+  width: 272px;
+  height: 153px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg)) scale(var(--combat-fx-mobile-scale)) scale(var(--combat-fx-tier-scale));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-fate-d12-weakness::before {
+  left: 50%;
+  top: 50%;
+  width: 272px;
+  height: 153px;
+  border-radius: 0;
+  background: url("assets/effects/fate-d12-weakness-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.2) saturate(1.24) contrast(1.08)
+    drop-shadow(0 0 14px rgba(246, 72, 255, .82))
+    drop-shadow(0 0 26px rgba(126, 30, 255, .6));
+  mix-blend-mode: screen;
+  animation:
+    fate-d12-weakness-impact .58s cubic-bezier(.1, .72, .16, 1) forwards,
+    fate-d12-weakness-frames .58s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-fate-d12-weakness::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-fate-d12-burst {
+  width: 332px;
+  height: 194px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg)) scale(var(--combat-fx-mobile-scale)) scale(var(--combat-fx-tier-scale));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-fate-d12-burst::before {
+  left: 50%;
+  top: 50%;
+  width: 332px;
+  height: 194px;
+  border-radius: 0;
+  background: url("assets/effects/fate-d12-burst-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.28) saturate(1.34) contrast(1.12)
+    drop-shadow(0 0 18px rgba(255, 80, 255, .9))
+    drop-shadow(0 0 34px rgba(122, 32, 255, .72))
+    drop-shadow(0 0 46px rgba(255, 226, 146, .34));
+  mix-blend-mode: screen;
+  animation:
+    fate-d12-burst-impact .72s cubic-bezier(.08, .72, .14, 1) forwards,
+    fate-d12-burst-frames .72s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-fate-d12-burst::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-lucky-d12-weakness {
+  width: 280px;
+  height: 160px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg)) scale(var(--combat-fx-mobile-scale)) scale(var(--combat-fx-tier-scale));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-lucky-d12-weakness::before {
+  left: 50%;
+  top: 50%;
+  width: 280px;
+  height: 160px;
+  border-radius: 0;
+  background: url("assets/effects/lucky-d12-weakness-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.22) saturate(1.2) contrast(1.08)
+    drop-shadow(0 0 14px rgba(255, 214, 72, .82))
+    drop-shadow(0 0 26px rgba(255, 142, 20, .58));
+  mix-blend-mode: screen;
+  animation:
+    fate-d12-weakness-impact .58s cubic-bezier(.1, .72, .16, 1) forwards,
+    fate-d12-weakness-frames .58s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-lucky-d12-weakness::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-lucky-d12-burst {
+  width: 352px;
+  height: 206px;
+  transform: translate(-50%, -50%) rotate(var(--trail-angle, 0deg)) scale(var(--combat-fx-mobile-scale)) scale(var(--combat-fx-tier-scale));
+  transform-origin: 50% 50%;
+}
+
+.combat-attack-trail.trail-lucky-d12-burst::before {
+  left: 50%;
+  top: 50%;
+  width: 352px;
+  height: 206px;
+  border-radius: 0;
+  background: url("assets/effects/lucky-d12-burst-sprite.png") 0 0 / 400% 200% no-repeat;
+  box-shadow: none;
+  filter: brightness(1.3) saturate(1.32) contrast(1.12)
+    drop-shadow(0 0 18px rgba(255, 226, 90, .9))
+    drop-shadow(0 0 34px rgba(255, 148, 24, .72))
+    drop-shadow(0 0 46px rgba(255, 244, 184, .34));
+  mix-blend-mode: screen;
+  animation:
+    fate-d12-burst-impact .72s cubic-bezier(.08, .72, .14, 1) forwards,
+    fate-d12-burst-frames .72s steps(1, end) forwards;
+}
+
+.combat-attack-trail.trail-lucky-d12-burst::after {
+  display: none;
+}
+
+.combat-attack-trail.trail-slash.trail-dagger-slash.palette-fate-d12::before {
+  filter: hue-rotate(255deg) saturate(2.55) brightness(1.16) contrast(1.12)
+    drop-shadow(0 0 11px rgba(236, 64, 255, .82))
+    drop-shadow(0 0 20px rgba(132, 42, 255, .58));
+  mix-blend-mode: screen;
 }
 
 .combat-attack-trail.trail-shell-impact {
@@ -6951,6 +7229,45 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   58%  { background-position: 0 100%; }
   74%  { background-position: 33.333% 100%; }
   90%,
+  100% { background-position: 66.666% 100%; }
+}
+
+@keyframes fate-d12-weakness-impact {
+  0%   { opacity: 0; transform: translate(-62%, -45%) rotate(-8deg) scale(.36); }
+  10%  { opacity: .92; }
+  44%  { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(.98); }
+  70%  { opacity: .9; transform: translate(-46%, -54%) rotate(-8deg) scale(1.05); }
+  100% { opacity: 0; transform: translate(-42%, -58%) rotate(-8deg) scale(1.12); }
+}
+
+@keyframes fate-d12-weakness-frames {
+  0%   { background-position: 0 0; }
+  14%  { background-position: 33.333% 0; }
+  28%  { background-position: 66.666% 0; }
+  42%  { background-position: 100% 0; }
+  58%  { background-position: 0 100%; }
+  74%  { background-position: 33.333% 100%; }
+  90%,
+  100% { background-position: 66.666% 100%; }
+}
+
+@keyframes fate-d12-burst-impact {
+  0%   { opacity: 0; transform: translate(-64%, -44%) rotate(-8deg) scale(.34); }
+  8%   { opacity: .96; }
+  36%  { opacity: 1; transform: translate(-50%, -50%) rotate(-8deg) scale(1.04); }
+  62%  { opacity: .98; transform: translate(-47%, -54%) rotate(-8deg) scale(1.16); }
+  82%  { opacity: .72; transform: translate(-44%, -57%) rotate(-8deg) scale(1.24); }
+  100% { opacity: 0; transform: translate(-40%, -60%) rotate(-8deg) scale(1.32); }
+}
+
+@keyframes fate-d12-burst-frames {
+  0%   { background-position: 0 0; }
+  12%  { background-position: 33.333% 0; }
+  24%  { background-position: 66.666% 0; }
+  36%  { background-position: 100% 0; }
+  50%  { background-position: 0 100%; }
+  66%  { background-position: 33.333% 100%; }
+  82%,
   100% { background-position: 66.666% 100%; }
 }
 
@@ -8610,6 +8927,25 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
     background-position: 50% 24%;
   }
 
+  .modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop) {
+    min-height: min(620px, calc(100dvh - 28px));
+  }
+
+  .modal-content.event-backdrop-modal .event-backdrop-img.dark-avatar-chase-backdrop {
+    background-position: 50% 20%;
+  }
+
+  .modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop)::after {
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, .12) 0%, rgba(0, 0, 0, .34) 34%, rgba(0, 0, 0, .9) 100%),
+      radial-gradient(circle at 50% 22%, rgba(0, 0, 0, .02), rgba(0, 0, 0, .42) 58%, rgba(0, 0, 0, .78) 100%);
+  }
+
+  .modal-content.event-backdrop-modal:has(.dark-avatar-chase-backdrop) #modal-desc {
+    max-width: none;
+    margin-top: auto;
+  }
+
   .tutorial-page-event .tutorial-layout {
     min-height: 340px;
     align-items: end;
@@ -8689,12 +9025,29 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .tutorial-dark-token.timer-yellow {
   --monster-glow-a: rgba(237, 190, 80, .9);
   --monster-glow-b: rgba(237, 190, 80, .52);
+  width: 44px;
+  height: 44px;
+}
+
+.tutorial-dark-token.timer-yellow img {
+  width: 35px;
+  height: 35px;
 }
 
 .tutorial-dark-token.timer-red,
 .tutorial-dark-token.timer-danger {
   --monster-glow-a: rgba(255, 80, 96, .96);
   --monster-glow-b: rgba(255, 80, 96, .6);
+  width: 52px;
+  height: 52px;
+  animation: darkMonsterGuideAlert .95s ease-in-out infinite;
+}
+
+.tutorial-dark-token.timer-red img,
+.tutorial-dark-token.timer-danger img {
+  width: 43px;
+  height: 43px;
+  filter: saturate(1.8) hue-rotate(-10deg) brightness(1.18) contrast(1.06);
 }
 
 .modal-content.dark-avatar-intro-modal {
@@ -9040,6 +9393,17 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   width: 1.55em;
   height: 1.55em;
 }
+
+.resonance-note-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  display: block;
+  filter:
+    drop-shadow(0 0 5px var(--res-primary, rgba(230, 54, 42, .42)))
+    drop-shadow(0 0 10px var(--res-shadow, rgba(130, 0, 0, .28)));
+}
+
 .relic-note-name  { font-size: .82em; color: var(--text); line-height: 1.25; }
 .relic-note-count { font-size: .76em; color: var(--text-dim); }
 .relic-resonance-section {
@@ -9051,14 +9415,87 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   gap: 10px;
 }
 .resonance-note-icon {
+  position: relative;
+  overflow: hidden;
   min-height: 108px;
   padding: 11px 8px;
   font-family: var(--font-sans);
   color: inherit;
 }
+.resonance-note-icon.has-resonance-img::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  width: 68px;
+  height: 58px;
+  transform: translateX(-50%);
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 44%,
+      var(--res-primary, rgba(230, 54, 42, .42)) 0%,
+      var(--res-secondary, rgba(255, 178, 112, .28)) 38%,
+      rgba(0, 0, 0, 0) 74%);
+  filter: blur(7px);
+  opacity: .52;
+  pointer-events: none;
+}
 .resonance-note-icon .relic-note-emoji {
+  position: relative;
+  z-index: 1;
   font-size: 1.65em;
 }
+.resonance-note-icon .relic-note-name {
+  position: relative;
+  z-index: 1;
+}
+
+.resonance-note-icon .relic-note-emoji:has(.resonance-note-img) {
+  min-height: 50px;
+}
+
+.resonance-detail-title-icon {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 62px;
+  height: 54px;
+  flex: 0 0 auto;
+  isolation: isolate;
+}
+.resonance-detail-title-icon::before {
+  content: "";
+  position: absolute;
+  inset: 3px 2px;
+  border-radius: 999px;
+  background:
+    radial-gradient(circle at 50% 48%,
+      var(--res-primary, rgba(230, 54, 42, .42)) 0%,
+      var(--res-secondary, rgba(255, 178, 112, .26)) 42%,
+      rgba(0, 0, 0, 0) 76%);
+  filter: blur(7px);
+  opacity: .68;
+  z-index: 0;
+}
+.resonance-detail-title-img {
+  position: relative;
+  z-index: 1;
+  width: 38px;
+  height: 38px;
+  object-fit: contain;
+  filter:
+    drop-shadow(0 0 4px var(--res-primary, rgba(230, 54, 42, .28)))
+    drop-shadow(0 0 8px var(--res-shadow, rgba(130, 0, 0, .18)));
+}
+
+.relic-lore-title.has-resonance-img {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 54px;
+  padding: 6px 0 8px;
+}
+
 .resonance-note-icon .relic-note-name {
   font-size: 1em;
   line-height: 1.35;
@@ -10284,6 +10721,16 @@ body::before {
     0 0 22px rgba(80, 216, 190, .42);
 }
 
+#map-hint {
+  max-width: min(100%, 520px);
+  padding: 5px 12px;
+  border: 1px solid rgba(226, 167, 62, .22);
+  border-radius: 999px;
+  color: #d9c38f;
+  background: rgba(0, 0, 0, .34);
+  box-shadow: inset 0 0 12px rgba(0, 0, 0, .34);
+}
+
 .map-cell.unique-strong-target:not(.cleared) {
   border-color: rgba(205, 64, 92, .95);
   background:
@@ -10314,6 +10761,49 @@ body::before {
   text-shadow:
     0 1px 3px rgba(0, 0, 0, .86),
     0 0 10px rgba(120, 235, 214, .44);
+}
+
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player) {
+  z-index: 12;
+  border-color: rgba(255, 224, 118, .98);
+  box-shadow:
+    inset 0 0 12px rgba(255, 235, 128, .30),
+    inset 0 0 28px rgba(255, 164, 40, .18),
+    0 0 0 2px rgba(255, 226, 104, .78),
+    0 0 18px rgba(255, 186, 58, .62),
+    0 0 30px rgba(255, 226, 104, .30);
+}
+
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player)::before,
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player)::after {
+  content: "";
+  position: absolute;
+  inset: -8px;
+  z-index: 1;
+  border: 2px solid rgba(255, 226, 104, .88);
+  border-radius: 50%;
+  opacity: 0;
+  pointer-events: none;
+  animation: echo-site-resonance-wave 1.35s ease-out infinite;
+}
+
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player)::after {
+  inset: 6px;
+  border: 1px solid rgba(255, 247, 178, .88);
+  border-radius: 4px;
+  background:
+    linear-gradient(120deg, transparent 0%, rgba(255, 245, 166, .14) 42%, rgba(255, 245, 166, .50) 50%, rgba(255, 245, 166, .14) 58%, transparent 100%);
+  animation: echo-site-resonance-sweep 1.55s ease-in-out infinite;
+}
+
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player) .echo-site-marker {
+  z-index: 3;
+  animation: echo-site-resonance-glow 1.1s ease-in-out infinite alternate;
+}
+
+.map-cell.echo-site-resonance-match:not(.fog):not(.cleared):not(.has-player) .cell-label {
+  position: relative;
+  z-index: 3;
 }
 
 .echo-site-marker {
@@ -10370,6 +10860,75 @@ body::before {
 .echo-site-marker-banner {
   --echo-site-color: rgba(255, 210, 112, .96);
   --echo-site-glow: rgba(230, 156, 60, .48);
+}
+
+.map-cell.echo-site-system-wound {
+  --echo-site-color: rgba(238, 108, 120, .94);
+  --echo-site-glow: rgba(220, 64, 92, .46);
+}
+
+.map-cell.echo-site-system-eagle {
+  --echo-site-color: rgba(126, 226, 255, .94);
+  --echo-site-glow: rgba(82, 178, 230, .46);
+}
+
+.map-cell.echo-site-system-fate {
+  --echo-site-color: rgba(214, 164, 255, .94);
+  --echo-site-glow: rgba(160, 86, 230, .48);
+}
+
+.map-cell.echo-site-system-banner {
+  --echo-site-color: rgba(255, 210, 112, .96);
+  --echo-site-glow: rgba(230, 156, 60, .48);
+}
+
+@keyframes echo-site-resonance-wave {
+  0% {
+    opacity: .92;
+    transform: scale(.66);
+    box-shadow: 0 0 8px rgba(255, 226, 104, .78);
+  }
+  70% {
+    opacity: .22;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.66);
+    box-shadow: 0 0 24px rgba(255, 186, 58, .18);
+  }
+}
+
+@keyframes echo-site-resonance-sweep {
+  0% {
+    opacity: 0;
+    transform: translateX(-28%) skewX(-14deg);
+  }
+  30% {
+    opacity: .72;
+  }
+  62% {
+    opacity: .48;
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(28%) skewX(-14deg);
+  }
+}
+
+@keyframes echo-site-resonance-glow {
+  from {
+    filter:
+      drop-shadow(0 0 7px rgba(255, 226, 104, .72))
+      drop-shadow(0 0 5px var(--echo-site-glow, rgba(122, 238, 218, .64)))
+      drop-shadow(0 2px 5px rgba(0, 0, 0, .72));
+  }
+  to {
+    filter:
+      drop-shadow(0 0 14px rgba(255, 226, 104, .98))
+      drop-shadow(0 0 10px rgba(255, 150, 34, .62))
+      drop-shadow(0 0 7px var(--echo-site-color, rgba(122, 238, 218, .62)))
+      drop-shadow(0 2px 5px rgba(0, 0, 0, .72));
+  }
 }
 
 .cell-icon {
@@ -10451,12 +11010,15 @@ body::before {
 
 .dark-monster {
   position: absolute;
-  top: calc(50% - 14px);
-  left: calc(50% - 14px);
+  --monster-size: 28px;
+  --monster-half-size: 14px;
+  --monster-icon-size: 27px;
+  top: calc(50% - var(--monster-half-size));
+  left: calc(50% - var(--monster-half-size));
   right: auto;
   z-index: 4;
-  width: 28px;
-  height: 28px;
+  width: var(--monster-size);
+  height: var(--monster-size);
   display: block;
   --monster-breathe-scale: 1.05;
   --monster-breathe-speed: 2.2s;
@@ -10486,8 +11048,8 @@ body::before {
 }
 
 .dark-monster-icon img {
-  width: 27px;
-  height: 27px;
+  width: var(--monster-icon-size);
+  height: var(--monster-icon-size);
   object-fit: contain;
   display: block;
   margin: auto;
@@ -10519,6 +11081,9 @@ body::before {
 }
 
 .dark-monster.timer-green {
+  --monster-size: 26px;
+  --monster-half-size: 13px;
+  --monster-icon-size: 25px;
   --monster-breathe-scale: 1.04;
   --monster-breathe-speed: 2.4s;
   --monster-glow-a: rgba(95, 191, 106, .8);
@@ -10526,18 +11091,25 @@ body::before {
 }
 
 .dark-monster.timer-yellow {
-  --monster-breathe-scale: 1.08;
-  --monster-breathe-speed: 1.8s;
+  --monster-size: 33px;
+  --monster-half-size: 16.5px;
+  --monster-icon-size: 32px;
+  --monster-breathe-scale: 1.12;
+  --monster-breathe-speed: 1.45s;
   --monster-glow-a: rgba(237, 190, 80, .9);
   --monster-glow-b: rgba(237, 190, 80, .52);
 }
 
 .dark-monster.timer-red {
-  --monster-breathe-scale: 1.2;
-  --monster-breathe-speed: .92s;
+  --monster-size: 40px;
+  --monster-half-size: 20px;
+  --monster-icon-size: 39px;
+  --monster-breathe-scale: 1.18;
+  --monster-breathe-speed: .72s;
   --monster-glow-a: rgba(255, 80, 96, .96);
   --monster-glow-b: rgba(255, 80, 96, .6);
   animation: darkMonsterAlert var(--monster-breathe-speed) ease-in-out infinite;
+  z-index: 8;
 }
 
 .dark-monster.timer-red .dark-monster-icon img {
@@ -10551,11 +11123,15 @@ body::before {
 }
 
 .dark-monster.timer-danger {
-  --monster-breathe-scale: 1.28;
-  --monster-breathe-speed: .58s;
+  --monster-size: 44px;
+  --monster-half-size: 22px;
+  --monster-icon-size: 43px;
+  --monster-breathe-scale: 1.24;
+  --monster-breathe-speed: .5s;
   --monster-glow-a: rgba(255, 54, 76, 1);
   --monster-glow-b: rgba(255, 54, 76, .72);
   animation: darkMonsterAlert var(--monster-breathe-speed) ease-in-out infinite;
+  z-index: 9;
 }
 
 .dark-monster.timer-danger .dark-monster-icon img {
@@ -10602,6 +11178,27 @@ body::before {
   }
   64% {
     transform: translate(1px, 0) scale(1.06);
+  }
+}
+
+@keyframes darkMonsterGuideAlert {
+  0%, 100% {
+    transform: translate(0, 0) scale(1);
+    filter:
+      drop-shadow(0 0 6px var(--monster-glow-a))
+      drop-shadow(0 0 14px var(--monster-glow-b));
+  }
+  22% {
+    transform: translate(-1px, 0) scale(1.08);
+  }
+  38% {
+    transform: translate(1px, -1px) scale(1.15);
+    filter:
+      drop-shadow(0 0 9px var(--monster-glow-a))
+      drop-shadow(0 0 22px var(--monster-glow-b));
+  }
+  58% {
+    transform: translate(-1px, 1px) scale(1.08);
   }
 }
 
@@ -11139,6 +11736,10 @@ body::before {
 
   .combat-attack-trail.trail-star-hunter-eye,
   .combat-attack-trail.trail-star-breaker,
+  .combat-attack-trail.trail-fate-d12-weakness,
+  .combat-attack-trail.trail-fate-d12-burst,
+  .combat-attack-trail.trail-lucky-d12-weakness,
+  .combat-attack-trail.trail-lucky-d12-burst,
   .combat-attack-trail.trail-poison-cloud {
     --combat-fx-mobile-scale: .82;
   }

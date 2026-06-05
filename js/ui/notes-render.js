@@ -183,7 +183,7 @@ const RenderNotes = {
         items: [
           ['行動', '白天移動、探索與原地休息會消耗行動。夜晚黑暗化身會追擊隊伍，黑夜結束今天時黑暗會更快壯大。'],
           ['原地休息', '白天可消耗 1 行動，讓全體存活角色恢復 2 HP。無法復活倒下角色。'],
-          ['黑暗化身', '黑暗化身使用固定基底，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。擊敗追殺黑暗化身只會移除該化身，不會降低黑暗；主動討伐可使黑暗 -2，並讓其他黑暗化身追殺延後 1 天。主動討伐中若本場曾命中並擊破原生弱點，額外黑暗 -1，每場最多一次。'],
+          ['黑暗化身', '黑暗化身使用固定基底，生成時會依當下黑暗層數決定強度：每 1 層黑暗使生命 +10%，每 6 層黑暗使攻擊 +1。生成後不會因黑暗繼續上升而即時變強。每天最多觸發 2 場被動追殺，其他已追上的黑暗化身會延後繼續追擊。擊敗追殺黑暗化身只會暫時擊退，黑暗不變；隔天牠會在別處重新潛伏並繼續追殺。主動討伐可使黑暗 -2，並讓其他黑暗化身追殺延後 1 天。主動討伐中若本場曾命中並擊破原生弱點，額外黑暗 -1，每場最多一次。'],
           ['休息點', '休息點可以恢復生命；使用過的休息點會依照規則重新變為可用。'],
           ['神壇', '神壇每日可用一次。血祭需探索骰判定；融合聖物消耗 1 行動且必定成功。'],
           ['藏寶圖', '藏寶圖會指引一處寶箱位置。黑暗化身不應吞掉已生成的寶箱獎勵。'],
@@ -286,13 +286,25 @@ const RenderNotes = {
 
     const grid = document.createElement('div');
     grid.className = 'relic-note-grid resonance-note-grid';
+    const escapeAttr = value => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/"/g, '&quot;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
     for (const res of this._resonanceNotes()) {
+      const theme = this._resonanceNoteTheme(res);
       const relicDisplays = (res.relics || []).map(id => this._relicDisplay(this._getRelicById(id) || { id }));
+      const iconHtml = res.iconImage
+        ? `<img class="resonance-note-img" src="${escapeAttr(res.iconImage)}" alt="">`
+        : relicDisplays.map(display => display.iconHtml || display.icon).join('');
       const item = document.createElement('button');
       item.type = 'button';
-      item.className = 'relic-note-icon resonance-note-icon';
+      item.className = `relic-note-icon resonance-note-icon resonance-theme-${theme.key}${res.iconImage ? ' has-resonance-img' : ''}`;
+      item.style.setProperty('--res-primary', theme.primary);
+      item.style.setProperty('--res-secondary', theme.secondary);
+      item.style.setProperty('--res-shadow', theme.shadow);
       item.innerHTML = `
-        <span class="relic-note-emoji">${relicDisplays.map(display => display.iconHtml || display.icon).join('')}</span>
+        <span class="relic-note-emoji">${iconHtml}</span>
         <span class="relic-note-name">${res.name}</span>
       `;
       item.addEventListener('click', () => {
@@ -318,8 +330,18 @@ const RenderNotes = {
     container.appendChild(back);
 
     const title = document.createElement('div');
-    title.className = 'relic-lore-title';
-    title.textContent = res.name;
+    const theme = this._resonanceNoteTheme(res);
+    title.className = `relic-lore-title resonance-theme-${theme.key}${res.iconImage ? ' has-resonance-img' : ''}`;
+    title.style.setProperty('--res-primary', theme.primary);
+    title.style.setProperty('--res-secondary', theme.secondary);
+    title.style.setProperty('--res-shadow', theme.shadow);
+    const escapeDetailText = value => String(value ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+    title.innerHTML = res.iconImage
+      ? `<span class="resonance-detail-title-icon"><img class="resonance-detail-title-img" src="${String(res.iconImage).replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}" alt=""></span><span>${escapeDetailText(res.name)}</span>`
+      : escapeDetailText(res.name);
     container.appendChild(title);
 
     const body = document.createElement('div');
@@ -395,8 +417,8 @@ const RenderNotes = {
         ['\u50b7\u53e3\u7206\u767c', '\u50b7\u53e3\u9054 10 \u5c64\u6642\u5f15\u7206\uff0c\u6bcf\u5c64\u9020\u6210 2 \u9ede\u56fa\u5b9a\u50b7\u5bb3\uff0c\u7206\u767c\u5f8c\u4fdd\u7559\u7d04\u4e09\u5206\u4e4b\u4e00\u50b7\u53e3\u3002'],
       ],
       pain_scar_resonance: [
-        ['傷口', '每層傷口通常會使該單位受到傷害提高 5%；折磨共鳴保留敵人身上的這個增傷。'],
-        ['高層傷口', '折磨共鳴在 5 層以上開始額外放大傷害，10 層以上會進入更高加成。'],
+        ['傷口', '每層傷口通常會使該單位受到傷害提高 5%；痛痕折磨保留敵人身上的這個增傷。'],
+        ['高層傷口', '痛痕折磨在 5 層以上開始額外放大傷害，10 層以上會進入更高加成。'],
       ],
       greatsword_resonance: [
         ['氣勢', '氣勢會提高持有者的基礎攻擊力。氣勢 1 等於基礎攻擊 +1，持續到本場戰鬥結束。'],
@@ -741,11 +763,77 @@ const RenderNotes = {
     };
   },
 
+  _resonanceNoteTheme(res) {
+    const themes = {
+      pain_resonance: {
+        key: 'pain',
+        primary: 'rgba(230, 54, 42, .92)',
+        secondary: 'rgba(255, 178, 112, .78)',
+        shadow: 'rgba(130, 0, 0, .52)',
+      },
+      pain_scar_resonance: {
+        key: 'scar',
+        primary: 'rgba(190, 40, 86, .9)',
+        secondary: 'rgba(255, 134, 174, .76)',
+        shadow: 'rgba(92, 0, 38, .52)',
+      },
+      greatsword_resonance: {
+        key: 'iron',
+        primary: 'rgba(228, 180, 96, .92)',
+        secondary: 'rgba(118, 210, 198, .72)',
+        shadow: 'rgba(68, 46, 18, .52)',
+      },
+      rapier_resonance: {
+        key: 'bee',
+        primary: 'rgba(190, 242, 255, .92)',
+        secondary: 'rgba(255, 214, 96, .76)',
+        shadow: 'rgba(18, 74, 92, .5)',
+      },
+      star_hunter_eye: {
+        key: 'eye',
+        primary: 'rgba(92, 214, 255, .92)',
+        secondary: 'rgba(255, 248, 172, .8)',
+        shadow: 'rgba(18, 42, 96, .5)',
+      },
+      star_breaker_eye: {
+        key: 'breaker',
+        primary: 'rgba(255, 70, 54, .9)',
+        secondary: 'rgba(255, 214, 90, .78)',
+        shadow: 'rgba(96, 10, 10, .52)',
+      },
+      dodeca_fate_dice: {
+        key: 'fate',
+        primary: 'rgba(184, 116, 255, .92)',
+        secondary: 'rgba(255, 222, 122, .8)',
+        shadow: 'rgba(54, 18, 96, .52)',
+      },
+      dodeca_lucky_dice: {
+        key: 'lucky',
+        primary: 'rgba(255, 228, 112, .94)',
+        secondary: 'rgba(124, 218, 255, .78)',
+        shadow: 'rgba(100, 74, 10, .5)',
+      },
+      dual_banner_formation: {
+        key: 'banner',
+        primary: 'rgba(230, 42, 42, .88)',
+        secondary: 'rgba(255, 220, 106, .74)',
+        shadow: 'rgba(82, 12, 8, .5)',
+      },
+    };
+    return themes[res?.resonanceTheme || res?.id] || {
+      key: 'default',
+      primary: 'rgba(126, 255, 232, .9)',
+      secondary: 'rgba(255, 211, 128, .76)',
+      shadow: 'rgba(24, 88, 82, .5)',
+    };
+  },
+
   _resonanceNotes() {
     return [
       {
         id: 'pain_resonance',
-        name: '痛痕共鳴・爆發',
+        name: '痛痕爆發',
+        iconImage: 'assets/relics/pain-burst-resonance.png',
         relics: ['pain_mask', 'pain_splinter_badge'],
         desc: '同身：融合痛苦面具 + 痛苦徽記。',
         body: '\u653b\u64ca\u6642\u4e0d\u5403\u50b7\u53e3\u589e\u50b7\uff1b\u9020\u6210\u50b7\u5bb3\u5f8c\u4f9d\u6700\u7d42\u9ab0\u9762\u9644\u52a0\u50b7\u53e3\u3002\u50b7\u53e3\u9054 10 \u5c64\u6642\u5f15\u7206\uff0c\u6bcf\u5c64\u9020\u6210 2 \u9ede\u56fa\u5b9a\u50b7\u5bb3\uff0c\u7206\u767c\u5f8c\u4fdd\u7559\u7d04\u4e09\u5206\u4e4b\u4e00\u50b7\u53e3\u3002',
@@ -753,15 +841,17 @@ const RenderNotes = {
       },
       {
         id: 'pain_scar_resonance',
-        name: '痛痕共鳴・折磨',
+        name: '痛痕折磨',
+        iconImage: 'assets/relics/pain-torment-resonance.png',
         relics: ['pain_splinter_badge', 'pain_mask'],
         desc: '同身：融合痛苦徽記 + 痛苦面具。',
         body: '持有者攻擊 5 層以上傷口的敵人時，該次擊中最終傷害額外提高 30%；若目標有 10 層以上傷口，改為提高 50%。',
-        detail: ['折磨共鳴不消耗傷口，適合長線堆疊與多段命中。'],
+        detail: ['痛痕折磨不消耗傷口，適合長線堆疊與多段命中。'],
       },
       {
         id: 'greatsword_resonance',
         name: '沉鐵劍律',
+        iconImage: 'assets/relics/iron-scabbard-resonance.png',
         relics: ['iron_scabbard', 'silver_bee_pin'],
         desc: '同身：融合沉鐵劍鞘 + 銀蜂針。',
         body: '銀蜂針不再觸發刺劍連擊，改為強化重劍。重劍命中後，除了沉鐵劍鞘原本的氣勢外，額外獲得 3 點氣勢。氣勢 1 等於基礎攻擊 +1；此外，每 5 點既有氣勢，使本次重劍傷害 +1。',
@@ -770,6 +860,7 @@ const RenderNotes = {
       {
         id: 'rapier_resonance',
         name: '銀蜂劍律',
+        iconImage: 'assets/relics/silver-bee-rapier-resonance.png',
         relics: ['silver_bee_pin', 'iron_scabbard'],
         desc: '同身：融合銀蜂針 + 沉鐵劍鞘。',
         body: '\u6c89\u9435\u528d\u9798\u4e0d\u518d\u89f8\u767c\u91cd\u528d\uff0c\u6539\u70ba\u5f37\u5316\u523a\u528d\u3002\u672c\u6b21\u523a\u528d\u6bcf\u6210\u529f\u9023\u64ca 1 \u6b21\uff0c\u5f8c\u7e8c\u9023\u64ca\u50b7\u5bb3\u984d\u5916 +1\uff0c\u6700\u591a +5\u3002',
@@ -778,6 +869,7 @@ const RenderNotes = {
       {
         id: 'star_hunter_eye',
         name: '獵星之眼',
+        iconImage: 'assets/relics/star-hunter-eye-resonance.png',
         relics: ['eagle_eye_feather', 'flaw_lens'],
         desc: '同身：融合鷹眼羽飾 + 鷹眼透鏡。',
         body: '持有者每次使用弓攻擊前，若敵人沒有獵星產生的鷹眼暫時原生弱點，新增 1 個；命中該弱點後進入鷹眼鎖定，本回合弓追擊不再需要命中原生弱點也能繼續。未鎖定時弓追加攻擊傷害 +2；鷹眼鎖定期間改為追擊次數 x5。若同回合觸發 2 次以上追加攻擊，最後一次追加攻擊的攻擊骰必定視為 6。',
@@ -786,6 +878,7 @@ const RenderNotes = {
       {
         id: 'star_breaker_eye',
         name: '裂星破滅',
+        iconImage: 'assets/relics/star-breaker-eye-resonance.png',
         relics: ['flaw_lens', 'eagle_eye_feather'],
         desc: '同身：融合鷹眼透鏡 + 鷹眼羽飾。',
         body: '持有者使用弓主戰命中任一原生弱點時，破壞這次命中的原生弱點，額外造成 20 點固定傷害。',
@@ -799,6 +892,7 @@ const RenderNotes = {
       {
         id: 'dodeca_fate_dice',
         name: '十二面命運骰',
+        iconImage: 'assets/relics/dodeca-fate-dice-resonance.png',
         relics: ['wager_dice', 'lucky_star'],
         desc: '同身：融合賭命骰子 + 幸運星。',
         body: '攻擊骰改為 1d12，可以命中原生弱點；若使用賭命骰子，可額外押注 3 個骰面，押中時額外再加上本次骰面；搏命者單數刷新原生弱點，其他職業只有 7、9、11 會刷新；命中原生弱點或視為命中原生弱點時最終傷害 x4；最終骰值等於原生弱點 x2 時額外觸發共鳴弱點。',
@@ -812,6 +906,7 @@ const RenderNotes = {
       {
         id: 'dodeca_lucky_dice',
         name: '十二面幸運骰',
+        iconImage: 'assets/relics/dodeca-lucky-dice-resonance.png',
         relics: ['lucky_star', 'wager_dice'],
         desc: '同身：融合幸運星 + 賭命骰子。',
         body: '攻擊骰改為 1d12且不命中原生弱點；若使用賭命骰子，可額外押注 3 個骰面，押中時額外再加上本次骰面；搏命者單數刷新破綻，7、9、11 刷新 2 個；其他職業只有 7、9、11 會刷新 1 個；命中破綻或破綻倍數時獲得額外傷害。',
@@ -824,6 +919,7 @@ const RenderNotes = {
       {
         id: 'dual_banner_formation',
         name: '雙旗戰陣',
+        iconImage: 'assets/relics/dual-banner-formation-resonance.png',
         relics: ['war_banner', 'eagle_banner'],
         desc: '同身：同時持有戰爭旗與鷹眼旗，且其中一面已融合。',
         body: '戰鬥中可同時維持 1 面戰爭旗與 1 面鷹眼旗；雙旗並立時，戰吼旗固定傷害提高 50%，且場上每面旗使持有者受到的傷害降低 20%。',

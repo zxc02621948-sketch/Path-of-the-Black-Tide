@@ -45,7 +45,7 @@ const RenderTutorial = {
           '角色先攜帶 1 件聖物；到神壇融合後，普通聖物欄才會空出來。',
           '融合後再攜帶配套聖物，或隊伍湊齊指定聖物，就可能啟動共鳴。',
         ],
-        points: ['探索事件可找到聖物', '黑夜空地會出現聖物', '神壇可融合已攜帶聖物'],
+        points: ['探索事件可找到聖物', '擊敗怪物也有機會取得聖物', '黑夜空地會出現聖物', '神壇可融合已攜帶聖物'],
       },
       {
         title: '裝備取得',
@@ -71,10 +71,11 @@ const RenderTutorial = {
         darkTokens: true,
         pageClass: 'tutorial-page-dark-avatar',
         body: [
-          '黑夜降臨後，黑暗化身會出現在地圖上並朝小隊移動。',
+          '黑暗值達到 5 後，黑暗會凝成化身並開始在地圖上追蹤小隊。',
           '牠身上的光代表追殺倒數；倒數歸零或追上小隊時會立刻準備追殺戰鬥。',
+          '每天最多觸發 2 場被動追殺；追殺勝利只會暫時擊退，主動討伐才會降低黑暗。',
         ],
-        points: ['綠光：還有 3 天', '黃光：還有 2 天', '紅光：最後 1 天', '倒數歸零或追上小隊時，會直接觸發追殺流程'],
+        points: ['綠光：還有 3 天', '黃光：還有 2 天', '紅光：最後 1 天'],
       },
       {
         title: '忘記規則時',
@@ -97,6 +98,9 @@ const RenderTutorial = {
     const index = Math.max(0, Math.min(pages.length - 1, pageIndex));
     const page = pages[index];
     const choices = [];
+    if (index < pages.length - 1) {
+      choices.push({ label: '跳過', action: () => Game._closeModal() });
+    }
     if (index === 0) {
       choices.push({
         label: '不再顯示',
@@ -105,9 +109,6 @@ const RenderTutorial = {
           Game._closeModal();
         },
       });
-    }
-    if (index < pages.length - 1) {
-      choices.push({ label: '跳過', action: () => Game._closeModal() });
     }
     if (index > 0) {
       choices.push({ label: '上一頁', action: () => this.showTutorial(index - 1) });

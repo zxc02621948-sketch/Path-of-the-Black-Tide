@@ -457,6 +457,7 @@ const GameDevTool = {
       desc: '選擇要在假戰鬥畫面中播放的效果。',
       typeText: false,
       choices: [
+        { label: '短影片：黑暗化身共鳴連段', detail: '錄影用假戰鬥：黑暗化身吃完整輪共鳴，最後固定 100 爆擊。', action: () => this._devPreviewDarkAvatarResonanceReel() },
         { label: '傷害分級演出', detail: '用 8 / 15 / 25 / 45 / 75 / 110 傷害預覽分段震動與放大。', action: () => this._devChooseDamageTierEffect() },
       ].concat(options.map(option => ({
         label: option.name,
@@ -575,6 +576,263 @@ const GameDevTool = {
         { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
       ],
     });
+  },
+
+  _devPreviewDarkAvatarResonanceReel() {
+    const combat = this._devDarkAvatarReelCombatScene();
+    const damageEvents = this._devDarkAvatarReelDamageEvents(combat.enemy.maxHp);
+    const finalEvent = damageEvents[damageEvents.length - 1];
+    this._openModal({
+      title: '短影片素材：黑暗化身共鳴連段',
+      desc: '錄影用測試場景。黑暗化身依序承受共鳴代表演出，最後一擊固定 100 點爆擊。',
+      typeText: false,
+      combat,
+      combatAnims: {
+        delay: 520,
+        lockActions: false,
+        playerAttacker: combat.attackerId,
+        playerFollowHits: damageEvents.length,
+        playerFollowStepMs: 760,
+        playerDamageEvents: damageEvents,
+      },
+      choices: [
+        { label: '重播', action: () => this._devReplayEffectPreview(() => this._devPreviewDarkAvatarResonanceReel()) },
+        { label: '返回', action: () => this._devChooseCombatEffect() },
+        { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
+      ],
+    });
+    if (finalEvent) {
+      const totalFollowDelay = damageEvents.reduce((sum, event) => sum + Math.max(120, Number(event.followDelayMs) || 760), 0);
+      setTimeout(() => {
+        this._log(`短影片測試：黑暗化身遭共鳴連段擊潰，最後一擊 ${finalEvent.damage}。`, 'reward');
+      }, 520 + totalFollowDelay + 420);
+    }
+  },
+
+  _devDarkAvatarReelDamageEvents(enemyHp = 260) {
+    const steps = [
+      {
+        name: '劍擊開場',
+        damage: 8,
+        attackTrail: 'slash',
+        hitEffect: 'slash',
+        weaponFamily: 'sword',
+        relicFx: '',
+        sfx: 'swordWoosh',
+        sfxVolume: 0.36,
+        followDelayMs: 520,
+      },
+      {
+        name: '弓擊牽制',
+        damage: 9,
+        attackTrail: 'pierce',
+        hitEffect: 'pierce',
+        weaponFamily: 'bow',
+        relicFx: '',
+        sfx: 'bowShot',
+        sfxVolume: 0.38,
+        trailExtendPx: 150,
+        followDelayMs: 520,
+      },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        name: `銀蜂劍律・第 ${index + 1} 刺`,
+        damage: 6,
+        attackTrail: 'slash',
+        hitEffect: 'slash',
+        weaponFamily: 'sword',
+        relicFx: 'silver_bee_pin',
+        sfx: 'silverBeePinCut',
+        sfxVolume: index === 0 ? 0.42 : 0.34,
+        followDelayMs: Math.max(130, 230 - index * 10),
+      })),
+      {
+        name: '沉鐵劍律',
+        damage: 28,
+        attackTrail: 'slash',
+        hitEffect: 'slash',
+        weaponFamily: 'sword',
+        relicFx: 'iron_scabbard',
+        sfx: 'ironScabbardSlice',
+        sfxVolume: 0.52,
+      },
+      {
+        name: '痛痕折磨',
+        damage: 38,
+        attackTrail: 'strike',
+        hitEffect: 'wound-burst',
+        weaponFamily: 'sword',
+        relicFx: '',
+        sfx: 'swordWoosh',
+        sfxVolume: 0.46,
+      },
+      {
+        name: '痛痕爆發',
+        damage: 54,
+        attackTrail: 'slash',
+        hitEffect: 'wound-burst',
+        weaponFamily: 'sword',
+        relicFx: '',
+        sfx: 'swordWoosh',
+        sfxVolume: 0.5,
+      },
+      {
+        name: '獵星之眼・第一箭',
+        damage: 15,
+        attackTrail: 'pierce',
+        hitEffect: 'eagle-mark',
+        weaponFamily: 'bow',
+        relicFx: 'star_hunter_eye',
+        sfx: 'bowShot',
+        sfxVolume: 0.42,
+        relicSfx: 'ironScabbardSlice',
+        relicSfxVolume: 0.4,
+        trailExtendPx: 150,
+        followDelayMs: 430,
+      },
+      {
+        name: '獵星之眼・第二箭',
+        damage: 16,
+        attackTrail: 'pierce',
+        hitEffect: 'eagle-mark',
+        weaponFamily: 'bow',
+        relicFx: 'star_hunter_eye',
+        sfx: 'bowShot',
+        sfxVolume: 0.44,
+        relicSfx: 'ironScabbardSlice',
+        relicSfxVolume: 0.42,
+        trailExtendPx: 150,
+        followDelayMs: 390,
+      },
+      {
+        name: '獵星之眼・鎖定',
+        damage: 20,
+        attackTrail: 'pierce',
+        hitEffect: 'eagle-mark',
+        weaponFamily: 'bow',
+        relicFx: 'star_hunter_eye',
+        sfx: 'bowShot',
+        sfxVolume: 0.46,
+        relicSfx: 'ironScabbardSlice',
+        relicSfxVolume: 0.46,
+        trailExtendPx: 150,
+        followDelayMs: 620,
+      },
+      {
+        name: '裂星破滅',
+        damage: 72,
+        attackTrail: 'pierce',
+        hitEffect: 'pierce',
+        weaponFamily: 'bow',
+        relicFx: 'star_breaker',
+        sfx: 'bowShot',
+        sfxVolume: 0.52,
+        relicSfx: 'ironScabbardSlice',
+        relicSfxVolume: 0.62,
+        trailExtendPx: 150,
+        followDelayMs: 820,
+      },
+      {
+        name: '十二面爆擊',
+        damage: 100,
+        attackTrail: 'iron_scabbard',
+        hitEffect: 'wound-burst',
+        weaponFamily: 'sword',
+        relicFx: 'iron_scabbard',
+        sfx: 'ironScabbardSlice',
+        sfxVolume: 0.58,
+        relicSfx: 'damageTierFinisherRumble',
+        relicSfxVolume: 0.72,
+        followDelayMs: 980,
+      },
+    ];
+    let hpCursor = Math.max(1, enemyHp || 260);
+    return steps.map((step, index) => {
+      const from = hpCursor;
+      hpCursor = Math.max(0, hpCursor - step.damage);
+      return {
+        type: index === steps.length - 1 ? 'critical' : 'primary',
+        label: step.name,
+        damage: step.damage,
+        from,
+        to: hpCursor,
+        attackTrail: step.attackTrail,
+        hitEffect: step.hitEffect,
+        weaponFamily: step.weaponFamily || '',
+        relicFx: step.relicFx,
+        sfx: step.sfx,
+        sfxVolume: step.sfxVolume,
+        relicSfx: step.relicSfx || '',
+        relicSfxVolume: step.relicSfxVolume ?? 0.48,
+        trailExtendPx: step.trailExtendPx || 0,
+        followDelayMs: step.followDelayMs || (index === steps.length - 1 ? 960 : 760),
+      };
+    });
+  },
+
+  _devDarkAvatarReelCombatScene() {
+    const baseCombat = this._devEffectCombatScene({
+      id: 'dark_avatar_reel',
+      name: '黑暗化身共鳴連段',
+      weaponFamily: 'bow',
+    });
+    const squad = baseCombat.squad.map((char, index) => ({
+      ...char,
+      hp: Math.max(char.hp || 0, char.maxHp || 12),
+      threat: index === 0 ? 6 : Math.max(0, char.threat || 0),
+      activeBanners: index === 0 ? [{ name: '戰吼旗', stacks: 1 }] : (char.activeBanners || []),
+    }));
+    return {
+      ...baseCombat,
+      status: '短影片素材：所有共鳴壓制黑暗化身',
+      selectable: false,
+      canGuard: false,
+      canUseBag: false,
+      suppressBgm: true,
+      reelCombat: true,
+      intent: {
+        type: 'attack',
+        icon: 'assets/icons/intent-attack-single.png',
+        text: '攻擊 13',
+        title: `${squad[0]?.name || '目標'} 即將受到攻擊，造成 13 傷害`,
+        targetId: squad[0]?.id || null,
+        targetName: squad[0]?.name || null,
+      },
+      enemy: {
+        id: 'dark_monster_reel_target',
+        name: '黑暗化身',
+        icon: '闇',
+        desc: '短影片錄影用目標。',
+        hp: 414,
+        maxHp: 414,
+        attack: 10,
+        weakness: 6,
+        block: 0,
+        currentBlock: 0,
+        woundMax: 30,
+        wounds: 12,
+        extraWeaknesses: [3, 9],
+        disabledNativeWeaknesses: [],
+        nativeWeaknessSources: {},
+        tempWeakness: 5,
+        eagleTempWeakness: 10,
+        eagleNativeWeakness: 12,
+        suspiciousFlaw: false,
+        gamblerNativeWeakness: null,
+        gamblerTempWeakness: null,
+        gamblerTempWeaknesses: [],
+        weaknessDesc: '黑霧裂解，此擊無視格檔，且黑暗化身下一次攻擊 -1',
+        darkMonster: true,
+        darkMonsterBase: true,
+        darkMonsterLevel: 20,
+        darkMonsterOriginalLevel: 20,
+        darkMonsterCombatLevel: 20,
+        iconImage: 'assets/enemies/dark-avatar-combat.png',
+        iconScale: 'large',
+        cardBgImage: 'assets/enemies/dark-avatar-card-bg.png',
+        mapIconImage: 'assets/enemies/dark-monster-icon.png',
+      },
+      squad,
+    };
   },
 
   _devCombatEffectSfx(option = {}) {

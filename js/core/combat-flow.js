@@ -86,7 +86,7 @@ const GameCombatFlow = {
 
   _resolveCombatEnemyForCurrentDay(enemy, cell = null, opts = {}) {
     if (!enemy || opts.source === 'devTest') return enemy;
-    if (cell?.content?.reward) return enemy;
+    if (cell?.content?.reward && !cell?.content?.scaleWithDay) return enemy;
     if (!['weak', 'medium'].includes(enemy.tier)) return enemy;
     if (typeof getEnemyById !== 'function' || typeof resolveEnemyTier !== 'function') return enemy;
     const base = getEnemyById(enemy.id);
@@ -2691,7 +2691,7 @@ const GameCombatFlow = {
 
   _buildCombatScene(enemy, attacker, status) {
     const inCombat = !!G.combat;
-    const intent = inCombat ? G.combat.intent : null;
+    const intent = inCombat ? G.combat.intent : (enemy?._victoryIntent || null);
     const activeBanners = this._activeCombatBanners();
     const attackerId = attacker?.id || G.combat?.attackerId || null;
     return {

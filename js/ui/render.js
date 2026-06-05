@@ -83,7 +83,7 @@ const Render = {
     }
     const turnEndFloat = document.getElementById('turn-end-float');
     if (turnEndFloat) {
-      turnEndFloat.classList.toggle('visible', actionsLeft <= 0 && !G.modal && G.phase !== 'over' && !G.dayTransitionActive);
+      turnEndFloat.classList.toggle('visible', actionsLeft <= 0 && !G.modal && G.phase !== 'over' && !G.dayTransitionActive && !G.nightTransitionActive);
     }
     const darkness = Math.max(0, G.darkness || 0);
     const meterMax = CONFIG.DARKNESS_MAX_THRESHOLD || CONFIG.DARKNESS_DEVOUR_THRESHOLD || 20;
@@ -115,12 +115,12 @@ const Render = {
     }
 
     const endDayBtn = document.getElementById('btn-end-day');
-    endDayBtn.disabled = G.phase === 'over' || G.actionsLeft > 0 || G.dayTransitionActive;
-    endDayBtn.title = G.dayTransitionActive
+    endDayBtn.disabled = G.phase === 'over' || G.actionsLeft > 0 || G.dayTransitionActive || G.nightTransitionActive;
+    endDayBtn.title = (G.dayTransitionActive || G.nightTransitionActive)
       ? '正在進入下一天'
       : (G.actionsLeft > 0 ? '必須先用完今天的行動力' : '');
-    endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over' && !G.dayTransitionActive);
-    endDayBtn.textContent = G.dayTransitionActive ? '夜色流轉中' : '結束今天';
+    endDayBtn.classList.toggle('end-day-ready', G.actionsLeft <= 0 && G.phase !== 'over' && !G.dayTransitionActive && !G.nightTransitionActive);
+    endDayBtn.textContent = (G.dayTransitionActive || G.nightTransitionActive) ? '夜色流轉中' : '結束今天';
 
     const fieldRestBtn = document.getElementById('btn-field-rest');
     if (fieldRestBtn) {
@@ -186,6 +186,12 @@ const Render = {
           }
           if (cell.content?.reward === 'echo_site') {
             el.classList.add('echo-site-target');
+            if (cell.content?.echoSystemId) {
+              el.classList.add(`echo-site-system-${cell.content.echoSystemId}`);
+            }
+            if (this._isEchoSiteResonanceMatch(cell)) {
+              el.classList.add('echo-site-resonance-match');
+            }
           }
           if (cell.content?.uniqueStrong) {
             el.classList.add('unique-strong-target');
@@ -698,7 +704,7 @@ const Render = {
       return '';
     }
     if (cell.type === 'altar' && cell.visited)  return '神壇';
-    if (cell.type === 'rest')  return G.phase === 'night' ? '殘火' : '休息';
+    if (cell.type === 'rest')  return G.phase === 'night' ? '' : '休息';
     if (cell.content?.reward === 'rescue') return '頭目';
     if (cell.content?.reward === 'echo_site') return this._cellEchoLabel(cell);
     if (cell.content?.uniqueStrong) return '強敵';
@@ -724,7 +730,12 @@ const Render = {
     if (cell.cleared) return '已探索';
     if (cell.corrupted) return '腐化空地，黑夜踏入會遭伏擊';
     if (cell.content?.reward === 'rescue') return '救援頭目，擊敗後可解救角色';
-    if (cell.content?.reward === 'echo_site') return `${cell.content?.echoSiteName || '共鳴遺址'}，擊敗守護者可獲得${cell.content?.echoSystemName || '共鳴'}聖物`;
+    if (cell.content?.reward === 'echo_site') {
+      const matchText = this._isEchoSiteResonanceMatch(cell)
+        ? '。此處守護者占用的是已融合聖物的配套聖物'
+        : '';
+      return `${cell.content?.echoSiteName || '共鳴遺址'}，擊敗守護者可獲得${cell.content?.echoSystemName || '共鳴'}聖物${matchText}`;
+    }
     if (cell.content?.uniqueStrong) return `${cell.content?.enemy?.name || '強敵'}，擊敗後可獲得祈願寶箱`;
     if (cell.type === 'enemy') return '敵人';
     if (cell.type === 'chest') return cell.content?.chestKind === 'dark_gift' ? '黑暗贈禮' : '寶箱';
@@ -765,6 +776,27 @@ const Render = {
       <span class="echo-site-marker-text">${names[systemId] || '共鳴'}</span>
     `;
     return marker;
+  },
+
+  _isEchoSiteResonanceMatch(cell) {
+    if (!cell || cell.cleared || cell.content?.reward !== 'echo_site') return false;
+    const reservedRelicId = cell.content?.reservedRelicId;
+    if (!reservedRelicId) return false;
+    const system = this._echoRelicSystemForCell(cell);
+    const relicIds = Array.isArray(system?.relics) ? system.relics : [];
+    if (!relicIds.includes(reservedRelicId)) return false;
+    return (G.squad || []).some(char => {
+      const fusedId = char?.fusedRelic?.id;
+      return fusedId && fusedId !== reservedRelicId && relicIds.includes(fusedId);
+    });
+  },
+
+  _echoRelicSystemForCell(cell) {
+    const systemId = cell?.content?.echoSystemId;
+    if (systemId && typeof getEchoRelicSystemById === 'function') {
+      return getEchoRelicSystemById(systemId);
+    }
+    return null;
   },
 
   _cellPlayerMarker() {
@@ -1122,13 +1154,19 @@ const Render = {
   },
 
   // Section.
-  showNightTransition() {
+  showNightTransition(onDone = null) {
     const overlay = document.getElementById('night-overlay');
-    if (!overlay) return;
+    if (!overlay) {
+      if (typeof onDone === 'function') onDone();
+      return;
+    }
     overlay.classList.remove('night-overlay-active');
     void overlay.offsetWidth;
     overlay.classList.add('night-overlay-active');
-    setTimeout(() => overlay.classList.remove('night-overlay-active'), 2400);
+    setTimeout(() => {
+      overlay.classList.remove('night-overlay-active');
+      if (typeof onDone === 'function') onDone();
+    }, 2400);
   },
 
   showDayTransition(info = {}, onDone = null) {

@@ -25,17 +25,28 @@ const MapGen = {
     }
     this._shuffle(positions);
 
-    let idx = 0;
-
     const terrainCounts = {
       forest: CONFIG.MAP_FORESTS,
       ruins: CONFIG.MAP_RUINS,
       cave: CONFIG.MAP_CAVES,
     };
+    const terrainPlaced = [];
+    const terrainPlacedByType = { forest: [], ruins: [], cave: [] };
     for (const [type, count] of Object.entries(terrainCounts)) {
-      for (let i = 0; i < count && idx < positions.length; i++, idx++) {
-        const { x, y } = positions[idx];
+      for (let i = 0; i < count; i++) {
+        const picked = this._takeSpreadPosition(positions, {
+          same: terrainPlacedByType[type],
+          all: terrainPlaced,
+          size,
+          sameWeight: 8,
+          allWeight: 1.5,
+          sectorWeight: 6,
+        });
+        if (!picked) break;
+        const { x, y } = picked;
         grid[y][x].type = type;
+        terrainPlaced.push({ x, y });
+        terrainPlacedByType[type].push({ x, y });
       }
     }
 
@@ -52,11 +63,21 @@ const MapGen = {
 
     const restPlaced = [];
     const MIN_REST_DIST = CONFIG.MAP_REST_MIN_DISTANCE;
-    for (let attempt = 0; attempt < positions.length && restPlaced.length < CONFIG.MAP_REST_POINTS; attempt++) {
-      if (idx >= positions.length) break;
-      const { x, y } = positions[idx++];
-      const tooClose = restPlaced.some(r => Math.abs(r.x - x) + Math.abs(r.y - y) < MIN_REST_DIST);
-      if (tooClose) continue;
+    while (restPlaced.length < CONFIG.MAP_REST_POINTS) {
+      const picked = this._takeSpreadPosition(positions, {
+        same: restPlaced,
+        all: [{ x: cx, y: cy }],
+        minSameDistance: MIN_REST_DIST,
+        minStartDistance: 3,
+        cx,
+        cy,
+        size,
+        sameWeight: 10,
+        allWeight: 2,
+        sectorWeight: 8,
+      });
+      if (!picked) break;
+      const { x, y } = picked;
       grid[y][x].type = 'rest';
       restPlaced.push({ x, y });
     }
@@ -64,11 +85,16 @@ const MapGen = {
     const dayRelicPool = getDayRelics();
     const relicPlaced = [];
     const MIN_RELIC_DIST = CONFIG.MAP_RELIC_MIN_DISTANCE;
-    for (let attempt = 0; attempt < positions.length && relicPlaced.length < CONFIG.MAP_RELIC_SPOTS; attempt++) {
-      if (idx >= positions.length || dayRelicPool.length === 0) break;
-      const { x, y } = positions[idx++];
-      const tooClose = relicPlaced.some(r => Math.abs(r.x - x) + Math.abs(r.y - y) < MIN_RELIC_DIST);
-      if (tooClose) continue;
+    while (relicPlaced.length < CONFIG.MAP_RELIC_SPOTS && dayRelicPool.length > 0) {
+      const picked = this._takeSpreadPosition(positions, {
+        same: relicPlaced,
+        minSameDistance: MIN_RELIC_DIST,
+        size,
+        sameWeight: 10,
+        sectorWeight: 8,
+      });
+      if (!picked) break;
+      const { x, y } = picked;
       const relic = weightedRelicPick(dayRelicPool);
       grid[y][x].type = 'relic';
       grid[y][x].content = relic ? { relic: { ...relic } } : null;
@@ -77,12 +103,19 @@ const MapGen = {
 
     const rescueBossPlaced = [];
     const MIN_RESCUE_BOSS_DIST = CONFIG.MAP_RESCUE_BOSS_MIN_DISTANCE;
-    for (let attempt = 0; attempt < positions.length && rescueBossPlaced.length < CONFIG.MAP_RESCUE_BOSSES; attempt++) {
-      if (idx >= positions.length) break;
-      const { x, y } = positions[idx++];
-      const tooCloseToStart = this.distance(x, y, cx, cy) < MIN_RESCUE_BOSS_DIST;
-      const tooCloseToBoss = rescueBossPlaced.some(r => this.distance(r.x, r.y, x, y) < MIN_RESCUE_BOSS_DIST);
-      if (tooCloseToStart || tooCloseToBoss) continue;
+    while (rescueBossPlaced.length < CONFIG.MAP_RESCUE_BOSSES) {
+      const picked = this._takeSpreadPosition(positions, {
+        same: rescueBossPlaced,
+        minSameDistance: MIN_RESCUE_BOSS_DIST,
+        minStartDistance: MIN_RESCUE_BOSS_DIST,
+        cx,
+        cy,
+        size,
+        sameWeight: 10,
+        sectorWeight: 8,
+      });
+      if (!picked) break;
+      const { x, y } = picked;
       grid[y][x].hiddenSite = {
         type: 'rescue',
         content: {
@@ -93,11 +126,24 @@ const MapGen = {
       rescueBossPlaced.push({ x, y });
     }
 
+    const enemyPlaced = [];
     for (let i = 0; i < CONFIG.MAP_ENEMY_SPOTS; i++) {
-      if (idx >= positions.length) break;
-      const { x, y } = positions[idx++];
+      const picked = this._takeSpreadPosition(positions, {
+        same: enemyPlaced,
+        all: [{ x: cx, y: cy }],
+        minStartDistance: 2,
+        cx,
+        cy,
+        size,
+        sameWeight: 8,
+        allWeight: 1,
+        sectorWeight: 7,
+      });
+      if (!picked) break;
+      const { x, y } = picked;
       grid[y][x].type = 'enemy';
-      grid[y][x].content = { enemy: randomEnemy(false) };
+      grid[y][x].content = { enemy: randomEnemy(false), scaleWithDay: true };
+      enemyPlaced.push({ x, y });
     }
 
     const EMPTY_EVENT_CHANCE = 0.30;
@@ -137,19 +183,93 @@ const MapGen = {
     return arr;
   },
 
+  _takeSpreadPosition(positions, options = {}) {
+    if (!positions?.length) return null;
+    const {
+      same = [],
+      all = [],
+      minSameDistance = 0,
+      minStartDistance = 0,
+      cx = null,
+      cy = null,
+      size = CONFIG.MAP_SIZE,
+      sameWeight = 8,
+      allWeight = 2,
+      sectorWeight = 6,
+      filter = null,
+    } = options;
+
+    const passes = p => {
+      if (filter && !filter(p)) return false;
+      if (minSameDistance > 0 && same.some(q => this.distance(p.x, p.y, q.x, q.y) < minSameDistance)) return false;
+      if (minStartDistance > 0 && Number.isFinite(cx) && Number.isFinite(cy) && this.distance(p.x, p.y, cx, cy) < minStartDistance) return false;
+      return true;
+    };
+    let candidates = positions.filter(passes);
+    if (candidates.length === 0) {
+      candidates = filter ? positions.filter(filter) : positions;
+    }
+    if (candidates.length === 0) return null;
+
+    const sameSectorCounts = same.reduce((counts, pos) => {
+      const key = this._sectorKey(pos, size);
+      counts[key] = (counts[key] || 0) + 1;
+      return counts;
+    }, {});
+    const score = p => {
+      const sameDist = this._nearestDistance(p, same, size * 2);
+      const allDist = this._nearestDistance(p, all, size * 2);
+      const sameSectorCount = sameSectorCounts[this._sectorKey(p, size)] || 0;
+      return sameDist * sameWeight + allDist * allWeight - sameSectorCount * sectorWeight + Math.random() * 2;
+    };
+
+    let best = candidates[0];
+    let bestScore = score(best);
+    for (let i = 1; i < candidates.length; i++) {
+      const candidateScore = score(candidates[i]);
+      if (candidateScore > bestScore) {
+        best = candidates[i];
+        bestScore = candidateScore;
+      }
+    }
+    const index = positions.indexOf(best);
+    if (index >= 0) positions.splice(index, 1);
+    return best;
+  },
+
+  _nearestDistance(pos, others, fallback) {
+    if (!others?.length) return fallback;
+    return others.reduce((best, other) => Math.min(best, this.distance(pos.x, pos.y, other.x, other.y)), fallback);
+  },
+
+  _sectorKey(pos, size) {
+    const sectorSize = Math.max(1, Math.ceil(size / 3));
+    return `${Math.floor(pos.x / sectorSize)},${Math.floor(pos.y / sectorSize)}`;
+  },
+
   // 計算兩格的曼哈頓距離
 
   _altarPositions(size) {
     const count = CONFIG.MAP_ALTARS || 2;
     const minDistance = CONFIG.MAP_ALTAR_MIN_DISTANCE || 7;
     const minStartDistance = CONFIG.MAP_ALTAR_MIN_START_DISTANCE || 4;
+    const maxStartDistance = CONFIG.MAP_ALTAR_MAX_START_DISTANCE || 0;
+    const edgeMargin = Math.max(0, CONFIG.MAP_ALTAR_EDGE_MARGIN || 0);
     const cx = Math.floor(size / 2);
     const cy = Math.floor(size / 2);
     const candidates = [];
     for (let y = 0; y < size; y++) {
       for (let x = 0; x < size; x++) {
         if (x === cx && y === cy) continue;
-        if (this.distance(x, y, cx, cy) < minStartDistance) continue;
+        const startDistance = this.distance(x, y, cx, cy);
+        if (startDistance < minStartDistance) continue;
+        if (maxStartDistance > 0 && startDistance > maxStartDistance) continue;
+        if (edgeMargin > 0 && (
+          x < edgeMargin ||
+          y < edgeMargin ||
+          x >= size - edgeMargin ||
+          y >= size - edgeMargin
+        )) continue;
         candidates.push({ x, y });
       }
     }
@@ -164,7 +284,17 @@ const MapGen = {
         if (valid.length >= count) return valid;
       }
     }
-    return candidates.slice(0, count);
+    if (candidates.length >= count) return candidates.slice(0, count);
+    const fallback = [];
+    for (let y = 0; y < size; y++) {
+      for (let x = 0; x < size; x++) {
+        if (x === cx && y === cy) continue;
+        if (this.distance(x, y, cx, cy) < minStartDistance) continue;
+        fallback.push({ x, y });
+      }
+    }
+    this._shuffle(fallback);
+    return fallback.slice(0, count);
   },
 
   _ensureOpeningArea(grid, cx, cy) {
@@ -179,14 +309,17 @@ const MapGen = {
     const isInteractive = cell => ['forest', 'ruins', 'cave', 'enemy', 'rest'].includes(cell.type) || !!cell.content?.eventPending;
     const terrainTypes = new Set(opening.filter(cell => ['forest', 'ruins', 'cave'].includes(cell.type)).map(cell => cell.type));
     const interactiveCount = opening.filter(isInteractive).length;
-    if (interactiveCount >= 3 && terrainTypes.size >= 2) return;
+    const hasOpeningEnemy = opening.some(cell => cell.type === 'enemy' && cell.content?.enemy);
+    if (hasOpeningEnemy && interactiveCount >= 3 && terrainTypes.size >= 2) return;
 
     const desiredTerrains = ['forest', 'ruins', 'cave'].filter(type => !terrainTypes.has(type));
-    const targetEmpty = opening.filter(cell => cell.type === 'empty' && !cell.content && !cell.hiddenSite);
+    const preferredTargets = opening.filter(cell => cell.type === 'empty' && !cell.content && !cell.hiddenSite);
+    const fallbackTargets = opening.filter(cell => cell.type !== 'enemy' && !cell.hiddenSite && !cell.revealed);
+    const targetCells = [...preferredTargets, ...fallbackTargets.filter(cell => !preferredTargets.includes(cell))];
     let targetIndex = 0;
 
     const swapIntoOpening = sourceCell => {
-      const target = targetEmpty[targetIndex++];
+      const target = targetCells[targetIndex++];
       if (!target || !sourceCell) return false;
       const sourceType = sourceCell.type;
       const sourceContent = sourceCell.content || null;
@@ -199,6 +332,11 @@ const MapGen = {
       target.hiddenSite = sourceHiddenSite;
       return true;
     };
+
+    if (!hasOpeningEnemy) {
+      const source = this._findOpeningSwapSource(grid, opening, cell => cell.type === 'enemy' && cell.content?.enemy);
+      swapIntoOpening(source);
+    }
 
     for (const type of desiredTerrains) {
       const source = this._findOpeningSwapSource(grid, opening, cell => cell.type === type);

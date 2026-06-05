@@ -3,6 +3,7 @@ const AudioManager = {
     exploreEarly: 'assets/audio/explore-early.mp3',
     exploreNight: 'assets/audio/explore-night.mp3',
     battleNormal: 'assets/audio/battle-normal.mp3',
+    // Intentionally swapped: these two files were renamed by mood, not by current track id.
     battleGuardian: 'assets/audio/battle-final.mp3',
     battleDarkAvatar: 'assets/audio/battle-dark-avatar.wav',
     battleFinal: 'assets/audio/battle-guardian.mp3',
@@ -17,10 +18,17 @@ const AudioManager = {
     bowShot: 'assets/audio/sfx/bow-shot.wav',
     swordWoosh: 'assets/audio/sfx/sword-woosh.wav',
     daggerWoosh: 'assets/audio/sfx/dagger-woosh.wav',
+    resonanceRapier: 'assets/audio/sfx/resonance-rapier.wav',
     silverBeePinCut: 'assets/audio/sfx/silver-bee-pin-cut.mp3',
     ironScabbardSlice: 'assets/audio/sfx/iron-scabbard-slice.mp3',
     damageTierSurgeElectric: 'assets/audio/sfx/damage-tier-surge-electric.mp3',
     damageTierFinisherRumble: 'assets/audio/sfx/damage-tier-finisher-rumble.wav',
+    dayEndTransition: 'assets/audio/sfx/day-end-transition.wav',
+    nightfallTransition: 'assets/audio/sfx/nightfall-transition.wav',
+    fateD12Normal: 'assets/audio/sfx/fate-d12-normal.wav',
+    fateD12Burst: 'assets/audio/sfx/fate-d12-burst.wav',
+    luckyD12Normal: 'assets/audio/sfx/lucky-d12-normal.wav',
+    luckyD12Burst: 'assets/audio/sfx/lucky-d12-burst.wav',
     darkMonsterGrowl: 'assets/audio/sfx/dark-monster-growl.mp3',
     shadowWormSpawnGrowl: 'assets/audio/sfx/shadow-worm-spawn-growl.wav',
     rotCrawlerSpawnHiss: 'assets/audio/sfx/rot-crawler-spawn-hiss.wav',
@@ -107,8 +115,10 @@ const AudioManager = {
     if (G.phase === 'over') {
       return ['lose', 'devoured'].includes(G.gameResult) ? 'gameOver' : '';
     }
-    const enemy = G.combat?.enemy || G.modal?.combat?.enemy || null;
-    const reward = G.combat?.reward || null;
+    const combat = G.combat || G.modal?.combat || null;
+    if (combat?.suppressBgm) return '';
+    const enemy = combat?.enemy || null;
+    const reward = combat?.reward || null;
     if (enemy) {
       if (enemy.finalBoss || reward === 'final_boss') return 'battleFinal';
       if (enemy.darkMonster) return 'battleDarkAvatar';
@@ -252,6 +262,18 @@ const AudioManager = {
 
   playDayTransitionSfx(phase = 'day') {
     if (!this.unlocked || this.pageHidden) return;
+    const phaseSfx = {
+      day: { id: 'dayEndTransition', volume: 0.52, delayMs: 820 },
+      nightfall: { id: 'nightfallTransition', volume: 0.58 },
+    }[phase];
+    if (phaseSfx?.id && this.sfx[phaseSfx.id]) {
+      if (phaseSfx.delayMs > 0) {
+        setTimeout(() => this.playSfx(phaseSfx.id, phaseSfx.volume), phaseSfx.delayMs);
+      } else {
+        this.playSfx(phaseSfx.id, phaseSfx.volume);
+      }
+      return;
+    }
     const AudioContextClass = window.AudioContext || window.webkitAudioContext;
     if (!AudioContextClass) return;
     try {
@@ -319,12 +341,19 @@ const AudioManager = {
     return Math.max(0, Math.min(1, this.trackVolumes?.[trackId] ?? this.volume));
   },
 
-  stop() {
+  stop(immediate = false) {
     this.wantedId = '';
     this.currentId = '';
     const audio = this.currentAudio;
     this.currentAudio = null;
-    if (audio) this.fade(audio, audio.volume, 0, this.fadeMs, () => audio.pause());
+    if (!audio) return;
+    if (immediate) {
+      this.fadeTokens.set(audio, {});
+      audio.volume = 0;
+      audio.pause();
+      return;
+    }
+    this.fade(audio, audio.volume, 0, this.fadeMs, () => audio.pause());
   },
 
   handlePageVisibility(isHidden) {

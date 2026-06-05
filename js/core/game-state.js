@@ -1,9 +1,5 @@
 // game-state methods extracted from js/core/game.js.
 const GameStateHelpers = {
-  _placeNightBox() {
-    // 舊黑夜遺匣已移除，保留空函式避免舊存檔或舊呼叫造成錯誤。
-  },
-
   _placeNightRelics() {
     const pool = this._getAvailableRelics(getNightRelics());
     let placed = 0;
@@ -116,6 +112,7 @@ const GameStateHelpers = {
           '黑暗凝成了化身。從現在開始，黑暗化身會在地圖上出現並朝小隊移動。',
           '牠們身上的顏色代表追殺倒數：綠色還有 3 天，黃色還有 2 天，紅色是最後 1 天。',
           '倒數歸零，或追上小隊所在位置時，會發動追殺戰鬥。',
+          '每天最多會觸發 2 場被動追殺；其他已追上的黑暗化身會延後繼續追擊。',
         ],
       },
       {
@@ -124,8 +121,8 @@ const GameStateHelpers = {
         eventImage: 'assets/enemies/dark-avatar-combat.png',
         eventImageClass: 'dark-avatar-intro-art dark-avatar-intro-art-combat',
         body: [
-          '黑暗化身本體固定，生成時會依當下黑暗層數決定強度。',
-          '每 1 層黑暗使生命 +10%，每 5 層黑暗使攻擊 +1。',
+          '黑暗化身生成時會依當下黑暗層數決定強度。',
+          '每 1 層黑暗使生命 +10%，每 6 層黑暗使攻擊 +1。',
           '生成後即使黑暗繼續上升，已存在的黑暗化身不會跟著即時變強。',
         ],
       },
@@ -135,7 +132,7 @@ const GameStateHelpers = {
         eventImage: 'assets/events/dark-avatar-hunt-bound.png',
         eventImageClass: 'dark-avatar-intro-art dark-avatar-intro-art-hunt',
         body: [
-          '擊敗追殺而來的黑暗化身只會移除該化身，不會降低黑暗。',
+          '擊敗追殺而來的黑暗化身只會暫時擊退牠，不會降低黑暗；隔天牠會在別處重新潛伏。',
           '主動討伐黑暗化身可使黑暗 -2；若目標為 Lv.10 以上，再額外黑暗 -1。',
           '主動討伐勝利後會震懾其他黑暗化身，使牠們的追殺延後 1 天。',
           '主動討伐中若本場曾擊破原生弱點，額外黑暗 -1，每場最多一次。',
@@ -235,7 +232,7 @@ const GameStateHelpers = {
   _queueSystemModal(cfg) {
     if (!cfg || G.phase === 'over') return;
     if (!Array.isArray(G.pendingSystemModals)) G.pendingSystemModals = [];
-    if (G.modal || G.combat) {
+    if (G.modal || G.combat || this._isWorldTransitionActive()) {
       G.pendingSystemModals.push(cfg);
       return;
     }
@@ -243,7 +240,7 @@ const GameStateHelpers = {
   },
 
   _flushSystemModal() {
-    if (G.phase === 'over' || G.modal || G.combat) return false;
+    if (G.phase === 'over' || G.modal || G.combat || this._isWorldTransitionActive()) return false;
     if (!Array.isArray(G.pendingSystemModals) || G.pendingSystemModals.length === 0) return false;
     const cfg = G.pendingSystemModals.shift();
     this._openModal(cfg);
@@ -280,6 +277,7 @@ const GameStateHelpers = {
     G.gameResult = result;
     G.modal = null;
     this._saveNotes();
+    AudioManager?.sync?.();
 
     if (result === 'evacuate' || result === 'dawn') {
       if (G.libraryUnlocked) {
@@ -629,6 +627,14 @@ const GameStateHelpers = {
     G.log.unshift({ msg, type, day: G.day ?? null });
     if (G.log.length > 80) G.log.pop();
     Render.renderLog();
+  },
+
+  _isWorldTransitionActive() {
+    return !!(G.dayTransitionActive || G.nightTransitionActive);
+  },
+
+  _isWorldInteractionLocked() {
+    return !!(G.modal || G.combat || G.phase === 'over' || G.mapMoveLocked || this._isWorldTransitionActive());
   },
 
   _openModal(cfg) {

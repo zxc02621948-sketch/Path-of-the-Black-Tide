@@ -1,7 +1,8 @@
 const RESONANCES = [
   {
     id: 'pain_resonance',
-    name: '痛痕共鳴・爆發',
+    name: '痛痕爆發',
+    iconImage: 'assets/relics/pain-burst-resonance.png',
     relics: ['pain_mask', 'pain_splinter_badge'],
     desc: '同身共鳴：融合痛苦面具 + 痛苦徽記。',
     bodyRequiresFused: 'pain_mask',
@@ -19,7 +20,8 @@ const RESONANCES = [
   },
   {
     id: 'pain_scar_resonance',
-    name: '痛痕共鳴・折磨',
+    name: '痛痕折磨',
+    iconImage: 'assets/relics/pain-torment-resonance.png',
     relics: ['pain_splinter_badge', 'pain_mask'],
     desc: '同身共鳴：融合痛苦徽記 + 痛苦面具。',
     bodyRequiresFused: 'pain_splinter_badge',
@@ -37,6 +39,7 @@ const RESONANCES = [
   {
     id: 'greatsword_resonance',
     name: '沉鐵劍律',
+    iconImage: 'assets/relics/iron-scabbard-resonance.png',
     relics: ['iron_scabbard', 'silver_bee_pin'],
     desc: '\u9280\u8702\u91dd\u4e0d\u518d\u89f8\u767c\u523a\u528d\u9023\u64ca\uff0c\u6539\u70ba\u5f37\u5316\u91cd\u528d\uff1a\u91cd\u528d\u547d\u4e2d\u5f8c\uff0c\u9664\u4e86\u6c89\u9435\u528d\u9798\u539f\u672c\u7684\u6c23\u52e2\u5916\uff0c\u984d\u5916\u7372\u5f97 3 \u9ede\u6c23\u52e2\u3002\u6c23\u52e2 1 \u7b49\u65bc\u57fa\u790e\u653b\u64ca +1\uff1b\u6bcf 5 \u9ede\u65e2\u6709\u6c23\u52e2\uff0c\u4f7f\u672c\u6b21\u91cd\u528d\u50b7\u5bb3 +1\u3002\u6c23\u52e2 20 \u4ee5\u4e0a\u672a\u6253\u51fa\u91cd\u528d\u6642\uff0c\u5931\u53bb\u4e00\u534a\u6c23\u52e2\u3002',
     bodyRequiresFused: 'iron_scabbard',
@@ -56,6 +59,9 @@ const RESONANCES = [
   {
     id: 'rapier_resonance',
     name: '銀蜂劍律',
+    iconImage: 'assets/relics/silver-bee-rapier-resonance.png',
+    activateSfx: 'resonanceRapier',
+    activateSfxVolume: 0.44,
     relics: ['silver_bee_pin', 'iron_scabbard'],
     desc: '\u6c89\u9435\u528d\u9798\u4e0d\u518d\u89f8\u767c\u91cd\u528d\uff0c\u6539\u70ba\u5f37\u5316\u523a\u528d\uff1a\u672c\u6b21\u523a\u528d\u6bcf\u6210\u529f\u9023\u64ca 1 \u6b21\uff0c\u5f8c\u7e8c\u9023\u64ca\u50b7\u5bb3 +1\u3002',
     bodyRequiresFused: 'silver_bee_pin',

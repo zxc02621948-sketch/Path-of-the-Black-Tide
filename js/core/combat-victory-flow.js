@@ -164,10 +164,11 @@ const GameCombatVictoryFlow = {
       title: '黑暗暫退',
       desc: [
         `${enemyName} 的形體在霧中崩散。`,
-        `你已擊退追殺而來的黑暗化身，但黑暗沒有因此退去（${darkResult.before} → ${darkResult.after}）。`,
-        '這只是暫時的。霧散去以前，黑暗仍會再次聚攏。',
+        '你們暫時擊退了黑暗化身，但牠早已準備好退路，潛入黑霧等待下一次追獵。',
+        `黑暗值不變（${darkResult.before} → ${darkResult.after}）。`,
+        darkResult.willRespawn ? '明天，牠會在別處重新潛伏並繼續追殺。' : '',
         '只有主動出擊才能有效延遲黑暗襲擊，並抑制黑暗增長。',
-      ].join('\n\n'),
+      ].filter(Boolean).join('\n\n'),
       resultFx: 'event-quiet',
       choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
     });

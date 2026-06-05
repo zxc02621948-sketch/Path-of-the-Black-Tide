@@ -1367,7 +1367,7 @@ const RenderModal = {
   },
 
   _showCombatAttackTrail(targetEl, trail = '', opts = {}) {
-    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'shell_impact', 'jaw_bite', 'poison_cloud', 'dark_avatar'].includes(trail)) return;
+    if (!targetEl || !trail || !['pierce', 'slash', 'strike', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'fate_d12_weakness', 'fate_d12_burst', 'lucky_d12_weakness', 'lucky_d12_burst', 'shell_impact', 'jaw_bite', 'poison_cloud', 'dark_avatar'].includes(trail)) return;
     const sceneEl = opts.scene || targetEl.closest('.combat-scene');
     let sourceRect = opts.sourceEl?.getBoundingClientRect?.() || null;
     if (!sceneEl || !sourceRect) return;
@@ -1380,6 +1380,10 @@ const RenderModal = {
     const ironScabbard = trail === 'iron_scabbard';
     const starHunterEye = trail === 'star_hunter_eye';
     const starBreaker = trail === 'star_breaker';
+    const fateD12Weakness = trail === 'fate_d12_weakness';
+    const fateD12Burst = trail === 'fate_d12_burst';
+    const luckyD12Weakness = trail === 'lucky_d12_weakness';
+    const luckyD12Burst = trail === 'lucky_d12_burst';
     const shellImpact = trail === 'shell_impact';
     const jawBite = trail === 'jaw_bite';
     const poisonCloud = trail === 'poison_cloud';
@@ -1389,7 +1393,7 @@ const RenderModal = {
     }
     let sourceX = sourceRect.left + sourceRect.width / 2;
     let sourceY = sourceRect.top + sourceRect.height / 2;
-    const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker || shellImpact || jawBite || poisonCloud;
+    const fixedTargetTrail = swordSlash || daggerSlash || ironScabbard || starHunterEye || starBreaker || fateD12Weakness || fateD12Burst || luckyD12Weakness || luckyD12Burst || shellImpact || jawBite || poisonCloud;
     const enemyFigureRect = fixedTargetTrail && opts.side === 'enemy'
       ? targetEl.querySelector('.combat-enemy-figure')?.getBoundingClientRect?.()
       : null;
@@ -1425,7 +1429,8 @@ const RenderModal = {
     }
     const dx = targetX - sourceX;
     const dy = targetY - sourceY;
-    const distance = Math.max(120, Math.hypot(dx, dy));
+    const trailExtendPx = Math.max(0, Number(opts.trailExtendPx) || 0);
+    const distance = Math.max(120, Math.hypot(dx, dy) + trailExtendPx);
     const angle = Math.atan2(dy, dx) * 180 / Math.PI;
     const mobileTargetHitAngle = fixedTargetTrail && stackedCombat
       ? (opts.side === 'enemy' ? 180 : 90)
@@ -1436,7 +1441,8 @@ const RenderModal = {
     const fx = document.createElement('div');
     const trailClass = String(trail).replace(/_/g, '-');
     const silverBeeSpeedClass = trail === 'silver_bee_pin' ? ` combo-speed-${this._combatSilverBeeComboSpeed(targetEl)}` : '';
-    fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}${silverBeeSpeedClass} fx-tier-${tier}`;
+    const paletteClass = opts.palette ? ` palette-${String(opts.palette).replace(/[^a-z0-9_-]/gi, '-')}` : '';
+    fx.className = `combat-attack-trail trail-${trailClass}${swordSlash ? ' trail-sword-slash' : ''}${daggerSlash ? ' trail-dagger-slash' : ''}${silverBeeSpeedClass}${paletteClass} fx-tier-${tier}`;
     fx.setAttribute('aria-hidden', 'true');
     if (trail === 'pierce' || trail === 'silver_bee_pin' || darkAvatar) {
       fx.style.left = `${Math.round(sourceX - sceneRect.left)}px`;
@@ -1461,6 +1467,10 @@ const RenderModal = {
       iron_scabbard: 940,
       star_hunter_eye: 720,
       star_breaker: 820,
+      fate_d12_weakness: 760,
+      fate_d12_burst: 900,
+      lucky_d12_weakness: 760,
+      lucky_d12_burst: 900,
       shell_impact: 760,
       jaw_bite: 760,
       poison_cloud: 820,
@@ -1738,12 +1748,13 @@ const RenderModal = {
                   ? (damageEvent.attackTrail || damageEvent.hitEffect)
                   : (relicFx || damageEvent.attackTrail || damageEvent.hitEffect);
                 const hitEffect = damageEvent.hitEffect || '';
-                const layeredWeaponHit = ['slash', 'strike', 'pierce', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker'].includes(attackTrail);
-                const visualHitEffect = relicFx ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
+                const layeredWeaponHit = ['slash', 'strike', 'pierce', 'silver_bee_pin', 'iron_scabbard', 'star_hunter_eye', 'star_breaker', 'fate_d12_weakness', 'fate_d12_burst', 'lucky_d12_weakness', 'lucky_d12_burst'].includes(attackTrail);
+                const dedicatedSpriteTrail = ['lucky_d12_weakness', 'lucky_d12_burst'].includes(attackTrail);
+                const visualHitEffect = relicFx || dedicatedSpriteTrail ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
                 const heavyRelicImpact = ['iron_scabbard', 'star_breaker'].includes(relicFx);
                 this._pulseCombatImpact(combatScene, damageEvent.damage, { tier: fxTier });
                 if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, damageEvent.sfxVolume ?? 0.44);
-                this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, weaponFamily: damageEvent.weaponFamily || '', palette: damageEvent.attackPalette || '', damage: damageEvent.damage, tier: fxTier, trailExtendPx: damageEvent.trailExtendPx || 0 });
                 if (Number.isFinite(damageEvent.enemyBlockAfter)) {
                   this._setDisplayedEnemyBlock(damageEvent.enemyBlockAfter);
                   if (damageEvent.enemyBlockAbsorbed > 0 && damageEvent.damage <= 0) playFullBlockSfx();
@@ -1751,7 +1762,7 @@ const RenderModal = {
                 if (delayedRelicFx) {
                   setTimeout(() => {
                     if (damageEvent.relicSfx) AudioManager?.playSfx?.(damageEvent.relicSfx, damageEvent.relicSfxVolume ?? 0.48);
-                    this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                    this._showCombatAttackTrail(enemyCard, relicFx, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, weaponFamily: damageEvent.weaponFamily || '', palette: damageEvent.attackPalette || '', damage: damageEvent.damage, tier: fxTier, trailExtendPx: damageEvent.trailExtendPx || 0 });
                   }, 180);
                 }
                 if (heavyRelicImpact) {
@@ -1772,6 +1783,7 @@ const RenderModal = {
                   scene: combatScene,
                   offsetY: relicFx ? -24 : 0,
                   tier: fxTier,
+                  kind: damageEvent.type === 'critical' ? 'critical' : '',
                 });
                 const damageNumberDelay = delayedRelicFx ? 300 : (relicFx ? 220 : 140);
                 setTimeout(showDamageNumber, damageNumberDelay + (fxTier === 'finisher' ? 120 : 0));
@@ -2133,6 +2145,7 @@ const RenderModal = {
     const enemyCardIdClass = combat.enemy.id
       ? ` enemy-${String(combat.enemy.id).replace(/[^a-z0-9_-]/gi, '-')}`
       : '';
+    const enemyReelClass = combat.reelCombat ? ' reel-combat-enemy' : '';
     const enemyDefeatedClass = combat.enemy.defeated ? ' pending-defeated' : '';
     const enemySelfTargetClass = combat.intent?.targetSelf ? ' self-targeted' : '';
     const enemyHoverTitle = this._combatEnemyHoverTitle(combat.enemy);
@@ -2148,7 +2161,7 @@ const RenderModal = {
     return `
       ${intentArrowHtml}
       ${bagHtml}
-      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyDefeatedClass}${enemySelfTargetClass}${tutorialTarget === 'enemy' ? ' combat-tutorial-highlight' : ''}"${enemyCardBgStyle}>
+      <div class="combat-enemy-card hoverable-enemy${enemyCardBgClass}${enemyCardIdClass}${enemyReelClass}${enemyDefeatedClass}${enemySelfTargetClass}${tutorialTarget === 'enemy' ? ' combat-tutorial-highlight' : ''}"${enemyCardBgStyle}>
         ${combat.enemyDice ? `<div class="combat-floating-enemy-dice">${this._combatDicePips(combat.enemyDice.animate === false ? combat.enemyDice.value : null, 'enemy', null, combat.enemyDice.sides)}</div>` : ''}
         ${this._combatEnemyDamageDiePanelHtml(combat.enemy)}
         <div class="combat-side-label" aria-hidden="true"></div>

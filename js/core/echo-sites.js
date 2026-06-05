@@ -81,6 +81,43 @@ const GameEchoSites = {
       return;
     }
     this._log(`共鳴遺址出現：${system.siteName} (${target.x},${target.y})。`, 'reward');
+    if (!G.echoSiteReserveHintDismissed) {
+      this._openEchoSiteReserveHint(() => this._openEchoSiteClueModal(system, target, ev));
+      return;
+    }
+    this._openEchoSiteClueModal(system, target, ev);
+  },
+
+  _openEchoSiteReserveHint(onDone = null) {
+    this._openModal({
+      title: '共鳴遺址的聖物占用',
+      desc: [
+        '共鳴遺址出現時，守護者會暫時占用一件對應體系的聖物。',
+        '被占用的聖物會從本局一般聖物獎勵中排除；若想補齊那套共鳴，需要前往遺址擊敗守護者。',
+        '如果你不想走這套流派，也可以把它視為清理聖物池的機會，讓其他聖物更容易出現。',
+      ].join('\n\n'),
+      resultFx: 'event-discover',
+      choices: [
+        {
+          label: '我知道了',
+          action: () => {
+            this._closeModal();
+            if (typeof onDone === 'function') onDone();
+          },
+        },
+        {
+          label: '本局不再顯示',
+          action: () => {
+            G.echoSiteReserveHintDismissed = true;
+            this._closeModal();
+            if (typeof onDone === 'function') onDone();
+          },
+        },
+      ],
+    });
+  },
+
+  _openEchoSiteClueModal(system, target, ev) {
     this._openModal({
       title: '共鳴遺址的線索',
       desc: [

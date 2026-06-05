@@ -25,12 +25,16 @@ const Game = {
       darkness: 0,
       lightCharges: 0,
       darkMonsters: [],
+      darkMonsterRespawns: [],
+      darkMonsterChasesToday: 0,
+      eventCounts: {},
       darknessMilestones: {},
       nightIntroShown: false,
       dayTransitionActive: false,
       pendingSystemModals: [],
       fateGamblingTableTriggered: false,
       echoSites: [],
+      echoSiteReserveHintDismissed: false,
       spawnedUniqueEnemies: [],
       defeatedUniqueEnemies: [],
       guideQuest: null,
@@ -326,7 +330,7 @@ const Game = {
 
   // Section.
   handleCellClick(x, y) {
-    if (G.modal || G.phase === 'over' || G.mapMoveLocked || G.dayTransitionActive) return;
+    if (this._isWorldInteractionLocked?.() || G.mapMoveLocked) return;
     if (this._triggerPendingDarkMonsterChase()) return;
     this._refreshRestPoints();
 
@@ -362,10 +366,11 @@ const Game = {
   },
 
   _animateMoveTo(x, y) {
-    if (G.mapMoveLocked) return;
+    if (this._isWorldInteractionLocked?.() || G.mapMoveLocked) return;
     G.mapMoveLocked = true;
     const done = () => {
       G.mapMoveLocked = false;
+      if (this._isWorldTransitionActive?.() || G.modal || G.combat || G.phase === 'over') return;
       this._moveTo(x, y);
     };
     if (Render.animatePlayerMove) {
@@ -376,6 +381,7 @@ const Game = {
   },
 
   _moveTo(x, y) {
+    if (this._isWorldTransitionActive?.() || G.modal || G.combat || G.phase === 'over') return;
     const cell = G.map[y][x];
 
     G.playerX = x;
@@ -413,7 +419,7 @@ const Game = {
   // Section.
   // Section.
   endDay() {
-    if (G.modal || G.phase === 'over' || G.dayTransitionActive) return;
+    if (G.modal || G.combat || G.phase === 'over' || this._isWorldTransitionActive?.()) return;
     if (G.actionsLeft > 0) {
       Render.renderTopBar();
       return;
@@ -452,8 +458,10 @@ const Game = {
   },
 
   _completeEndDay() {
-    G.dayTransitionActive = false;
-    if (this._applyNightEndErosion()) return;
+    if (this._applyNightEndErosion()) {
+      G.dayTransitionActive = false;
+      return;
+    }
 
     G.day++;
     G.actionsLeft = CONFIG.ACTIONS_PER_DAY;
@@ -468,28 +476,39 @@ const Game = {
       char._exorcismRingUsed = false;
     }
     G.gamblerRerollsLeft = 0;
+    G.darkMonsterChasesToday = 0;
     this._syncGamblerRerollDisplay();
 
     const dailyDarkness = G.phase === 'night' ? 2 : 1;
     this._applyDarkness(dailyDarkness, G.phase === 'night' ? '夜晚結束' : '白天結束');
-    if (G.phase === 'over') return;
+    if (G.phase === 'over') {
+      G.dayTransitionActive = false;
+      return;
+    }
     this._updateDarkMonstersDaily();
     this._maybeSpawnDailyDarkMonster();
+    this._respawnRoutedDarkMonsters?.();
     const hasPhaseTransition = (G.day === CONFIG.NIGHT_START_DAY && G.phase === 'day') || G.day >= CONFIG.DAWN_DAY;
-    if (!hasPhaseTransition && this._triggerPendingDarkMonsterChase()) return;
+    if (!hasPhaseTransition) {
+      G.dayTransitionActive = false;
+      this._flushSystemModal?.();
+      if (this._triggerPendingDarkMonsterChase()) return;
+    }
 
     // 進入黑夜。
     if (G.day === CONFIG.NIGHT_START_DAY && G.phase === 'day') {
       this._enterNight();
-      this._triggerPendingDarkMonsterChase();
       return;
     }
     if (G.day >= CONFIG.DAWN_DAY) {
+      G.dayTransitionActive = false;
       this._triggerDawn(); return;
     }
 
     this._maybeCompleteGuideQuestByFreedom();
     this._log(`第 ${G.day} 天開始。`, 'important');
+    G.dayTransitionActive = false;
+    this._flushSystemModal?.();
     Render.fullRender();
   },
 
@@ -501,18 +520,24 @@ const Game = {
       this._maybeSpawnUniqueStrongEnemy();
     }
 
-    // 夜晚只放置目前的黑夜聖物；舊黑夜遺匣流程已移除。
     this._placeNightRelics();
 
     Render.fullRender();
     G.nightTransitionActive = true;
-    Render.showNightTransition();
     const shouldShowIntro = !G.nightIntroShown;
-    setTimeout(() => {
+    const finishNightTransition = () => {
+      G.dayTransitionActive = false;
       G.nightTransitionActive = false;
       this._showNightIntroOnce();
       if (!shouldShowIntro) this._triggerPendingDarkMonsterChase?.();
-    }, 1250);
+      this._flushSystemModal?.();
+      Render.fullRender();
+    };
+    if (typeof Render.showNightTransition === 'function') {
+      Render.showNightTransition(finishNightTransition);
+    } else {
+      setTimeout(finishNightTransition, 2400);
+    }
   },
 
   _applyNightEndErosion() {

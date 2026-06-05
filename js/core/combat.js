@@ -554,7 +554,7 @@ const CombatRules = {
     }
     const preWoundDamage = preSoulCutterDamage;
     if (painResonanceActive && currentWounds > 0 && damage > 0) {
-      logs.push(`痛痕共鳴・爆發：本次主戰無視傷口 ${currentWounds} 層的傷害加成`);
+      logs.push(`痛痕爆發：本次主戰無視傷口 ${currentWounds} 層的傷害加成`);
     }
     if (!painResonanceActive && currentWounds > 0 && damage > 0) {
       let woundBonusRate = currentWounds * 0.05;
@@ -568,7 +568,7 @@ const CombatRules = {
       if (painScarResonanceActive && currentWounds >= painScarThreshold) {
         const painScarBonusRate = currentWounds >= 10 ? 0.50 : 0.30;
         woundBonusRate += painScarBonusRate;
-        logs.push(`痛痕共鳴・折磨：目標傷口 ${currentWounds} 層，擊中傷害額外提高 ${Math.round(painScarBonusRate * 100)}%`);
+        logs.push(`痛痕折磨：目標傷口 ${currentWounds} 層，擊中傷害額外提高 ${Math.round(painScarBonusRate * 100)}%`);
       }
       const woundBonus = Math.floor(damage * woundBonusRate);
       if (woundBonus > 0) {
@@ -644,6 +644,11 @@ const CombatRules = {
     }
 
     const playerDamageEvents = [];
+    const fateDiceBurstFx = !!rollResult.dodecaFateDice && diceRaw === 12 && resonanceWeaknessHit;
+    const fateDiceNativeWeaknessFx = !!rollResult.dodecaFateDice && (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit);
+    const fateDiceBaseFx = !!rollResult.dodecaFateDice;
+    const luckyDiceBurstFx = !!rollResult.dodecaLuckyDice && roll === 12;
+    const luckyDiceWeaknessFx = !!rollResult.dodecaLuckyDice && !luckyDiceBurstFx && tempWeaknessHit;
     const primaryAttackTrail = weapon?.family === 'bow'
       ? 'pierce'
       : (['sword', 'dagger', 'katana'].includes(weapon?.family) ? 'slash' : 'strike');
@@ -668,9 +673,31 @@ const CombatRules = {
         enemyBlockBefore,
         enemyBlockAfter,
         enemyBlockAbsorbed,
-        hitEffect: primaryHitEffect,
-        attackTrail: primaryAttackTrail,
-        sfx: weapon?.family === 'bow'
+        hitEffect: (luckyDiceBurstFx || luckyDiceWeaknessFx)
+          ? ''
+          : (fateDiceBaseFx && !fateDiceNativeWeaknessFx ? 'slash' : primaryHitEffect),
+        attackTrail: luckyDiceBurstFx
+          ? 'lucky_d12_burst'
+          : luckyDiceWeaknessFx
+          ? 'lucky_d12_weakness'
+          : fateDiceBurstFx
+          ? 'fate_d12_burst'
+          : fateDiceNativeWeaknessFx
+          ? 'fate_d12_weakness'
+          : (fateDiceBaseFx ? 'slash' : primaryAttackTrail),
+        weaponFamily: fateDiceBaseFx && !fateDiceNativeWeaknessFx ? 'dagger' : (weapon?.family || ''),
+        attackPalette: fateDiceBaseFx && !fateDiceNativeWeaknessFx ? 'fate-d12' : '',
+        sfx: luckyDiceBurstFx
+          ? 'luckyD12Burst'
+          : luckyDiceWeaknessFx
+          ? 'luckyD12Normal'
+          : fateDiceBurstFx
+          ? 'fateD12Burst'
+          : fateDiceNativeWeaknessFx
+          ? 'fateD12Normal'
+          : fateDiceBaseFx && !fateDiceNativeWeaknessFx
+          ? 'daggerWoosh'
+          : weapon?.family === 'bow'
           ? 'bowShot'
           : (greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
             ? 'ironScabbardSlice'
@@ -679,7 +706,10 @@ const CombatRules = {
             : (weapon?.family === 'sword'
             ? 'swordWoosh'
             : (weapon?.family === 'dagger' ? 'daggerWoosh' : '')))),
-        relicFx: greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
+        sfxVolume: luckyDiceBurstFx ? 0.6 : (luckyDiceWeaknessFx ? 0.56 : (fateDiceBurstFx ? 0.6 : undefined)),
+        relicFx: fateDiceNativeWeaknessFx
+          ? ''
+          : greatswordStrike && greatswordRelic?.id === 'iron_scabbard'
           ? 'iron_scabbard'
           : (rapierStrike && rapierRelic?.id === 'silver_bee_pin'
             ? 'silver_bee_pin'
@@ -798,7 +828,7 @@ const CombatRules = {
       if (painResonanceActive) {
         const resonanceWounds = Math.ceil(Math.max(0, roll || 0) / 2);
         woundGain += resonanceWounds;
-        logs.push(`痛痕共鳴・爆發：本次造成傷害，最終骰面 ${roll} 減半附加 ${resonanceWounds} 層傷口`);
+        logs.push(`痛痕爆發：本次造成傷害，最終骰面 ${roll} 減半附加 ${resonanceWounds} 層傷口`);
       }
       if (weapon?.effect?.type === 'wound_on_hit') {
         const weaponWounds = weapon.effect.stacks || 1;
@@ -859,7 +889,7 @@ const CombatRules = {
             : 0;
           enemy.wounds = Math.min(woundMax, retainedWounds);
           const retainedText = retainedWounds > 0 ? `，爆發後保留 ${retainedWounds} 層傷口` : '，傷口清空';
-          logs.push(`${painResonanceActive ? '痛痕共鳴・爆發' : '痛苦面具融合'}：引爆 ${consumedWounds} 層傷口，每層 ${damagePerWound} 點，造成 ${explodeDamage} 點固定傷害${retainedText}`);
+          logs.push(`${painResonanceActive ? '痛痕爆發' : '痛苦面具融合'}：引爆 ${consumedWounds} 層傷口，每層 ${damagePerWound} 點，造成 ${explodeDamage} 點固定傷害${retainedText}`);
           if (weapon?.effect?.explodeDamage) {
             const weaponExplodeBonus = weapon.effect.explodeDamage;
             const weaponExplodeHpBefore = enemy.hp;

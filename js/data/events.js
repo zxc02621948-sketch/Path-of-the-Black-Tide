@@ -56,6 +56,7 @@ const EVENT_POOL = {
       rarity: 'epic',
       category: 2,
       weight: 1,
+      maxPerRun: 1,
       heal: 2,
       darknessChange: -1,
     },
@@ -223,6 +224,7 @@ const EVENT_POOL = {
       rarity: 'epic',
       category: 6,
       weight: 1,
+      maxPerRun: 1,
       noteText: '你們點燃餘燼，黑暗短暫退去。',
       darknessChange: -1,
       purificationRoll: true,
@@ -502,29 +504,27 @@ function createFateGamblingTableEvent(baseEvent = null) {
 }
 
 const EVENT_RARITY_WEIGHTS = {
-  common: 50,
-  rare: 28,
-  epic: 14,
-  legendary: 8,
+  common: 62,
+  rare: 27,
+  epic: 9,
+  legendary: 2,
 };
-const EVENT_RARITY_FALLBACK = ['legendary', 'epic', 'rare', 'common'];
+const EVENT_RARITIES = ['common', 'rare', 'epic', 'legendary'];
 
-function _rollEventRarity() {
-  const total = Object.values(EVENT_RARITY_WEIGHTS).reduce((sum, value) => sum + value, 0);
+function _rollAvailableEventRarity(candidatesByRarity) {
+  const available = EVENT_RARITIES.filter(rarity => candidatesByRarity[rarity]?.length > 0);
+  const total = available.reduce((sum, rarity) => sum + (EVENT_RARITY_WEIGHTS[rarity] || 0), 0);
+  if (total <= 0) return available[0] || null;
   let roll = Math.random() * total;
-  for (const [rarity, weight] of Object.entries(EVENT_RARITY_WEIGHTS)) {
-    roll -= weight;
+  for (const rarity of available) {
+    roll -= EVENT_RARITY_WEIGHTS[rarity] || 0;
     if (roll < 0) return rarity;
   }
-  return 'common';
-}
-
-function _raritySearchOrder(rarity) {
-  const idx = EVENT_RARITY_FALLBACK.indexOf(rarity);
-  return idx >= 0 ? EVENT_RARITY_FALLBACK.slice(idx) : ['common'];
+  return available[available.length - 1] || null;
 }
 
 function _eventConditionPass(ev, state) {
+  if (ev?.maxPerRun && (state?.eventCounts?.[ev.id] || 0) >= ev.maxPerRun) return false;
   if (!ev?.condition) return true;
   if (typeof ev.condition === 'function') return !!ev.condition(state || {});
   return true;
@@ -562,27 +562,20 @@ function _decorateEvent(ev, rarity) {
   };
 }
 
-// 地形事件：先抽稀有度，再從目前地形中抽符合 rarity 與 condition 的事件。
+// 地形事件：先看目前地形實際可用的稀有度，再依稀有度權重抽選。
 function randomTerrainEvent(terrainType, state = null) {
   const basePool = EVENT_POOL[terrainType];
   if (!basePool) return null;
   const pool = [...basePool, ..._specialTerrainEvents(terrainType)];
   const eventState = _eventState(state);
-  const rolledRarity = _rollEventRarity();
-  const searched = new Set();
-  for (const rarity of _raritySearchOrder(rolledRarity)) {
-    searched.add(rarity);
-    const candidates = pool.filter(ev => (ev.rarity || 'common') === rarity && _eventConditionPass(ev, eventState));
-    const picked = _pickWeightedEvent(candidates);
-    if (picked) return _decorateEvent(picked, rarity);
+  const candidatesByRarity = {};
+  for (const rarity of EVENT_RARITIES) {
+    candidatesByRarity[rarity] = pool.filter(ev => (ev.rarity || 'common') === rarity && _eventConditionPass(ev, eventState));
   }
-  for (const rarity of EVENT_RARITY_FALLBACK) {
-    if (searched.has(rarity)) continue;
-    const candidates = pool.filter(ev => (ev.rarity || 'common') === rarity && _eventConditionPass(ev, eventState));
-    const picked = _pickWeightedEvent(candidates);
-    if (picked) return _decorateEvent(picked, rarity);
-  }
-  return null;
+  const rarity = _rollAvailableEventRarity(candidatesByRarity);
+  if (!rarity) return null;
+  const picked = _pickWeightedEvent(candidatesByRarity[rarity]);
+  return picked ? _decorateEvent(picked, rarity) : null;
 }
 
 function _specialTerrainEvents(terrainType) {

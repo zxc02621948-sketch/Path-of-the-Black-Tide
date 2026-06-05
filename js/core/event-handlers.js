@@ -86,6 +86,7 @@ const GameEventHandlers = {
 
   _dispatchTerrainEvent(cell, ev) {
     cell.cleared = true;
+    this._recordEventCompletion(ev);
     if (ev.id === 'empty_darkness_seep') { this._triggerDarknessSeep(cell, ev); return; }
     if (ev.id === 'empty_dark_whisper') { this._triggerDarkWhisper(cell, ev); return; }
     if (ev.id === 'empty_old_camp') { this._triggerOldCamp(cell, ev); return; }
@@ -175,6 +176,7 @@ const GameEventHandlers = {
       ...G,
       squadHasRelic: relicId => this._squadHasRelic(relicId),
       relicIdInRun: relicId => this._getRelicIdsInRun().has(relicId),
+      eventCounts: G.eventCounts || {},
       canRevealAltarClue: () => this._canRevealAltarClue(),
       canRevealRescueBoss: () => this._canRevealRescueBoss(),
       canFindEventRelic: () => this._canFindEventRelic(),
@@ -458,6 +460,7 @@ const GameEventHandlers = {
   },
 
   _completeProgressEvent(ev, fallbackDelta = undefined) {
+    this._recordEventCompletion(ev);
     let delta = this._progressEventDelta(ev, fallbackDelta);
     if (typeof delta !== 'number' || delta === 0) return;
     if (delta < 0) {
@@ -465,6 +468,14 @@ const GameEventHandlers = {
       return;
     }
     this._applyDarkness(delta, ev.name || '事件');
+  },
+
+  _recordEventCompletion(ev) {
+    if (!ev?.id) return;
+    if (ev._completionRecorded) return;
+    ev._completionRecorded = true;
+    if (!G.eventCounts) G.eventCounts = {};
+    G.eventCounts[ev.id] = (G.eventCounts[ev.id] || 0) + 1;
   },
 
   _rollDarknessReduction(ev, delta) {

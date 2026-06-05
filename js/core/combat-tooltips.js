@@ -295,7 +295,7 @@ const GameCombatTooltips = {
     if (wounds <= 0) return;
     const max = enemy.woundMax || 15;
     const bonus = wounds * 5;
-    const descText = `${enemy.name} 目前 ${wounds} / ${max} 層傷口，通常受到傷害提高 ${bonus}%。每 1 層傷口提供 +5% 受傷害；痛痕共鳴・爆發的持有者攻擊時會忽略這個增傷，改以快速累積並引爆傷口。`;
+    const descText = `${enemy.name} 目前 ${wounds} / ${max} 層傷口，通常受到傷害提高 ${bonus}%。每 1 層傷口提供 +5% 受傷害；痛痕爆發的持有者攻擊時會忽略這個增傷，改以快速累積並引爆傷口。`;
 
     let popover = document.getElementById('combat-status-popover');
     if (!popover) {
