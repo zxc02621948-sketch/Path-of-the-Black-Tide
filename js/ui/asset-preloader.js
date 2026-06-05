@@ -118,6 +118,9 @@ const AssetPreloader = {
       'assets/effects/fate-d12-burst-sprite.png',
       'assets/effects/lucky-d12-weakness-sprite.png',
       'assets/effects/lucky-d12-burst-sprite.png',
+      'assets/effects/resonance-awaken-charge.png',
+      'assets/effects/resonance-awaken-wave.png',
+      'assets/events/resonance-awaken-backdrop.png',
       'assets/effects/dark-avatar-skill-sprite.png',
       ...Array.from({ length: 10 }, (_, digit) => `assets/effects/damage-digits/${digit}.png`),
     ];

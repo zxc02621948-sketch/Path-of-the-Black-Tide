@@ -33,6 +33,7 @@ const RenderNotes = {
         tab.classList.toggle('active', tab === activeTab);
       }
       area.innerHTML = '';
+      area.className = 'notes-area';
       render.call(this, area);
       this._resetNotesScroll(modal, content, area);
     };
@@ -561,7 +562,7 @@ const RenderNotes = {
 
     for (const info of terrains) {
       const entry = document.createElement('div');
-      entry.className = 'terrain-note-entry';
+      entry.className = `terrain-note-entry${info.image ? '' : ' terrain-note-plain'}`;
       const visual = info.image
         ? `<img class="terrain-note-image" src="${info.image}" alt="${info.name}">`
         : `<span class="terrain-note-icon">${info.icon}</span>`;

@@ -90,7 +90,7 @@ const GameRelicResonance = {
     return newly;
   },
 
-  _showResonanceActivatedModal(resonances = []) {
+  _showResonanceActivatedModal(resonances = [], opts = {}) {
     const escape = value => this._escapeHtmlLocal ? this._escapeHtmlLocal(value) : String(value ?? '');
     const rows = resonances.map(res => {
       const owner = res.bodyChar?.name || '隊伍';
@@ -125,9 +125,10 @@ const GameRelicResonance = {
         </div>
       `,
       resultFx: 'resonance-awaken',
-      eventSfx: sfxRes?.activateSfx || 'swordWoosh',
-      eventSfxVolume: Number.isFinite(sfxRes?.activateSfxVolume) ? sfxRes.activateSfxVolume : 0.32,
-      choices: [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
+      resultSfx: sfxRes?.activateSfx || 'swordWoosh',
+      resultSfxVolume: Number.isFinite(sfxRes?.activateSfxVolume) ? sfxRes.activateSfxVolume : 0.32,
+      resultSfxDelay: 820,
+      choices: opts.choices || [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
 
@@ -146,6 +147,10 @@ const GameRelicResonance = {
     const alt = escapeAttr(res.name || '共鳴');
     return `
       <div class="resonance-awaken-scene resonance-awaken-icon-scene resonance-theme-${escapeAttr(theme.key)}" style="${style}">
+        <span class="resonance-awaken-charge-sprite"></span>
+        <span class="resonance-awaken-charge-aura"></span>
+        <span class="resonance-awaken-wave-sprite"></span>
+        <span class="resonance-awaken-impact-flash"></span>
         <span class="resonance-awaken-icon-burst resonance-awaken-icon-burst-a"></span>
         <span class="resonance-awaken-icon-burst resonance-awaken-icon-burst-b"></span>
         <span class="resonance-awaken-icon-ghost resonance-awaken-icon-ghost-a"><img src="${src}" alt=""></span>
@@ -296,6 +301,8 @@ const GameRelicResonance = {
           id: 'dodeca_fate_dice',
           name: '十二面命運骰',
           iconImage: 'assets/relics/dodeca-fate-dice-resonance.png',
+          activateSfx: 'resonanceFateD12',
+          activateSfxVolume: 0.48,
           isBody: true,
           bodyChar: char,
           effect: {
@@ -309,6 +316,8 @@ const GameRelicResonance = {
           id: 'dodeca_lucky_dice',
           name: '十二面幸運骰',
           iconImage: 'assets/relics/dodeca-lucky-dice-resonance.png',
+          activateSfx: 'resonanceLuckyD12',
+          activateSfxVolume: 0.48,
           isBody: true,
           bodyChar: char,
           effect: {
@@ -322,6 +331,8 @@ const GameRelicResonance = {
           id: 'star_hunter_eye',
           name: '獵星之眼',
           iconImage: 'assets/relics/star-hunter-eye-resonance.png',
+          activateSfx: 'resonanceStarHunterEye',
+          activateSfxVolume: 0.48,
           isBody: true,
           bodyChar: char,
           effect: {
@@ -335,6 +346,8 @@ const GameRelicResonance = {
           id: 'star_breaker_eye',
           name: '裂星破滅',
           iconImage: 'assets/relics/star-breaker-eye-resonance.png',
+          activateSfx: 'resonanceStarBreakerEye',
+          activateSfxVolume: 0.5,
           isBody: true,
           bodyChar: char,
           effect: {
@@ -348,6 +361,8 @@ const GameRelicResonance = {
           id: 'dual_banner_formation',
           name: '雙旗戰陣',
           iconImage: 'assets/relics/dual-banner-formation-resonance.png',
+          activateSfx: 'resonanceDualBanner',
+          activateSfxVolume: 0.48,
           isBody: true,
           bodyChar: char,
           relics: ['war_banner', 'eagle_banner'],

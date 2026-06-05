@@ -445,9 +445,93 @@ const GameDevTool = {
       choices: [
         { label: '戰鬥演出', action: () => this._devChooseCombatEffect() },
         { label: '事件演出', action: () => this._devChooseEventEffect() },
+        { label: '共鳴啟動演出', action: () => this._devChooseResonanceAwakenEffect() },
         { label: '返回', action: () => this.openDevTool() },
       ],
     });
+  },
+
+  _devChooseResonanceAwakenEffect() {
+    const options = this._devResonanceOptions();
+    this._openModal({
+      title: '測試工具：共鳴啟動演出',
+      desc: '選擇要預覽的共鳴動畫。這只會播放演出，不會修改角色聖物或共鳴狀態。',
+      typeText: false,
+      choices: options.map(option => ({
+        label: option.name,
+        detail: option.desc || '',
+        action: () => this._devPreviewResonanceAwakenEffect(option),
+      })).concat([{ label: '返回', action: () => this._devOpenEffectTool() }]),
+    });
+  },
+
+  _devPreviewResonanceAwakenEffect(option) {
+    const preview = this._devResonancePreviewData(option);
+    if (!preview) return;
+    this._showResonanceActivatedModal([preview], {
+      choices: [
+        { label: '重播', action: () => this._devReplayEffectPreview(() => this._devPreviewResonanceAwakenEffect(option)) },
+        { label: '返回', action: () => this._devChooseResonanceAwakenEffect() },
+        { label: '關閉', action: () => { this._closeModal(); Render.fullRender(); } },
+      ],
+    });
+  },
+
+  _devResonancePreviewData(option) {
+    if (!option) return null;
+    const char = this._aliveSquad()[0] || { id: 'dev_preview', name: '測試角色' };
+    const dataRes = (typeof RESONANCES !== 'undefined' ? RESONANCES : []).find(res => res?.id === option.id);
+    if (dataRes) {
+      return {
+        ...dataRes,
+        isBody: true,
+        bodyChar: char,
+        effect: dataRes.bodyEffect || dataRes.squadEffect || { type: option.id, desc: option.desc || '共鳴效果已啟動。' },
+      };
+    }
+    const special = {
+      dodeca_fate_dice: {
+        name: '十二面命運骰',
+        iconImage: 'assets/relics/dodeca-fate-dice-resonance.png',
+        activateSfx: 'resonanceFateD12',
+        activateSfxVolume: 0.48,
+      },
+      dodeca_lucky_dice: {
+        name: '十二面幸運骰',
+        iconImage: 'assets/relics/dodeca-lucky-dice-resonance.png',
+        activateSfx: 'resonanceLuckyD12',
+        activateSfxVolume: 0.48,
+      },
+      star_hunter_eye: {
+        name: '獵星之眼',
+        iconImage: 'assets/relics/star-hunter-eye-resonance.png',
+        activateSfx: 'resonanceStarHunterEye',
+        activateSfxVolume: 0.48,
+      },
+      star_breaker_eye: {
+        name: '裂星破滅',
+        iconImage: 'assets/relics/star-breaker-eye-resonance.png',
+        activateSfx: 'resonanceStarBreakerEye',
+        activateSfxVolume: 0.5,
+      },
+      dual_banner_formation: {
+        name: '雙旗戰陣',
+        iconImage: 'assets/relics/dual-banner-formation-resonance.png',
+        activateSfx: 'resonanceDualBanner',
+        activateSfxVolume: 0.48,
+      },
+    }[option.id];
+    if (!special) return null;
+    return {
+      id: option.id,
+      name: special.name,
+      iconImage: special.iconImage,
+      activateSfx: special.activateSfx,
+      activateSfxVolume: special.activateSfxVolume,
+      isBody: true,
+      bodyChar: char,
+      effect: { type: option.id, desc: option.desc || '共鳴效果已啟動。' },
+    };
   },
 
   _devChooseCombatEffect() {

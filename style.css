@@ -1942,6 +1942,15 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .modal-content.resonance-awaken {
+  overflow-x: hidden;
+  width: min(820px, calc(100vw - 32px));
+  max-width: 820px;
+  height: min(680px, calc(100dvh - 32px));
+  max-height: calc(100dvh - 32px);
+  background:
+    linear-gradient(180deg, rgba(8, 5, 3, .24), rgba(8, 5, 3, .52)),
+    url("assets/ui/modal-panel-frame.png") center / 100% 100% no-repeat,
+    var(--surface2);
   animation: resonance-awaken-modal .7s cubic-bezier(.16, .72, .18, 1);
   box-shadow:
     inset 0 1px 0 rgba(255,255,255,.05),
@@ -1956,6 +1965,10 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .modal-content.resonance-awaken #modal-choices {
   position: relative;
   z-index: 3;
+}
+
+.modal-content.resonance-awaken #modal-desc {
+  overflow-x: hidden;
 }
 
 .modal-content.event-quiet {
@@ -2034,11 +2047,23 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .modal-content.resonance-awaken::before {
-  animation: resonance-awaken-flash 1.16s ease-out .06s forwards;
+  inset: 10px;
+  z-index: 1;
   background:
-    radial-gradient(circle at 34% 38%, rgba(120, 238, 220, .28), transparent 31%),
-    radial-gradient(circle at 64% 54%, rgba(255, 204, 112, .18), transparent 36%),
-    radial-gradient(ellipse at 50% 50%, transparent 42%, rgba(0, 0, 0, .34) 100%);
+    linear-gradient(180deg, rgba(0, 0, 0, .48) 0%, rgba(0, 0, 0, .22) 34%, rgba(0, 0, 0, .48) 68%, rgba(0, 0, 0, .84) 100%),
+    linear-gradient(90deg, rgba(0, 0, 0, .62) 0%, rgba(0, 0, 0, .12) 34%, rgba(0, 0, 0, .18) 66%, rgba(0, 0, 0, .62) 100%),
+    radial-gradient(ellipse at 50% 40%, rgba(255, 184, 82, .08), rgba(0, 0, 0, .34) 70%);
+}
+
+.modal-content.resonance-awaken::after {
+  content: "";
+  position: absolute;
+  inset: 10px;
+  z-index: 0;
+  border-radius: 8px;
+  pointer-events: none;
+  background: url("assets/events/resonance-awaken-backdrop.png") 50% 46% / cover no-repeat;
+  filter: brightness(.92) saturate(1.08);
 }
 
 .modal-content.event-quiet::before {
@@ -2320,16 +2345,159 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   height: 176px;
   margin-top: -2px;
   margin-bottom: 12px;
+  max-width: 100%;
   isolation: isolate;
+  --res-sprite-hue: 0deg;
+  --res-sprite-sat: 1.48;
+  --res-charge-bright: 1.52;
+  --res-wave-bright: 1.1;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-pain {
+  --res-sprite-hue: -18deg;
+  --res-sprite-sat: 1.72;
+  --res-charge-bright: 1.5;
+  --res-wave-bright: 1.12;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-scar {
+  --res-sprite-hue: -42deg;
+  --res-sprite-sat: 1.82;
+  --res-charge-bright: 1.46;
+  --res-wave-bright: 1.08;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-iron {
+  --res-sprite-hue: 18deg;
+  --res-sprite-sat: 1.22;
+  --res-charge-bright: 1.38;
+  --res-wave-bright: 1.02;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-bee {
+  --res-sprite-hue: 166deg;
+  --res-sprite-sat: 1.38;
+  --res-charge-bright: 1.5;
+  --res-wave-bright: 1.18;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-fate {
+  --res-sprite-hue: 238deg;
+  --res-sprite-sat: 1.7;
+  --res-charge-bright: 1.42;
+  --res-wave-bright: 1.08;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-lucky {
+  --res-sprite-hue: 38deg;
+  --res-sprite-sat: 1.36;
+  --res-charge-bright: 1.62;
+  --res-wave-bright: 1.18;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-eye {
+  --res-sprite-hue: 180deg;
+  --res-sprite-sat: 1.55;
+  --res-charge-bright: 1.48;
+  --res-wave-bright: 1.14;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-breaker {
+  --res-sprite-hue: -8deg;
+  --res-sprite-sat: 1.95;
+  --res-charge-bright: 1.56;
+  --res-wave-bright: 1.16;
+}
+
+.resonance-awaken-icon-scene.resonance-theme-banner {
+  --res-sprite-hue: 88deg;
+  --res-sprite-sat: 1.34;
+  --res-charge-bright: 1.44;
+  --res-wave-bright: 1.1;
 }
 
 .resonance-awaken-icon-core-img,
 .resonance-awaken-icon-ghost,
-.resonance-awaken-icon-burst {
+.resonance-awaken-icon-burst,
+.resonance-awaken-charge-sprite,
+.resonance-awaken-charge-aura,
+.resonance-awaken-wave-sprite,
+.resonance-awaken-impact-flash {
   position: absolute;
   left: 50%;
   top: 50%;
   pointer-events: none;
+}
+
+.resonance-awaken-charge-sprite {
+  z-index: 5;
+  width: min(360px, 72vw);
+  height: min(360px, 72vw);
+  background: url("assets/effects/resonance-awaken-charge.png") 33.333% 0 / 400% 200% no-repeat;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    hue-rotate(var(--res-sprite-hue, 0deg))
+    brightness(calc(var(--res-charge-bright, 1.52) * .86))
+    contrast(1.04)
+    saturate(calc(var(--res-sprite-sat, 1.75) * .82))
+    drop-shadow(0 0 16px rgba(255, 226, 114, .38))
+    drop-shadow(0 0 30px var(--res-primary, rgba(230, 54, 42, .42)))
+    drop-shadow(0 0 44px var(--res-shadow, rgba(130, 0, 0, .26)));
+  animation:
+    resonance-awaken-charge-motion 1.02s cubic-bezier(.18, .82, .2, 1) both,
+    resonance-awaken-charge-frames 1.02s steps(1, end) both;
+}
+
+.resonance-awaken-charge-aura {
+  display: none;
+  z-index: 1;
+  width: min(330px, 68vw);
+  height: min(330px, 68vw);
+  border-radius: 50%;
+  opacity: 0;
+  mix-blend-mode: screen;
+  background:
+    repeating-conic-gradient(from -18deg, transparent 0 15deg, rgba(255, 221, 92, .28) 16deg 19deg, transparent 20deg 34deg),
+    radial-gradient(circle, rgba(255, 238, 160, .34) 0 8%, rgba(255, 178, 48, .18) 28%, transparent 66%);
+  filter:
+    blur(.4px)
+    drop-shadow(0 0 18px rgba(255, 219, 102, .5))
+    drop-shadow(0 0 36px var(--res-primary, rgba(230, 54, 42, .5)));
+  animation: resonance-awaken-charge-aura 1.02s ease-out both;
+}
+
+.resonance-awaken-wave-sprite {
+  z-index: 6;
+  width: min(370px, 78vw);
+  height: min(370px, 78vw);
+  background: url("assets/effects/resonance-awaken-wave.png") 0 0 / 400% 200% no-repeat;
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter:
+    hue-rotate(var(--res-sprite-hue, 0deg))
+    brightness(var(--res-wave-bright, 1.1))
+    saturate(calc(var(--res-sprite-sat, 1.48) * .86))
+    drop-shadow(0 0 20px rgba(255, 218, 104, .72))
+    drop-shadow(0 0 36px var(--res-primary, rgba(230, 54, 42, .54)));
+  animation:
+    resonance-awaken-wave-motion .72s cubic-bezier(.08, .74, .2, 1) .82s both,
+    resonance-awaken-wave-frames .72s steps(1, end) .82s both;
+}
+
+.resonance-awaken-impact-flash {
+  display: none;
+  z-index: 4;
+  width: min(210px, 48vw);
+  height: min(210px, 48vw);
+  border-radius: 50%;
+  background:
+    radial-gradient(circle, rgba(255, 255, 245, .96) 0 7%, rgba(255, 226, 116, .54) 18%, transparent 62%),
+    conic-gradient(from 10deg, transparent 0 9deg, rgba(255, 245, 178, .86) 10deg 12deg, transparent 13deg 44deg);
+  opacity: 0;
+  mix-blend-mode: screen;
+  filter: blur(.2px) drop-shadow(0 0 22px rgba(255, 228, 108, .76));
+  animation: resonance-awaken-impact-flash .38s ease-out .82s both;
 }
 
 .resonance-awaken-icon-core-img,
@@ -2340,7 +2508,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .resonance-awaken-icon-core-img {
-  z-index: 3;
+  z-index: 4;
   filter:
     drop-shadow(0 0 12px var(--res-primary, rgba(230, 54, 42, .72)))
     drop-shadow(0 0 30px var(--res-shadow, rgba(130, 0, 0, .52)));
@@ -2356,6 +2524,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .resonance-awaken-icon-ghost {
+  display: none;
   z-index: 2;
   opacity: 0;
   mix-blend-mode: screen;
@@ -2374,6 +2543,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .resonance-awaken-icon-burst {
+  display: none;
   z-index: 1;
   width: min(250px, 56vw);
   height: min(250px, 56vw);
@@ -2486,6 +2656,14 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .resonance-awaken-copy.compact {
   display: grid;
   gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid rgba(255, 190, 90, .18);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(12, 7, 3, .62), rgba(9, 6, 4, .78));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 222, 140, .08),
+    0 14px 28px rgba(0, 0, 0, .28);
 }
 
 .resonance-awaken-lead {
@@ -2494,7 +2672,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   font-weight: 600;
   letter-spacing: 0;
   line-height: 1.45;
-  text-shadow: 0 0 12px rgba(84, 226, 204, .28);
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .92), 0 0 12px rgba(255, 184, 82, .22);
 }
 
 .resonance-awaken-list {
@@ -2535,9 +2713,10 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 
 .resonance-awaken-entry p {
   margin: 0;
-  color: var(--text);
+  color: #eadfc8;
   font-size: .94em;
   line-height: 1.48;
+  text-shadow: 0 2px 8px rgba(0, 0, 0, .88);
 }
 
 .resonance-awaken-card {
@@ -2719,6 +2898,14 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   100% { transform: translateY(0) scale(1); filter: brightness(1) saturate(1); }
 }
 
+@keyframes resonance-awaken-shock {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  18% { transform: translate(-1px, 1px) scale(1.006); }
+  34% { transform: translate(2px, -1px) scale(1.01); }
+  50% { transform: translate(-2px, 0) scale(1.006); }
+  68% { transform: translate(1px, 1px) scale(1.002); }
+}
+
 @keyframes resonance-awaken-flash {
   0% { opacity: 0; transform: scale(.9); filter: blur(0); }
   24% { opacity: .96; transform: scale(1.02); filter: blur(1px); }
@@ -2780,6 +2967,94 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   0% { opacity: 0; transform: translate(-50%, -50%) scale(.42) rotate(-10deg); }
   28% { opacity: .75; }
   100% { opacity: 0; transform: translate(-50%, -50%) scale(1.18) rotate(24deg); }
+}
+
+@keyframes resonance-awaken-charge-motion {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08) rotate(-18deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-charge-bright, 1.52) * .56)) contrast(1) saturate(calc(var(--res-sprite-sat, 1.48) * .62)) blur(2.4px);
+  }
+  14% {
+    opacity: .2;
+    transform: translate(-50%, -50%) scale(1.02) rotate(-10deg);
+  }
+  42% {
+    opacity: .34;
+    transform: translate(-50%, -50%) scale(.86) rotate(4deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-charge-bright, 1.52) * .7)) contrast(1.03) saturate(calc(var(--res-sprite-sat, 1.48) * .72)) blur(1.1px);
+  }
+  72% {
+    opacity: .78;
+    transform: translate(-50%, -50%) scale(.66) rotate(14deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-charge-bright, 1.52) * 1.02)) contrast(1.1) saturate(calc(var(--res-sprite-sat, 1.48) * .98)) blur(.15px);
+  }
+  88% {
+    opacity: .86;
+    transform: translate(-50%, -50%) scale(.54) rotate(19deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-charge-bright, 1.52) * 1.12)) contrast(1.12) saturate(calc(var(--res-sprite-sat, 1.48) * 1.04)) blur(0);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.46) rotate(22deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-charge-bright, 1.52) * .78)) contrast(1.04) saturate(calc(var(--res-sprite-sat, 1.48) * .82)) blur(2.6px);
+  }
+}
+
+@keyframes resonance-awaken-charge-frames {
+  0% { background-position: 33.333% 100%; }
+  16% { background-position: 0 100%; }
+  32% { background-position: 100% 0; }
+  48% { background-position: 66.666% 0; }
+  64% { background-position: 33.333% 0; }
+  80% { background-position: 0 0; }
+  100% { background-position: 100% 100%; }
+}
+
+@keyframes resonance-awaken-charge-aura {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(1.28) rotate(-30deg); }
+  16% { opacity: .58; }
+  62% { opacity: .82; transform: translate(-50%, -50%) scale(.78) rotate(18deg); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(.32) rotate(48deg); }
+}
+
+@keyframes resonance-awaken-wave-motion {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(.22) rotate(-6deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-wave-bright, 1.1) * 1.36)) saturate(calc(var(--res-sprite-sat, 1.48) * .92)) blur(1px);
+  }
+  12% {
+    opacity: .98;
+    transform: translate(-50%, -50%) scale(.42) rotate(0deg);
+  }
+  48% {
+    opacity: .88;
+    transform: translate(-50%, -50%) scale(1.02) rotate(5deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-wave-bright, 1.1) * 1.16)) saturate(calc(var(--res-sprite-sat, 1.48) * .86)) blur(.2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.58) rotate(9deg);
+    filter: hue-rotate(var(--res-sprite-hue, 0deg)) brightness(calc(var(--res-wave-bright, 1.1) * .94)) saturate(calc(var(--res-sprite-sat, 1.48) * .78)) blur(5px);
+  }
+}
+
+@keyframes resonance-awaken-wave-frames {
+  0% { background-position: 0 0; }
+  14% { background-position: 33.333% 0; }
+  28% { background-position: 66.666% 0; }
+  42% { background-position: 100% 0; }
+  56% { background-position: 0 100%; }
+  70% { background-position: 33.333% 100%; }
+  84% { background-position: 66.666% 100%; }
+  100% { background-position: 100% 100%; }
+}
+
+@keyframes resonance-awaken-impact-flash {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(.26) rotate(0deg); filter: blur(2px); }
+  24% { opacity: .96; transform: translate(-50%, -50%) scale(.8) rotate(12deg); filter: blur(.2px); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.55) rotate(34deg); filter: blur(10px); }
 }
 
 @keyframes resonance-awaken-echo {
@@ -8679,11 +8954,41 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   overflow-y: auto;
   font-size: 1.06em;
 }
+
+#notes-modal .modal-content.wide {
+  position: relative;
+  overflow: hidden;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.88) 0%, rgba(0,0,0,.70) 50%, rgba(0,0,0,.44) 100%),
+    radial-gradient(circle at 58% 42%, rgba(201,145,47,.16), transparent 46%),
+    url("assets/ui/guide-notes-book.png") 62% 44% / cover no-repeat,
+    rgba(0,0,0,.38);
+}
+
+#notes-modal .modal-content.wide::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.10), rgba(0,0,0,.72)),
+    radial-gradient(circle at 72% 38%, rgba(255,189,76,.10), transparent 44%);
+}
+
+#notes-modal .modal-content.wide > * {
+  position: relative;
+  z-index: 1;
+}
+
 .note-entry {
   margin-bottom: 14px;
   padding: 10px 12px;
-  background: var(--surface);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.64), rgba(0,0,0,.38)),
+    rgba(14, 13, 10, .34);
+  border: 1px solid rgba(201,145,47,.16);
   border-left: 2px solid var(--accent-dim);
+  box-shadow: inset 0 0 18px rgba(0,0,0,.24);
 }
 .note-title { color: #4a9a9a; font-size: 1.08em; margin-bottom: 6px; font-weight: 600; }
 .note-text  { font-size: 1em; color: var(--text-dim); line-height: 1.7; font-style: italic; }
@@ -8693,12 +8998,13 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .notes-tabs { display: flex; gap: 6px; margin-bottom: 12px; }
 .notes-tab {
   flex: 1; padding: 7px 11px; font-size: .95em;
-  background: var(--surface); border: 1px solid var(--border);
+  background: rgba(14, 13, 10, .48); border: 1px solid rgba(201,145,47,.16);
   border-radius: 5px; color: var(--text-dim); cursor: pointer;
 }
-.notes-tab.active { background: rgba(200,137,10,.15); border-color: var(--accent-dim); color: var(--accent); }
+.notes-tab.active { background: rgba(200,137,10,.18); border-color: var(--accent-dim); color: var(--accent); }
 .notes-tab:hover:not(.active) { border-color: #555; color: var(--text); }
 .notes-area { min-height: 60px; }
+
 .notes-empty { font-size: .98em; color: var(--text-dim); margin: 8px 0; }
 .notes-back-btn { margin-bottom: 10px; font-size: .92em; padding: 5px 11px; }
 
@@ -8838,7 +9144,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   justify-content: start;
   gap: 12px;
   width: max-content;
-  margin: 10px 0 12px 48px;
+  margin: 10px 0 12px;
 }
 
 .guide-dark-grid .tutorial-dark-token {
@@ -9018,7 +9324,6 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 
   .guide-dark-grid {
     grid-template-columns: repeat(3, 42px);
-    margin-left: 4px;
   }
 }
 
@@ -9327,17 +9632,54 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .guide-note-entry {
-  padding: 12px;
+  position: relative;
+  overflow: hidden;
+  min-height: 168px;
+  padding: 18px 20px 16px;
   border: 1px solid rgba(201,145,47,.2);
   border-radius: 8px;
-  background: rgba(0,0,0,.2);
+  background:
+    linear-gradient(135deg, rgba(201,145,47,.08), rgba(0,0,0,0) 30%),
+    rgba(0,0,0,.24);
+  box-shadow: inset 0 0 18px rgba(0, 0, 0, .24);
+}
+
+.guide-note-entry.guide-note-has-bg::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: var(--guide-note-bg) var(--guide-note-card-pos, 50% 42%) / cover no-repeat;
+  opacity: .42;
+  filter: saturate(1.08) contrast(1.05) brightness(.86);
+  transform: scale(1.02);
+}
+
+.guide-note-entry.guide-note-has-bg::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.92) 0%, rgba(0,0,0,.74) 46%, rgba(0,0,0,.34) 78%, rgba(0,0,0,.62) 100%),
+    radial-gradient(circle at 70% 40%, rgba(201,145,47,.16), rgba(0,0,0,0) 48%);
+}
+
+.guide-note-entry > * {
+  position: relative;
+  z-index: 1;
 }
 
 .guide-note-head {
-  display: flex;
-  gap: 10px;
-  align-items: center;
-  margin-bottom: 8px;
+  display: block;
+  margin-bottom: 13px;
+}
+
+.guide-note-title-block {
+  min-width: 0;
+  max-width: 620px;
+  padding: 4px 0 6px 12px;
+  border-left: 2px solid rgba(201,145,47,.62);
+  background: linear-gradient(90deg, rgba(0,0,0,.34), rgba(0,0,0,0));
+  border-radius: 6px;
 }
 
 .guide-note-icon {
@@ -9355,12 +9697,77 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   margin: 0;
   color: var(--accent);
   font-family: var(--font-serif);
+  text-shadow: 0 2px 8px rgba(0,0,0,.84);
 }
 
 .guide-note-head p {
   margin: 2px 0 0;
   color: var(--text-dim);
   font-size: .9em;
+  text-shadow: 0 2px 7px rgba(0,0,0,.8);
+}
+
+.guide-note-tutorial-backdrop-explore {
+  --guide-note-card-pos: 70% 42%;
+}
+
+.guide-note-tutorial-backdrop-relics {
+  --guide-note-card-pos: 68% 42%;
+}
+
+.guide-note-tutorial-backdrop-equipment {
+  --guide-note-card-pos: 68% 40%;
+}
+
+.guide-note-tutorial-backdrop-dark-avatar {
+  --guide-note-card-pos: 28% 36%;
+}
+
+.guide-note-tutorial-backdrop-notes {
+  --guide-note-card-pos: 70% 44%;
+}
+
+@media (max-width: 680px) {
+  #notes-modal .modal-content.wide {
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.92) 0%, rgba(0,0,0,.74) 60%, rgba(0,0,0,.50) 100%),
+      radial-gradient(circle at 66% 38%, rgba(201,145,47,.12), transparent 42%),
+      url("assets/ui/guide-notes-book.png") 58% 38% / cover no-repeat,
+      rgba(0,0,0,.38);
+  }
+
+  .guide-note-entry {
+    min-height: 0;
+    padding: 14px 14px 13px;
+  }
+
+  .guide-note-entry.guide-note-has-bg::before {
+    opacity: .34;
+  }
+
+  .guide-note-entry.guide-note-has-bg::after {
+    background:
+      linear-gradient(90deg, rgba(0,0,0,.94) 0%, rgba(0,0,0,.82) 58%, rgba(0,0,0,.54) 100%),
+      radial-gradient(circle at 78% 36%, rgba(201,145,47,.12), rgba(0,0,0,0) 48%);
+  }
+
+  .guide-note-head {
+    margin-bottom: 10px;
+  }
+
+  .guide-note-title-block {
+    padding-left: 10px;
+  }
+
+  .resonance-note-icon {
+    min-height: 116px;
+    padding: 14px 8px 12px;
+  }
+
+  .resonance-note-img {
+    width: 50px;
+    height: 50px;
+  }
 }
 
 /* 聖物筆記格子 */
@@ -9372,17 +9779,28 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .relic-note-icon {
   display: flex; flex-direction: column; align-items: center;
   gap: 3px; padding: 8px 4px;
-  background: var(--surface); border: 1px solid var(--border);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.26)),
+    rgba(18, 14, 8, .22);
+  border: 1px solid rgba(201,145,47,.18);
   border-radius: 7px; cursor: pointer; text-align: center;
+  box-shadow: inset 0 0 14px rgba(0,0,0,.18);
 }
-.relic-note-icon:hover { border-color: var(--accent-dim); background: rgba(200,137,10,.08); }
+.relic-note-icon:hover {
+  border-color: var(--accent-dim);
+  background:
+    linear-gradient(180deg, rgba(200,137,10,.12), rgba(0,0,0,.28)),
+    rgba(18, 14, 8, .26);
+}
 .relic-note-icon.locked {
   opacity: .55;
   filter: grayscale(.35);
 }
 .relic-note-icon.locked:hover {
-  border-color: var(--border);
-  background: var(--surface);
+  border-color: rgba(201,145,47,.18);
+  background:
+    linear-gradient(180deg, rgba(0,0,0,.50), rgba(0,0,0,.26)),
+    rgba(18, 14, 8, .22);
 }
 .relic-note-emoji { font-size: 1.5em; line-height: 1; }
 .relic-note-emoji .equipment-inline-icon {
@@ -9395,8 +9813,8 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .resonance-note-img {
-  width: 48px;
-  height: 48px;
+  width: 54px;
+  height: 54px;
   object-fit: contain;
   display: block;
   filter:
@@ -9417,8 +9835,13 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .resonance-note-icon {
   position: relative;
   overflow: hidden;
-  min-height: 108px;
-  padding: 11px 8px;
+  min-height: 126px;
+  padding: 16px 10px 14px;
+  display: grid;
+  grid-template-rows: auto auto;
+  place-items: center;
+  align-content: center;
+  gap: 7px;
   font-family: var(--font-sans);
   color: inherit;
 }
@@ -9426,10 +9849,10 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   content: "";
   position: absolute;
   left: 50%;
-  top: 14px;
-  width: 68px;
-  height: 58px;
-  transform: translateX(-50%);
+  top: 46%;
+  width: 74px;
+  height: 64px;
+  transform: translate(-50%, -50%);
   border-radius: 999px;
   background:
     radial-gradient(circle at 50% 44%,
@@ -9444,6 +9867,9 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   position: relative;
   z-index: 1;
   font-size: 1.65em;
+  display: grid;
+  place-items: center;
+  min-height: 56px;
 }
 .resonance-note-icon .relic-note-name {
   position: relative;
@@ -9451,7 +9877,7 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .resonance-note-icon .relic-note-emoji:has(.resonance-note-img) {
-  min-height: 50px;
+  min-height: 58px;
 }
 
 .resonance-detail-title-icon {
@@ -9500,6 +9926,9 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   font-size: 1em;
   line-height: 1.35;
   font-weight: 700;
+  width: 100%;
+  max-width: 10em;
+  text-align: center;
 }
 .resonance-detail-card {
   display: grid;
@@ -9616,7 +10045,9 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   border: 1px solid rgba(112,178,166,.28);
   border-left: 3px solid #70b2a6;
   border-radius: 6px;
-  background: linear-gradient(90deg, rgba(112,178,166,.14), rgba(200,137,10,.035));
+  background:
+    linear-gradient(90deg, rgba(18, 50, 45, .54), rgba(200,137,10,.08)),
+    rgba(0,0,0,.24);
   color: #70b2a6;
   font-size: 1.08em;
   font-weight: 600;
@@ -9655,7 +10086,10 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   padding: 10px 12px;
   border: 1px solid rgba(200,137,10,.24);
   border-radius: 6px;
-  background: rgba(255,255,255,.025);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.58), rgba(0,0,0,.30)),
+    rgba(18, 14, 8, .22);
+  box-shadow: inset 0 0 18px rgba(0,0,0,.20);
 }
 .equipment-note-head {
   display: flex;
@@ -9727,9 +10161,13 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   align-items: center;
   padding: 10px 12px;
   margin-bottom: 10px;
-  background: var(--surface);
-  border-left: 2px solid #3a4a3a;
-  border-radius: 0 5px 5px 0;
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.62), rgba(0,0,0,.34)),
+    rgba(12, 18, 12, .24);
+  border: 1px solid rgba(90, 140, 90, .18);
+  border-left: 2px solid rgba(90, 140, 90, .62);
+  border-radius: 0 6px 6px 0;
+  box-shadow: inset 0 0 18px rgba(0,0,0,.20);
 }
 .terrain-note-visual {
   display: flex;
@@ -9753,6 +10191,36 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   font-size: 2.3em;
   line-height: 1;
 }
+
+.terrain-note-plain .terrain-note-icon {
+  position: relative;
+  width: 58px;
+  height: 58px;
+  border: 1px solid rgba(236, 219, 180, .32);
+  border-radius: 50%;
+  color: rgba(236, 219, 180, .92);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(236,219,180,.14), transparent 46%),
+    linear-gradient(135deg, rgba(0,0,0,.42), rgba(255,255,255,.035));
+  box-shadow:
+    inset 0 0 16px rgba(0,0,0,.32),
+    0 0 14px rgba(236,219,180,.10);
+  font-size: 1.9em;
+}
+
+.terrain-note-plain .terrain-note-icon::before,
+.terrain-note-plain .terrain-note-icon::after {
+  content: "";
+  position: absolute;
+  inset: 12px;
+  border: 1px solid rgba(236, 219, 180, .32);
+  transform: rotate(45deg);
+}
+
+.terrain-note-plain .terrain-note-icon::after {
+  inset: 21px;
+  border-color: rgba(236, 219, 180, .22);
+}
 .terrain-note-name {
   color: var(--text-bright);
   font-size: 1em;
@@ -9765,14 +10233,17 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .terrain-note-tags   { display: flex; flex-wrap: wrap; gap: 4px; }
 .terrain-tag {
   font-size: .8em; padding: 2px 7px;
-  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12);
+  background: rgba(255,255,255,.055); border: 1px solid rgba(255,255,255,.12);
   border-radius: 10px; color: #aaa;
 }
 
 #library-section {
   margin-top: 16px;
   padding: 10px 12px;
-  background: var(--surface);
+  background:
+    linear-gradient(90deg, rgba(0,0,0,.62), rgba(0,0,0,.34)),
+    rgba(22, 10, 28, .22);
+  border: 1px solid rgba(140, 82, 165, .18);
   border-left: 2px solid #4a1a5a;
 }
 .library-relic {
@@ -12879,5 +13350,169 @@ body::before {
     background:
       linear-gradient(180deg, transparent 0, transparent 56%, rgba(3, 1, 6, .28) 76%, rgba(2, 1, 5, .54) 100%),
       var(--enemy-card-bg) center top / 100% auto no-repeat;
+  }
+}
+
+@media (max-width: 680px) {
+  .modal-content.event-backdrop-modal:not(.tutorial-backdrop-modal):not(:has(.dark-avatar-chase-backdrop)):not(.resonance-awaken) {
+    width: 100%;
+    max-width: none;
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 18px 14px 14px;
+  }
+
+  .modal-content.event-backdrop-modal:not(.tutorial-backdrop-modal):not(:has(.dark-avatar-chase-backdrop)):not(.resonance-awaken) .event-backdrop-img {
+    inset: 8px;
+    background-position: var(--event-mobile-bg-pos, 50% 36%);
+    background-size: cover;
+    filter: brightness(.96) saturate(1.06);
+  }
+
+  .modal-content.event-backdrop-modal:not(.tutorial-backdrop-modal):not(:has(.dark-avatar-chase-backdrop)):not(.resonance-awaken)::after {
+    inset: 8px;
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, .22) 0%, rgba(0, 0, 0, .18) 24%, rgba(0, 0, 0, .64) 66%, rgba(0, 0, 0, .92) 100%),
+      radial-gradient(ellipse at 50% 28%, rgba(255, 196, 98, .08), rgba(0, 0, 0, .42) 72%);
+  }
+
+  .modal-content.event-backdrop-modal:not(.tutorial-backdrop-modal):not(:has(.dark-avatar-chase-backdrop)):not(.resonance-awaken) #modal-desc {
+    margin-top: auto;
+    max-height: min(43dvh, 360px);
+    padding: 11px 12px;
+    border: 1px solid rgba(201, 145, 47, .26);
+    border-radius: 8px;
+    overflow-y: auto;
+    background:
+      linear-gradient(180deg, rgba(10, 7, 4, .62), rgba(5, 4, 3, .86));
+    box-shadow: inset 0 1px 0 rgba(255, 232, 172, .08), 0 12px 28px rgba(0, 0, 0, .36);
+  }
+
+  .modal-content.event-backdrop-modal:not(.tutorial-backdrop-modal):not(:has(.dark-avatar-chase-backdrop)):not(.resonance-awaken) #modal-choices {
+    position: relative;
+    z-index: 2;
+    background:
+      linear-gradient(180deg, rgba(5, 4, 3, 0), rgba(5, 4, 3, .72));
+  }
+
+  .event-backdrop-fate-gambling-table,
+  .event-backdrop-fate-table-blood-wager,
+  .event-backdrop-fate-table-night-wager,
+  .event-backdrop-fate-table-life-wager {
+    --event-mobile-bg-pos: 50% 40%;
+  }
+
+  .event-backdrop-fate-table-blood-fail,
+  .event-backdrop-fate-table-night-fail,
+  .event-backdrop-fate-table-life-fail {
+    --event-mobile-bg-pos: 50% 38%;
+  }
+
+  .event-backdrop-echo-site-wound,
+  .event-backdrop-echo-site-eagle,
+  .event-backdrop-echo-site-fate,
+  .event-backdrop-echo-site-banner {
+    --event-mobile-bg-pos: 50% 32%;
+  }
+
+  .event-backdrop-forest-footprints,
+  .event-backdrop-forest-ancestral-pyre,
+  .event-backdrop-forest-inscription,
+  .event-backdrop-forest-dark-growth {
+    --event-mobile-bg-pos: 50% 34%;
+  }
+
+  .event-backdrop-forest-supply-pack,
+  .event-backdrop-forest-snare-trap,
+  .event-backdrop-swallowing-mud {
+    --event-mobile-bg-pos: 50% 42%;
+  }
+
+  .event-backdrop-ruins-enemy,
+  .event-backdrop-ruins-falling-debris,
+  .event-backdrop-ruins-old-shrine {
+    --event-mobile-bg-pos: 50% 34%;
+  }
+
+  .event-backdrop-ruins-inscription,
+  .event-backdrop-ruins-unstable-floor,
+  .event-backdrop-ruins-supply-cache,
+  .event-backdrop-ruins-wall-marks {
+    --event-mobile-bg-pos: 50% 42%;
+  }
+
+  .event-backdrop-cave-eyes,
+  .event-backdrop-cave-dripping-water,
+  .event-backdrop-cave-starlight-shard,
+  .event-backdrop-cave-lost-voice {
+    --event-mobile-bg-pos: 50% 32%;
+  }
+
+  .event-backdrop-cave-dark-trap,
+  .event-backdrop-cave-razor-stone,
+  .event-backdrop-cave-inscription {
+    --event-mobile-bg-pos: 50% 42%;
+  }
+
+  .event-backdrop-empty-shadow-passage,
+  .event-backdrop-empty-darkness-seep,
+  .event-backdrop-empty-dark-whisper {
+    --event-mobile-bg-pos: 50% 34%;
+  }
+
+  .event-backdrop-empty-supply,
+  .event-backdrop-empty-survivor-clue,
+  .event-backdrop-empty-old-camp,
+  .event-backdrop-empty-treasure-map {
+    --event-mobile-bg-pos: 50% 42%;
+  }
+
+  .modal-content.resonance-awaken {
+    width: 100%;
+    max-width: none;
+    height: calc(100dvh - 16px);
+    max-height: calc(100dvh - 16px);
+    padding: 18px 14px 14px;
+    background:
+      linear-gradient(180deg, rgba(8, 5, 3, .22), rgba(8, 5, 3, .64)),
+      url("assets/ui/modal-panel-frame.png") center / 100% 100% no-repeat,
+      var(--surface2);
+  }
+
+  .modal-content.resonance-awaken::before {
+    inset: 8px;
+    background:
+      linear-gradient(180deg, rgba(0, 0, 0, .34) 0%, rgba(0, 0, 0, .2) 28%, rgba(0, 0, 0, .62) 62%, rgba(0, 0, 0, .9) 100%),
+      radial-gradient(ellipse at 50% 30%, rgba(255, 184, 82, .08), rgba(0, 0, 0, .48) 68%);
+  }
+
+  .modal-content.resonance-awaken::after {
+    inset: 8px;
+    background-position: 50% 35%;
+    filter: brightness(.9) saturate(1.08);
+  }
+
+  .resonance-awaken-icon-scene {
+    height: clamp(150px, 28dvh, 210px);
+    margin-top: 0;
+    margin-bottom: 8px;
+  }
+
+  .resonance-awaken-copy.compact {
+    gap: 6px;
+    padding: 9px 10px;
+  }
+
+  .resonance-awaken-lead {
+    font-size: .94em;
+  }
+
+  .resonance-awaken-entry {
+    padding-left: 8px;
+  }
+
+  .resonance-awaken-entry p {
+    font-size: .9em;
+    line-height: 1.43;
   }
 }

@@ -72,7 +72,8 @@ const RenderModal = {
       this._playModalResultFx(contentEl, activeResultFx);
       if (cfg.resultSfx) {
         const resultSfxVolume = Number.isFinite(cfg.resultSfxVolume) ? cfg.resultSfxVolume : undefined;
-        this._playModalResultSfx(cfg.resultSfx, resultSfxVolume);
+        const resultSfxDelay = Number.isFinite(cfg.resultSfxDelay) ? cfg.resultSfxDelay : 0;
+        this._playModalResultSfx(cfg.resultSfx, resultSfxVolume, resultSfxDelay);
       }
     }
     if (cfg.descHtml) {
@@ -136,6 +137,11 @@ const RenderModal = {
       } else {
         delete descEl.dataset.resultSfxVolume;
       }
+      if (Number.isFinite(cfg.resultSfxDelay)) {
+        descEl.dataset.resultSfxDelay = String(cfg.resultSfxDelay);
+      } else {
+        delete descEl.dataset.resultSfxDelay;
+      }
     } else {
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
@@ -146,6 +152,7 @@ const RenderModal = {
       delete descEl.dataset.resultBackdrop;
       delete descEl.dataset.resultSfx;
       delete descEl.dataset.resultSfxVolume;
+      delete descEl.dataset.resultSfxDelay;
       delete descEl.dataset.resultFx;
     }
 
@@ -376,7 +383,8 @@ const RenderModal = {
 
     if (cfg.eventBackdrop) {
       const backdrop = document.createElement('div');
-      backdrop.className = `modal-extra event-backdrop-img ${cfg.eventBackdropClass || ''}`.trim();
+      const generatedBackdropClass = this._eventBackdropClassFromUrl(cfg.eventBackdrop);
+      backdrop.className = `modal-extra event-backdrop-img ${cfg.eventBackdropClass || ''} ${generatedBackdropClass}`.trim();
       backdrop.style.backgroundImage = `url("${String(cfg.eventBackdrop).replace(/"/g, '%22')}")`;
       contentEl.prepend(backdrop);
     } else if (cfg.eventImage) {
@@ -868,6 +876,7 @@ const RenderModal = {
       const resultFx = descEl.dataset.resultFx;
       const resultSfx = descEl.dataset.resultSfx;
       const resultSfxVolume = Number(descEl.dataset.resultSfxVolume);
+      const resultSfxDelay = Number(descEl.dataset.resultSfxDelay);
       delete descEl.dataset.resultDesc;
       delete descEl.dataset.preDesc;
       delete descEl.dataset.resultAppend;
@@ -878,6 +887,7 @@ const RenderModal = {
       delete descEl.dataset.resultFx;
       delete descEl.dataset.resultSfx;
       delete descEl.dataset.resultSfxVolume;
+      delete descEl.dataset.resultSfxDelay;
       if (resultTitle) {
         const titleEl = document.getElementById('modal-title');
         if (titleEl) titleEl.textContent = resultTitle;
@@ -885,7 +895,14 @@ const RenderModal = {
       if (resultBackdrop) {
         const contentEl = document.querySelector('#event-modal .modal-content');
         const backdropEl = contentEl?.querySelector('.event-backdrop-img');
-        if (backdropEl) backdropEl.style.backgroundImage = `url("${String(resultBackdrop).replace(/"/g, '%22')}")`;
+        if (backdropEl) {
+          for (const cls of Array.from(backdropEl.classList)) {
+            if (cls.startsWith('event-backdrop-') && cls !== 'event-backdrop-img') backdropEl.classList.remove(cls);
+          }
+          const generatedBackdropClass = this._eventBackdropClassFromUrl(resultBackdrop);
+          if (generatedBackdropClass) backdropEl.classList.add(generatedBackdropClass);
+          backdropEl.style.backgroundImage = `url("${String(resultBackdrop).replace(/"/g, '%22')}")`;
+        }
       }
       if (resultFx) {
         const contentEl = document.querySelector('#event-modal .modal-content');
@@ -893,7 +910,11 @@ const RenderModal = {
         this._playModalResultFx(contentEl, resultFx);
       }
       if (resultSfx) {
-        this._playModalResultSfx(resultSfx, Number.isFinite(resultSfxVolume) ? resultSfxVolume : undefined);
+        this._playModalResultSfx(
+          resultSfx,
+          Number.isFinite(resultSfxVolume) ? resultSfxVolume : undefined,
+          Number.isFinite(resultSfxDelay) ? resultSfxDelay : 0
+        );
       }
       if (this._modalTypeTimer) {
         clearInterval(this._modalTypeTimer);
@@ -965,10 +986,28 @@ const RenderModal = {
     return '';
   },
 
-  _playModalResultSfx(id, volume) {
+  _eventBackdropClassFromUrl(url) {
+    const file = String(url || '')
+      .split(/[?#]/)[0]
+      .split(/[\\/]/)
+      .pop() || '';
+    const stem = file
+      .replace(/\.[^.]+$/, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-+|-+$/g, '');
+    return stem ? `event-backdrop-${stem}` : '';
+  },
+
+  _playModalResultSfx(id, volume, delayMs = 0) {
     if (!id) return;
+    const delay = Math.max(0, delayMs || 0);
     if (id === 'eventInjury') {
       const playInjury = () => AudioManager?.playEventInjurySfx?.(volume);
+      if (delay > 0) {
+        setTimeout(playInjury, delay);
+        return;
+      }
       if (typeof requestAnimationFrame === 'function') {
         requestAnimationFrame(playInjury);
       } else {
@@ -977,6 +1016,10 @@ const RenderModal = {
       return;
     }
     const play = () => AudioManager?.playSfx?.(id, volume);
+    if (delay > 0) {
+      setTimeout(play, delay);
+      return;
+    }
     if (typeof requestAnimationFrame === 'function') {
       requestAnimationFrame(play);
     } else {

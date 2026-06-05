@@ -179,15 +179,27 @@ const RenderTutorial = {
     `;
   },
 
+  _guideNoteBgStyle(url) {
+    if (!url) return '';
+    const safeUrl = String(url)
+      .replace(/\\/g, '/')
+      .replace(/"/g, '%22')
+      .replace(/'/g, '%27')
+      .replace(/\)/g, '%29');
+    return ` style="--guide-note-bg: url('${safeUrl}')"`;
+  },
+
   renderGuideNotes(container) {
     const pages = this.tutorialPages();
     const guide = document.createElement('div');
     guide.className = 'guide-note-list';
-    guide.innerHTML = pages.map(page => `
-      <section class="guide-note-entry">
+    guide.innerHTML = pages.map(page => {
+      const backdropClass = page.eventBackdropClass ? ` guide-note-${page.eventBackdropClass}` : '';
+      const hasBackdrop = page.eventBackdrop ? ' guide-note-has-bg' : '';
+      return `
+      <section class="guide-note-entry${hasBackdrop}${backdropClass}"${this._guideNoteBgStyle(page.eventBackdrop)}>
         <div class="guide-note-head">
-          <span class="guide-note-icon">${page.icon || '◆'}</span>
-          <div>
+          <div class="guide-note-title-block">
             <h4>${page.title}</h4>
             <p>${page.kicker}</p>
           </div>
@@ -196,7 +208,8 @@ const RenderTutorial = {
         ${page.body.map(text => `<p class="guide-note-body">${text}</p>`).join('')}
         <ul class="guide-note-points">${page.points.map(point => `<li>${point}</li>`).join('')}</ul>
       </section>
-    `).join('');
+    `;
+    }).join('');
     container.appendChild(guide);
   },
 };
