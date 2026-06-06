@@ -107,7 +107,7 @@ const Render = {
       phaseEl.textContent = '白日探索期';
       phaseEl.className = 'phase-day';
     } else if (G.phase === 'night') {
-      phaseEl.textContent = '黑夜降臨';
+      phaseEl.textContent = '永夜滯留';
       phaseEl.className = 'phase-night';
     } else if (G.phase === 'dawn') {
       phaseEl.textContent = '黎明';
@@ -753,6 +753,7 @@ const Render = {
       eagle: '鷹眼系',
       fate: '命運系',
       banner: '戰旗系',
+      sword: '劍律系',
     };
     if (displayNames[systemId]) return displayNames[systemId];
     const name = cell?.content?.echoSystemName || '';
@@ -767,6 +768,7 @@ const Render = {
       eagle: '鷹眼',
       fate: '命運',
       banner: '戰旗',
+      sword: '劍律',
     };
     const marker = document.createElement('div');
     marker.className = `cell-icon echo-site-marker echo-site-marker-${systemId}`;
@@ -1352,12 +1354,17 @@ const Render = {
     for (const [clsId, cls] of Object.entries(CHARACTER_CLASSES)) {
       const card = document.createElement('button');
       card.type = 'button';
-      card.className = `class-card${selected.includes(clsId) ? ' selected' : ''}`;
+      card.className = `class-card class-${clsId}${selected.includes(clsId) ? ' selected' : ''}`;
+      if (typeof CLASS_BATTLE_ART !== 'undefined' && CLASS_BATTLE_ART[clsId]) {
+        card.style.setProperty('--class-battle-art', `url('${CLASS_BATTLE_ART[clsId]}')`);
+      }
       card.innerHTML = `
         ${this._classAvatarHtml(clsId, cls)}
-        <div class="class-card-name">${cls.name}</div>
-        <div class="class-card-desc">${cls.desc}</div>
-        <div class="class-card-stat">HP ${cls.maxHp}　攻擊 ${cls.attack}</div>
+        <div class="class-card-body">
+          <div class="class-card-name">${cls.name}</div>
+          <div class="class-card-desc">${cls.desc}</div>
+          <div class="class-card-stat">HP ${cls.maxHp}　攻擊 ${cls.attack}</div>
+        </div>
       `;
       card.addEventListener('click', () => onToggle(clsId));
       card.addEventListener('mouseenter', () => {

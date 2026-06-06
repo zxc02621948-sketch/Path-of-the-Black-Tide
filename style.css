@@ -1435,15 +1435,34 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 #squad-detail-right { border-left:  1px solid var(--border); }
 .squad-select-center {
   flex: 1;
-  padding: 22px 20px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  padding: 22px 20px 0;
+  overflow: hidden;
+}
+
+.squad-select-center #squad-select {
+  flex: 1 1 auto;
+  min-height: 0;
   overflow-y: auto;
+  padding-right: 4px;
+  padding-bottom: 8px;
 }
 
 .squad-actions {
-  display: flex;
+  flex: 0 0 auto;
+  z-index: 6;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, .78fr);
   gap: 10px;
   justify-content: center;
-  margin-top: 16px;
+  margin: 0 -20px;
+  padding: 12px 18px 14px;
+  width: auto;
+  background:
+    linear-gradient(180deg, rgba(14, 13, 11, .28), rgba(14, 13, 11, .94) 45%, rgba(10, 10, 9, .98));
+  box-shadow: 0 -14px 24px rgba(0, 0, 0, .34);
 }
 
 /* 詳情面板 */
@@ -3892,6 +3911,25 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   background:
     linear-gradient(180deg, transparent 0, transparent 58%, rgba(3, 1, 6, .28) 76%, rgba(2, 1, 5, .52) 100%),
     var(--enemy-card-bg) center top / auto 67% no-repeat;
+}
+
+.combat-enemy-card.enemy-echo_guardian_sword.has-card-bg::before {
+  height: 100%;
+  background:
+    linear-gradient(180deg, rgba(2, 1, 5, .08), rgba(3, 1, 6, .18) 48%, rgba(1, 1, 3, .48)),
+    url("assets/enemies/full-card-atmosphere-bg.png") center center / cover no-repeat;
+  opacity: 1;
+  filter: saturate(1.02) contrast(1.06);
+}
+
+.combat-enemy-card.enemy-echo_guardian_sword.has-card-bg::after {
+  height: 100%;
+  background:
+    linear-gradient(180deg, transparent 0, transparent 62%, rgba(3, 1, 6, .28) 78%, rgba(2, 1, 5, .52) 100%),
+    var(--enemy-card-bg) center 6% / auto 88% no-repeat;
+  box-shadow:
+    inset 0 0 32px rgba(0, 0, 0, .34),
+    inset 0 -42px 42px rgba(0, 0, 0, .46);
 }
 
 .combat-enemy-card.enemy-abyss_warden.has-card-bg::after,
@@ -8642,26 +8680,91 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   margin: 12px 0;
 }
 .class-card {
-  display: block;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
   width: 100%;
+  min-height: 198px;
   font: inherit;
-  background: var(--surface2);
+  background:
+    linear-gradient(180deg, rgba(2, 2, 2, .18), rgba(2, 2, 2, .66) 78%, rgba(2, 2, 2, .82)),
+    linear-gradient(90deg, rgba(4, 4, 4, .82), rgba(12, 10, 8, .48)),
+    var(--class-battle-art, none) center / cover no-repeat,
+    var(--surface2);
   color: inherit;
   border: 2px solid var(--border);
-  padding: 14px 12px;
+  padding: 16px 14px 20px;
   cursor: pointer;
   text-align: center;
-  transition: border-color .15s, background .15s;
+  transition: border-color .15s, background .15s, transform .15s, box-shadow .15s;
   border-radius: 1px;
+  overflow: hidden;
 }
-.class-card:hover     { border-color: var(--accent-dim); }
-.class-card.selected  { border-color: var(--accent); background: #1c1308; }
+.class-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(255, 210, 120, .09), transparent 32%, rgba(0, 0, 0, .58) 100%),
+    radial-gradient(circle at 50% 20%, rgba(201, 145, 47, .13), transparent 48%);
+  opacity: .72;
+}
+.class-card:hover {
+  border-color: var(--accent-dim);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .22);
+}
+.class-card.selected {
+  border-color: var(--accent);
+  background:
+    linear-gradient(180deg, rgba(32, 18, 6, .12), rgba(2, 2, 2, .58) 74%, rgba(2, 2, 2, .78)),
+    linear-gradient(90deg, rgba(21, 13, 4, .68), rgba(6, 12, 8, .48)),
+    var(--class-battle-art, none) center / cover no-repeat,
+    #1c1308;
+  box-shadow:
+    0 0 0 1px rgba(201, 145, 47, .2),
+    inset 0 0 24px rgba(201, 145, 47, .1);
+}
+.class-card .class-card-icon.class-avatar {
+  box-shadow:
+    inset 0 0 12px rgba(0,0,0,.5),
+    0 0 12px rgba(201,145,47,.12),
+    0 8px 18px rgba(0,0,0,.32);
+}
+.class-card > * {
+  position: relative;
+  z-index: 1;
+}
+.class-card-body {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  gap: 4px;
+}
+.class-card.class-warrior {
+  background-size: auto, auto, cover, auto;
+  background-position: center, center, 54% 36%, center;
+}
+.class-card.class-explorer {
+  background-size: auto, auto, cover, auto;
+  background-position: center, center, 58% 34%, center;
+}
+.class-card.class-scholar {
+  background-size: auto, auto, cover, auto;
+  background-position: center, center, 56% 34%, center;
+}
+.class-card.class-support {
+  background-size: auto, auto, cover, auto;
+  background-position: center, center, 56% 34%, center;
+}
 .class-card-icon { font-size: 1.8em; margin-bottom: 5px; }
 .class-card-icon.class-avatar {
   display: block;
   width: 66px;
   height: 66px;
-  margin: 0 auto 8px;
+  margin: 0 auto 10px;
   border: 1px solid rgba(201,145,47,.42);
   border-radius: 10px;
   overflow: hidden;
@@ -8675,9 +8778,26 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   object-position: center 18%;
   display: block;
 }
-.class-card-name { font-size: 1em; color: var(--text-bright); margin-bottom: 4px; font-weight: 600; }
-.class-card-desc { font-size: .88em; color: var(--text-dim); line-height: 1.5; }
-.class-card-stat { margin-top: 6px; font-size: .85em; color: #5a7a5a; }
+.class-card-name {
+  font-size: 1em;
+  color: #fff4d5;
+  margin-bottom: 4px;
+  font-weight: 700;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .86);
+}
+.class-card-desc {
+  font-size: .88em;
+  color: rgba(226, 215, 188, .86);
+  line-height: 1.5;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .82);
+}
+.class-card-stat {
+  margin-top: 8px;
+  font-size: .85em;
+  color: #88ad77;
+  font-weight: 650;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, .82);
+}
 
 .library-pick-section {
   grid-column: 1 / -1;
@@ -12291,6 +12411,62 @@ body::before {
 
   #squad-select {
     grid-template-columns: 1fr;
+    overflow: visible;
+    padding-right: 0;
+  }
+
+  .class-card {
+    display: grid;
+    grid-template-columns: 74px minmax(0, 1fr);
+    align-items: center;
+    min-height: 118px;
+    padding: 12px 13px;
+    text-align: left;
+    gap: 13px;
+    background:
+      linear-gradient(90deg, rgba(5, 5, 5, .16), rgba(5, 5, 5, .68) 35%, rgba(10, 8, 6, .9)),
+      var(--class-battle-art, none) center / cover no-repeat,
+      var(--surface2);
+  }
+
+  .class-card.selected {
+    background:
+      linear-gradient(90deg, rgba(25, 15, 5, .2), rgba(6, 12, 8, .7) 38%, rgba(8, 8, 6, .9)),
+      var(--class-battle-art, none) center / cover no-repeat,
+      #1c1308;
+  }
+
+  .class-card.class-warrior { background-position: center, 34% 34%, center; }
+  .class-card.class-explorer { background-position: center, 32% 34%, center; }
+  .class-card.class-scholar { background-position: center, 34% 34%, center; }
+  .class-card.class-support { background-position: center, 34% 34%, center; }
+
+  .class-card-icon.class-avatar {
+    width: 68px;
+    height: 68px;
+    margin: 0;
+    border-radius: 8px;
+  }
+
+  .class-card-body {
+    min-width: 0;
+  }
+
+  .class-card-name {
+    margin-bottom: 2px;
+    font-size: 1.06em;
+  }
+
+  .class-card-desc {
+    font-size: .88em;
+    line-height: 1.38;
+    color: rgba(232, 222, 198, .9);
+  }
+
+  .class-card-stat {
+    margin-top: 5px;
+    font-size: .86em;
+    color: #8fba7f;
   }
 
   .character-detail-modal {
@@ -12713,6 +12889,7 @@ body::before {
     gap: 8px;
     margin: 0;
     padding: 10px;
+    width: auto;
     max-height: none;
     overflow: visible;
     background:
@@ -13319,6 +13496,7 @@ body::before {
   .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg,
   .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg,
   .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg,
+  .combat-enemy-card.enemy-echo_guardian_sword.has-card-bg,
   .combat-enemy-card.enemy-night_heart.has-card-bg {
     background: rgba(10, 10, 10, .18);
   }
@@ -13329,6 +13507,7 @@ body::before {
   .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg::before,
   .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg::before,
   .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg::before,
+  .combat-enemy-card.enemy-echo_guardian_sword.has-card-bg::before,
   .combat-enemy-card.enemy-night_heart.has-card-bg::before,
   .combat-enemy-card.enemy-cage_warden.has-card-bg::after,
   .combat-enemy-card.enemy-dice_corruptor.has-card-bg::after,
@@ -13336,6 +13515,7 @@ body::before {
   .combat-enemy-card.enemy-echo_guardian_eagle.has-card-bg::after,
   .combat-enemy-card.enemy-echo_guardian_fate.has-card-bg::after,
   .combat-enemy-card.enemy-echo_guardian_banner.has-card-bg::after,
+  .combat-enemy-card.enemy-echo_guardian_sword.has-card-bg::after,
   .combat-enemy-card.enemy-night_heart.has-card-bg::after {
     height: 100%;
   }
@@ -13350,6 +13530,12 @@ body::before {
     background:
       linear-gradient(180deg, transparent 0, transparent 56%, rgba(3, 1, 6, .28) 76%, rgba(2, 1, 5, .54) 100%),
       var(--enemy-card-bg) center top / 100% auto no-repeat;
+  }
+
+  .combat-enemy-card.enemy-echo_guardian_sword.has-card-bg::after {
+    background:
+      linear-gradient(180deg, transparent 0, transparent 56%, rgba(3, 1, 6, .28) 76%, rgba(2, 1, 5, .54) 100%),
+      var(--enemy-card-bg) center 8px / auto 92% no-repeat;
   }
 }
 

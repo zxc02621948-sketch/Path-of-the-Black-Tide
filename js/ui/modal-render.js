@@ -1891,21 +1891,36 @@ const RenderModal = {
         }
       } else if (counterTarget) {
         const el = findAllyUnit(counterTarget);
-        if (el) {
-          if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, enemyAttackSfxVolume ?? 0.42);
-          const event = incomingEvents.find(item => item?.targetId === counterTarget);
-          const fxTier = event ? this._playCombatDamageReaction(el, event.damage) : 'light';
-          this._showCombatAttackTrail(el, enemyAttackTrail, { side: 'ally', scene: combatScene, sourceEl: enemyCard, weaponFamily: enemyAttackTrailFamily, damage: event?.damage || 0, tier: fxTier });
-          if (event) this._pulseCombatImpact(combatScene, event.damage, { tier: fxTier });
-          if (event && Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
-          if (event?.fullBlock) playFullBlockSfx();
-          if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene, tier: fxTier }), 140);
-        }
-        const event = incomingEvents.find(item => item?.targetId === counterTarget);
-        if (event && Number.isFinite(event.to)) {
-          this._setDisplayedAllyHp(event.targetId, event.to);
-          if (event.to <= 0) playAllyDeathSfxOnce(event);
-        }
+        const targetEvents = incomingEvents.filter(item => item?.targetId === counterTarget);
+        const eventsToPlay = targetEvents.length > 0 ? targetEvents : [null];
+        eventsToPlay.forEach((event, index) => {
+          const customDelay = Number(event?.followDelayMs);
+          const hitOffset = Number.isFinite(customDelay) && customDelay > 0
+            ? customDelay * index
+            : index * 150;
+          setTimeout(() => {
+            if (el) {
+              if (enemyAttackSfx) AudioManager?.playSfx?.(enemyAttackSfx, event?.multiHitTotal > 1 ? Math.max(0.24, (enemyAttackSfxVolume ?? 0.42) - 0.08) : (enemyAttackSfxVolume ?? 0.42));
+              const fxTier = event ? this._playCombatDamageReaction(el, event.damage) : 'light';
+              this._showCombatAttackTrail(el, event?.attackTrail || enemyAttackTrail, {
+                side: 'ally',
+                scene: combatScene,
+                sourceEl: enemyCard,
+                weaponFamily: enemyAttackTrailFamily,
+                damage: event?.damage || 0,
+                tier: fxTier,
+              });
+              if (event) this._pulseCombatImpact(combatScene, event.damage, { tier: fxTier });
+              if (event && Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
+              if (event?.fullBlock) playFullBlockSfx();
+              if (event) setTimeout(() => this._showCombatDamageNumber(el, event.damage, { side: 'ally', scene: combatScene, tier: fxTier }), 110);
+            }
+            if (event && Number.isFinite(event.to)) {
+              this._setDisplayedAllyHp(event.targetId, event.to);
+              if (event.to <= 0) playAllyDeathSfxOnce(event);
+            }
+          }, hitOffset);
+        });
       }
       if (remainingBlocks) {
         applyRemainingBlocks();
@@ -2077,15 +2092,19 @@ const RenderModal = {
         </button>
       ` : '';
       const bannerHtml = Array.isArray(char.activeBanners) && char.activeBanners.length > 0
-        ? char.activeBanners.map(banner => `
+        ? char.activeBanners.map(banner => {
+          const bannerLevel = Math.max(1, Math.floor(Number(banner?.level) || 1));
+          const bannerName = banner?.shortName || banner?.faceName || '旗面';
+          return `
           <button type="button"
             class="combat-banner-badge"
             onclick="event.stopPropagation(); Game.showCombatBannerDetail('${char.id}', '${banner.relicId}', '${banner.faceId}', event)">
             <span class="banner-icon"><img src="assets/relics/war-banner.png" alt=""></span>
-            <span>${banner.shortName || banner.faceName}</span>
-            <strong>${banner.level}階</strong>
+            <span>${bannerName}</span>
+            <strong>${bannerLevel}階</strong>
           </button>
-        `).join('')
+        `;
+        }).join('')
         : '';
       const tag = 'div';
       const clickAttr = guardTargeting && !isDown

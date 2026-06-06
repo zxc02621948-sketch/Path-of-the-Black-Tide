@@ -1000,6 +1000,7 @@ const CombatRules = {
       fateLuckyFace: null,
       fateLuckyFaces: null,
       fateUnluckyFaces: null,
+      counterDamageHits: null,
     };
     if (!enemyDead && !suppressEnemyAction && !stunned) {
       EnemyAbilities.beforeEnemyAction(enemyActionResult, {
@@ -1075,17 +1076,16 @@ const CombatRules = {
           counterTarget.finalEyeIntimidatedUntilRound = Math.max(counterTarget.finalEyeIntimidatedUntilRound || 0, round + 1);
           logs.push(`${enemy.name} 開眼威懾：${counterTarget.name} 下回合無法主戰。`);
         }
-        incomingDamageEvents.push({
+        incomingDamageEvents.push(...this._splitIncomingHitEvents(enemyActionResult.counterDamageHits, totalCounterDamage, {
           type: 'counter',
           targetId: counterTarget.id,
-          damage: totalCounterDamage,
           from: beforeHp,
           to: counterTarget.hp,
           allyBlockBefore,
           allyBlockAfter,
           allyBlockAbsorbed,
           fullBlock: allyBlockAbsorbed > 0 && totalCounterDamage <= 0,
-        });
+        }));
         counterDmg = totalCounterDamage;
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
@@ -1168,6 +1168,62 @@ const CombatRules = {
       darkGiftNativeOpen,
       logs,
     };
+  },
+
+  _splitIncomingHitEvents(rawHits, totalDamage, baseEvent = {}) {
+    const total = Math.max(0, Math.floor(Number(totalDamage) || 0));
+    if (total <= 0) return [{ ...baseEvent, damage: 0 }];
+    const raw = Array.isArray(rawHits)
+      ? rawHits
+        .map(hit => ({
+          ...hit,
+          damage: Math.max(0, Math.floor(Number(hit?.damage) || 0)),
+        }))
+        .filter(hit => hit.damage > 0)
+      : [];
+    if (raw.length <= 1) return [{ ...baseEvent, ...(raw[0] || {}), damage: total }];
+
+    const slotCount = Math.min(raw.length, total);
+    const rawTotal = raw.reduce((sum, hit) => sum + hit.damage, 0) || total;
+    let remaining = total;
+    const damages = [];
+    for (let i = 0; i < slotCount; i += 1) {
+      const slotsLeft = slotCount - i;
+      const scaled = Math.round(total * (raw[i]?.damage || 1) / rawTotal);
+      const value = i === slotCount - 1
+        ? remaining
+        : Math.max(1, Math.min(remaining - (slotsLeft - 1), scaled));
+      damages.push(value);
+      remaining -= value;
+    }
+
+    let hpCursor = Number.isFinite(baseEvent.from) ? baseEvent.from : null;
+    const finalHp = Number.isFinite(baseEvent.to) ? baseEvent.to : null;
+    return damages.map((damage, index) => {
+      const rawHit = raw[index] || {};
+      const isLast = index === damages.length - 1;
+      const from = hpCursor;
+      const to = from !== null && finalHp !== null
+        ? (isLast ? finalHp : Math.max(finalHp, from - damage))
+        : baseEvent.to;
+      hpCursor = Number.isFinite(to) ? to : hpCursor;
+      const event = {
+        ...baseEvent,
+        ...rawHit,
+        damage,
+        from,
+        to,
+        multiHitIndex: index,
+        multiHitTotal: damages.length,
+      };
+      if (index > 0) {
+        event.allyBlockBefore = null;
+        event.allyBlockAfter = null;
+        event.allyBlockAbsorbed = 0;
+        event.fullBlock = false;
+      }
+      return event;
+    });
   },
 
   fallenEchoMod(squad, fallenChar) {

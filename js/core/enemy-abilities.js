@@ -837,6 +837,56 @@ const EnemyAbilities = {
       },
     },
 
+    sword_law_guardian: {
+      onCombatStart(ability, { enemy, logs }) {
+        const state = EnemyAbilities._swordLawState(enemy, ability);
+        logs.push(`${enemy.name}的劍律甦醒：基礎攻擊 ${state.baseAttack}。`);
+      },
+
+      resolveIntent(ability, { enemy, intent }) {
+        const state = EnemyAbilities._swordLawState(enemy, ability);
+        return {
+          ...(intent || { type: 'attack', weight: 1 }),
+          type: 'attack',
+          swordLaw: true,
+          swordLawBaseAttack: state.baseAttack,
+        };
+      },
+
+      beforeEnemyAction(ability, { enemy, result, logs }) {
+        const state = EnemyAbilities._swordLawState(enemy, ability);
+        const roll = Math.ceil(Math.random() * 6);
+        const lowMax = Math.max(1, ability.lowMax || 3);
+        const growMin = Math.max(lowMax + 1, ability.growMin || 4);
+        const before = state.baseAttack;
+        result.enemyDiceRoll = roll;
+        result.enemyDiceSides = 6;
+        result.enemyAttackFlow = true;
+
+        if (roll <= lowMax) {
+          const hits = Math.max(1, roll);
+          const damage = Math.max(0, before * hits);
+          result.counterDmg = damage;
+          result.counterDamageHits = Array.from({ length: hits }, (_, index) => ({
+            damage: before,
+            followDelayMs: index === 0 ? 0 : Math.max(120, 190 - index * 25),
+            attackTrail: 'slash',
+            hitEffect: 'slash',
+          }));
+          result.firstStrikeSummary = `${enemy.name}劍律骰 ${roll}：銀蜂律，${before} 傷 × ${hits} 刺 = ${damage}。`;
+          logs.push(`${enemy.name}劍律骰 ${roll}：銀蜂連刺 ${hits} 次，每刺 ${before} 傷，合計 ${damage}。`);
+          return;
+        }
+
+        const growth = Math.max(1, ability.growAmount || 1);
+        state.baseAttack = before + growth;
+        enemy.attack = state.baseAttack;
+        result.counterDmg = state.baseAttack;
+        result.firstStrikeSummary = `${enemy.name}劍律骰 ${roll}：沉鐵律，基礎攻擊 ${before} → ${state.baseAttack}，造成 ${state.baseAttack} 傷害。`;
+        logs.push(`${enemy.name}劍律骰 ${roll}：沉鐵蓄勢，基礎攻擊 ${before} → ${state.baseAttack}，造成 ${state.baseAttack} 傷害。`);
+      },
+    },
+
     banner_guardian: {
       onCombatStart(ability, { enemy }) {
         EnemyAbilities._bannerGuardianState(enemy, ability);
@@ -909,6 +959,19 @@ const EnemyAbilities = {
         }
       },
     },
+  },
+
+  _swordLawState(enemy, ability = {}) {
+    this._ensureState(enemy);
+    if (!enemy.abilityState.swordLawGuardian) {
+      const base = Math.max(1, Math.floor(ability.baseAttack || enemy.attack || 2));
+      enemy.abilityState.swordLawGuardian = { baseAttack: base };
+      enemy.attack = base;
+    }
+    const state = enemy.abilityState.swordLawGuardian;
+    state.baseAttack = Math.max(Math.max(1, ability.minBaseAttack || 1), Math.floor(state.baseAttack || ability.baseAttack || enemy.attack || 2));
+    enemy.attack = state.baseAttack;
+    return state;
   },
 
   _bannerGuardianState(enemy, ability = {}) {

@@ -570,7 +570,7 @@ const GameDevTool = {
       { id: 'bow', name: '弓射擊', detail: '一般弓箭飛行與命中。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', damage: 5 },
       { id: 'sword', name: '劍攻擊', detail: '劍系斬擊 sprite。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', damage: 6 },
       { id: 'dagger', name: '匕首攻擊', detail: '匕首斬擊 sprite。', weaponFamily: 'dagger', attackTrail: 'slash', hitEffect: 'slash', damage: 5 },
-      { id: 'silver_bee_pin', name: '銀蜂針', detail: '銀蜂針共鳴射擊。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'silver_bee_pin', damage: 6, previewHits: 5, followDelayMs: [320, 278, 236, 194, 152] },
+      { id: 'silver_bee_pin', name: '銀蜂針', detail: '銀蜂劍律連刺：後續連擊傷害逐步提高。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'silver_bee_pin', damage: 6, damageSequence: [6, 7, 8, 9, 10], previewHits: 5, followDelayMs: [320, 278, 236, 194, 152] },
       { id: 'iron_scabbard', name: '沉鐵劍鞘', detail: '重擊命中與持有者強化。', weaponFamily: 'sword', attackTrail: 'slash', hitEffect: 'slash', relicFx: 'iron_scabbard', damage: 8 },
       { id: 'star_hunter_eye', name: '獵星之眼', detail: '弓箭先命中，準星再啟動。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_hunter_eye', damage: 7 },
       { id: 'star_breaker', name: '裂星破滅', detail: '弓箭命中後觸發裂星爆破與重擊。', weaponFamily: 'bow', attackTrail: 'pierce', hitEffect: 'pierce', relicFx: 'star_breaker', damage: 12 },
@@ -625,11 +625,12 @@ const GameDevTool = {
     const damageEvents = [];
     let hpCursor = enemyHp;
     for (let i = 0; i < previewHits; i++) {
+      const eventDamage = Math.max(1, option.damageSequence?.[i] || damage);
       const from = hpCursor;
-      hpCursor = Math.max(0, hpCursor - damage);
+      hpCursor = Math.max(0, hpCursor - eventDamage);
       damageEvents.push({
       type: 'primary',
-      damage,
+      damage: eventDamage,
       from,
       to: hpCursor,
       attackTrail: option.attackTrail || option.hitEffect || 'strike',
@@ -720,7 +721,7 @@ const GameDevTool = {
       },
       ...Array.from({ length: 9 }, (_, index) => ({
         name: `銀蜂劍律・第 ${index + 1} 刺`,
-        damage: 6,
+        damage: Math.min(11, 6 + index),
         attackTrail: 'slash',
         hitEffect: 'slash',
         weaponFamily: 'sword',
@@ -1027,7 +1028,7 @@ const GameDevTool = {
       { id: 'fate-fail-blood', name: '命運賭桌失敗：血', detail: '第一局失敗。', fx: 'fate-fail-blood', backdrop: 'assets/events/fate-table-blood-fail.png' },
       { id: 'fate-fail-night', name: '命運賭桌失敗：黑夜', detail: '第二局失敗。', fx: 'fate-fail-night', backdrop: 'assets/events/fate-table-night-fail.png' },
       { id: 'fate-fail-life', name: '命運賭桌失敗：命', detail: '第三局失敗。', fx: 'fate-fail-life', backdrop: 'assets/events/fate-table-life-fail.png' },
-      { id: 'night-transition', name: '第十天黑夜過渡', detail: '全畫面黑夜降臨覆蓋演出。', nightTransition: true },
+      { id: 'night-transition', name: '第十天永夜過渡', detail: '全畫面永夜滯留覆蓋演出。', nightTransition: true },
     ];
   },
 
@@ -1040,7 +1041,7 @@ const GameDevTool = {
     this._openModal({
       title: `效果演出：${option.name}`,
       desc: option.nightTransition
-        ? '已播放第十天黑夜過渡覆蓋演出。'
+        ? '已播放第十天永夜過渡覆蓋演出。'
         : '事件演出預覽。',
       typeText: false,
       eventBackdrop: option.backdrop || '',

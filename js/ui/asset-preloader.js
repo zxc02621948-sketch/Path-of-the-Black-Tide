@@ -151,6 +151,7 @@ const AssetPreloader = {
       'assets/events/echo-site-eagle.png',
       'assets/events/echo-site-fate.png',
       'assets/events/echo-site-banner.png',
+      'assets/enemies/sword-law-guardian.png',
       'assets/ui/treasure-chest-map.png',
       'assets/ui/dark-gift-chest-map.png',
       'assets/ui/battle-map-icon.png',

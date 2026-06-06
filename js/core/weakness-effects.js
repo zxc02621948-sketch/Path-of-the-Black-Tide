@@ -85,6 +85,19 @@ const WeaknessEffects = {
         : `${prefix}：命運偏折，但擲命守衛的厄運面已達上限。`);
     }
 
+    if (effect.type === 'reduce_sword_law_attack') {
+      const ability = Array.isArray(enemy?.abilities)
+        ? enemy.abilities.find(item => item?.type === 'sword_law_guardian') || {}
+        : {};
+      const state = EnemyAbilities._swordLawState(enemy, ability);
+      const amount = Math.max(1, effect.amount || 1);
+      const min = Math.max(1, effect.min || ability.minBaseAttack || 1);
+      const before = Math.max(min, state.baseAttack || ability.baseAttack || enemy.attack || 2);
+      state.baseAttack = Math.max(min, before - amount);
+      enemy.attack = state.baseAttack;
+      logs.push(`${prefix}：劍律被壓回，${enemy.name} 基礎攻擊 ${before} → ${state.baseAttack}。`);
+    }
+
     if (effect.type === 'clear_dice_pollution') {
       EnemyAbilities.clearOneDicePollutionFromAll(squad, logs);
     }

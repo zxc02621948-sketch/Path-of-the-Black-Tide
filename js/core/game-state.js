@@ -219,13 +219,13 @@ const GameStateHelpers = {
     if (G.nightIntroShown) return;
     G.nightIntroShown = true;
     this._queueSystemModal({
-      title: '黑夜降臨',
+      title: '永夜滯留',
       desc: [
-        `第 ${CONFIG.NIGHT_START_DAY || 10} 天開始，邊境進入黑夜。`,
+        `第 ${CONFIG.NIGHT_START_DAY || 10} 天開始，夜色不再退去，邊境進入永夜。`,
         '黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。',
         '黑暗每日上升得更快，黑暗化身也會持續追蹤小隊。休息點會變成殘火點，可用來治療、救起倒下隊友，或點燃火把暫時提高黑夜視野。',
       ].join('\n\n'),
-      choices: [{ label: '進入黑夜', action: () => { this._closeModal(); Render.fullRender(); } }],
+      choices: [{ label: '進入永夜', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
 

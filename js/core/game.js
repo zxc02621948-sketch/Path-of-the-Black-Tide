@@ -445,7 +445,7 @@ const Game = {
       : (nextDay >= CONFIG.DAWN_DAY ? 'dawn' : (nextDay === CONFIG.NIGHT_START_DAY ? 'nightfall' : 'day'));
     const nextLabel = nextDay >= CONFIG.DAWN_DAY
       ? '黎明將至'
-      : (nextDay === CONFIG.NIGHT_START_DAY && G.phase === 'day' ? '黑夜降臨' : `第 ${nextDay} 天`);
+      : (nextDay === CONFIG.NIGHT_START_DAY && G.phase === 'day' ? '永夜滯留' : `第 ${nextDay} 天`);
     return {
       endingDay,
       nextDay,
@@ -495,7 +495,7 @@ const Game = {
       if (this._triggerPendingDarkMonsterChase()) return;
     }
 
-    // 進入黑夜。
+    // 進入永夜。
     if (G.day === CONFIG.NIGHT_START_DAY && G.phase === 'day') {
       this._enterNight();
       return;
@@ -514,7 +514,7 @@ const Game = {
 
   _enterNight() {
     G.phase = 'night';
-    this._log('黑夜降臨，邊境變得更加危險。', 'night');
+    this._log('夜色不再退去，邊境變得更加危險。', 'night');
     this._log('黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。', 'night');
     if (typeof this._maybeSpawnUniqueStrongEnemy === 'function') {
       this._maybeSpawnUniqueStrongEnemy();

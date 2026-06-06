@@ -350,6 +350,16 @@ const ECHO_RELIC_SYSTEMS = [
     guardianText: '守護者像一支殘軍般死守陣地，格檔與持久戰會讓它更難突破。',
     victoryText: '殘旗垂落，舊日軍勢的回聲散開，旗影下露出一件聖物。',
   },
+  {
+    id: 'sword',
+    name: '劍律體系',
+    siteName: '劍律共鳴遺址',
+    relics: ['iron_scabbard', 'silver_bee_pin'],
+    clueText: '線索是一道被反覆劈開又縫合的劍痕。黑鐵沉響與銀針蜂鳴交錯，像兩種劍法正在同一處呼吸。',
+    siteText: '遺址裡垂著無數斷裂劍影。每一步都會引起沉重劍鞘的回音，隨後又被細密銀刺切碎。',
+    guardianText: '守護者會擲劍律骰。低骰時釋放銀蜂連刺，造成目前基礎攻擊乘以骰面的傷害；高骰時沉鐵蓄勢，基礎攻擊 +1 並造成一次攻擊。命中原生弱點可使牠的基礎攻擊 -1，最低 1。',
+    victoryText: '斷裂劍律終於停下，黑鐵與銀針各自歸位，遺址深處露出一件聖物。',
+  },
 ];
 
 function getEchoRelicSystems() {

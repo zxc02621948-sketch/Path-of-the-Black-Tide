@@ -39,6 +39,7 @@ const GameEchoSites = {
       eagle: 'assets/events/echo-site-eagle.png',
       fate: 'assets/events/echo-site-fate.png',
       banner: 'assets/events/echo-site-banner.png',
+      sword: 'assets/enemies/sword-law-guardian.png',
     };
     return backdrops[systemId] || '';
   },

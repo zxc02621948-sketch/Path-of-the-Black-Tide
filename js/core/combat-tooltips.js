@@ -141,6 +141,13 @@ const GameCombatTooltips = {
       const unluckyRate = Math.round(Math.max(0, ability.unluckySelfDamageRate ?? 0.25) * 100);
       notes.push(`命運盤：每 ${rerollEvery} 回合重擲幸運面與厄運面，但保留目前面數。攻擊前擲命運骰，命中幸運面時本次單體傷害 x${multiplier}，並新增 1 個幸運面（最多 ${maxLucky} 面）；命中厄運面時牠失去目前生命的 ${unluckyRate}%，且本回合攻擊減半。命中牠的原生弱點可新增 1 個厄運面（最多 ${maxUnlucky} 面）。`);
     }
+    if (hasAbility('sword_law_guardian')) {
+      const ability = abilities.find(item => item?.type === 'sword_law_guardian') || {};
+      const base = Math.max(1, ability.baseAttack || enemy?.attack || 2);
+      const lowMax = Math.max(1, ability.lowMax || 3);
+      const growMin = Math.max(lowMax + 1, ability.growMin || 4);
+      notes.push(`劍律骰：基礎攻擊初始 ${base}。骰出 1-${lowMax} 時進行等同骰面的銀蜂連刺，每刺造成目前基礎攻擊傷害；骰出 ${growMin}-6 時基礎攻擊 +1，並造成一次目前基礎攻擊傷害。命中原生弱點可使基礎攻擊 -1，最低 1。`);
+    }
     if (hasAbility('banner_guardian')) {
       const ability = abilities.find(item => item?.type === 'banner_guardian') || {};
       const wounds = Math.max(0, ability.woundStacks || 0);

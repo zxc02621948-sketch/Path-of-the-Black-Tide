@@ -499,6 +499,7 @@ const GameCombatFlow = {
       lines.push(`${enemy.name} 本回合沒有造成傷害。`);
     }
     if (combatResult.gazeSummary) lines.push(combatResult.gazeSummary);
+    if (combatResult.firstStrikeSummary) lines.push(combatResult.firstStrikeSummary);
     if (combatResult.fateSummary) lines.push(combatResult.fateSummary);
     if (combatResult.bannerSummary) lines.push(combatResult.bannerSummary);
     return lines;
@@ -522,6 +523,62 @@ const GameCombatFlow = {
       + enemyDiceWindup
       + (healEvents.length > 0 ? 520 : 0)
       + 720;
+  },
+
+  _combatSplitIncomingHitEvents(rawHits, totalDamage, baseEvent = {}) {
+    const total = Math.max(0, Math.floor(Number(totalDamage) || 0));
+    if (total <= 0) return [{ ...baseEvent, damage: 0 }];
+    const raw = Array.isArray(rawHits)
+      ? rawHits
+        .map(hit => ({
+          ...hit,
+          damage: Math.max(0, Math.floor(Number(hit?.damage) || 0)),
+        }))
+        .filter(hit => hit.damage > 0)
+      : [];
+    if (raw.length <= 1) return [{ ...baseEvent, ...(raw[0] || {}), damage: total }];
+
+    const slotCount = Math.min(raw.length, total);
+    const rawTotal = raw.reduce((sum, hit) => sum + hit.damage, 0) || total;
+    let remaining = total;
+    const damages = [];
+    for (let i = 0; i < slotCount; i += 1) {
+      const slotsLeft = slotCount - i;
+      const scaled = Math.round(total * (raw[i]?.damage || 1) / rawTotal);
+      const value = i === slotCount - 1
+        ? remaining
+        : Math.max(1, Math.min(remaining - (slotsLeft - 1), scaled));
+      damages.push(value);
+      remaining -= value;
+    }
+
+    let hpCursor = Number.isFinite(baseEvent.from) ? baseEvent.from : null;
+    const finalHp = Number.isFinite(baseEvent.to) ? baseEvent.to : null;
+    return damages.map((damage, index) => {
+      const rawHit = raw[index] || {};
+      const isLast = index === damages.length - 1;
+      const from = hpCursor;
+      const to = from !== null && finalHp !== null
+        ? (isLast ? finalHp : Math.max(finalHp, from - damage))
+        : baseEvent.to;
+      hpCursor = Number.isFinite(to) ? to : hpCursor;
+      const event = {
+        ...baseEvent,
+        ...rawHit,
+        damage,
+        from,
+        to,
+        multiHitIndex: index,
+        multiHitTotal: damages.length,
+      };
+      if (index > 0) {
+        event.allyBlockBefore = null;
+        event.allyBlockAfter = null;
+        event.allyBlockAbsorbed = 0;
+        event.fullBlock = false;
+      }
+      return event;
+    });
   },
 
   _canBowFollowUp(attacker, combatResult, enemy, rollResult) {
@@ -1142,6 +1199,7 @@ const GameCombatFlow = {
       fateLuckyFace: null,
       fateLuckyFaces: null,
       fateUnluckyFaces: null,
+      counterDamageHits: null,
     };
 
     EnemyAbilities.beforeEnemyAction(enemyActionResult, {
@@ -1217,10 +1275,9 @@ const GameCombatFlow = {
           logs.push(`${enemy.name} 開眼威懾：${counterTarget.name} 下回合無法主戰。`);
         }
         combatResult.incomingDamageEvents = Array.isArray(combatResult.incomingDamageEvents) ? combatResult.incomingDamageEvents : [];
-        combatResult.incomingDamageEvents.push({
+        const counterEvents = this._combatSplitIncomingHitEvents(enemyActionResult.counterDamageHits, totalCounterDamage, {
           type: 'counter',
           targetId: counterTarget.id,
-          damage: totalCounterDamage,
           from: beforeHp,
           to: counterTarget.hp,
           allyBlockBefore,
@@ -1228,6 +1285,7 @@ const GameCombatFlow = {
           allyBlockAbsorbed,
           fullBlock: allyBlockAbsorbed > 0 && totalCounterDamage <= 0,
         });
+        combatResult.incomingDamageEvents.push(...counterEvents);
         counterDmg = totalCounterDamage;
         logs.push(`${enemy.name} 攻擊 ${counterTarget.name}，造成 ${counterDmg} 傷害。`);
       } else {
@@ -1427,6 +1485,7 @@ const GameCombatFlow = {
           summaryLines.push(`${enemy.name} 本回合沒有造成傷害。`);
         }
         if (combatResult.gazeSummary) summaryLines.push(combatResult.gazeSummary);
+        if (combatResult.firstStrikeSummary) summaryLines.push(combatResult.firstStrikeSummary);
         if (combatResult.fateSummary) summaryLines.push(combatResult.fateSummary);
         if (combatResult.bannerSummary) summaryLines.push(combatResult.bannerSummary);
         const hasActableNext = this._combatActableSquad().length > 0;

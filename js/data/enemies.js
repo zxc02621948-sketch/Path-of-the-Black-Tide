@@ -411,6 +411,31 @@ const ENEMIES = [
   },
 
   {
+    id: 'echo_guardian_sword',
+    name: '斷律劍衛',
+    icon: '劍',
+    cardBgImage: 'assets/enemies/sword-law-guardian.png',
+    hideIconInCombat: true,
+    desc: '共鳴遺址中的守護者，黑鐵重律與銀蜂連刺被縫在同一副鎧甲裡。',
+    hp: 90,
+    block: 0,
+    attack: 2,
+    weakness: 3,
+    weaknessEffect: { type: 'reduce_sword_law_attack', amount: 1, min: 1, desc: '劍律偏移，斷律劍衛的基礎攻擊 -1，最低 1' },
+    nightOnly: false,
+    boss: true,
+    echoGuardian: true,
+    echoSystemId: 'sword',
+    lore: '它不是握著劍，而是讓所有劍都服從同一條斷裂的律。',
+    intents: [
+      { type: 'attack', weight: 1 },
+    ],
+    abilities: [
+      { type: 'sword_law_guardian', baseAttack: 2, lowMax: 3, growMin: 4, growAmount: 1, minBaseAttack: 1 },
+    ],
+  },
+
+  {
     id: 'night_heart',
     name: '夜幕之瞳',
     icon: '夜',

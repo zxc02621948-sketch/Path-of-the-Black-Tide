@@ -105,6 +105,10 @@ const GameCombatThreat = {
   },
 
   _combatIntentDamageLabel(intent, enemy) {
+    if (intent?.swordLaw) {
+      const base = Math.max(1, intent.swordLawBaseAttack || enemy?.attack || 2);
+      return `劍律骰　1-3 連刺 / 4-6 蓄勢（基礎攻擊 ${base}）`;
+    }
     const painBonus = this._enemyPainGrowthAttackBonus(enemy);
     const bannerInfo = this._enemyBannerGuardianIntentInfo(enemy, intent);
     const bannerDamageBonus = bannerInfo.damageBonus || 0;
