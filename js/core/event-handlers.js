@@ -18,57 +18,7 @@ const GameEventHandlers = {
       cell.content.event = ev;
     }
 
-    if (!ev.gamblerResolved && this._maybePromptGamblerEventReroll(cell, ev)) return;
-
     this._dispatchTerrainEvent(cell, ev);
-  },
-
-  _maybePromptGamblerEventReroll(cell, ev) {
-    const gambler = this._getAvailableGambler();
-    if (!gambler || ev.gamblerResolved) return false;
-    let resolved = false;
-
-    this._openModal({
-      title: '搏命者重擲事件',
-      desc: [
-        `目前事件：${ev.name}`,
-        `今天剩餘重擲：${this._gamblerRerollsLeft()}`,
-        '可以接受目前事件，或消耗 1 次重擲重新抽取事件。',
-      ].join('\n'),
-      choices: [
-        {
-          label: '接受目前事件',
-          action: () => {
-            if (resolved) return;
-            resolved = true;
-            ev.gamblerResolved = true;
-            this._closeModal();
-            this._triggerTerrain(cell);
-          },
-        },
-        {
-          label: '重擲事件',
-          action: () => {
-            if (resolved) return;
-            resolved = true;
-            this._spendGamblerReroll();
-            const next = this._rollTerrainEventForCell(cell);
-            if (!next) {
-              this._closeModal();
-              this._triggerEmptyTerrainSearch(cell);
-              return;
-            }
-            next.gamblerResolved = true;
-            cell.content.event = next;
-            delete cell.content.eventPending;
-            this._log(`搏命者重擲事件，改為「${next.name}」。`, 'reward');
-            this._closeModal();
-            this._triggerTerrain(cell);
-          },
-        },
-      ],
-    });
-    return true;
   },
 
   _triggerEmptyTerrainSearch(cell) {
@@ -90,6 +40,7 @@ const GameEventHandlers = {
     if (ev.id === 'empty_darkness_seep') { this._triggerDarknessSeep(cell, ev); return; }
     if (ev.id === 'empty_dark_whisper') { this._triggerDarkWhisper(cell, ev); return; }
     if (ev.id === 'empty_old_camp') { this._triggerOldCamp(cell, ev); return; }
+    if (ev.id === 'cave_dripping_water') { this._triggerCaveDrippingWater(cell, ev); return; }
     if (ev.id === 'cave_starlight_shard') { this._triggerCaveStarlightShard(ev); return; }
     if (ev.choiceTrap) { this._triggerChoiceTrap(cell, ev); return; }
     if (this._shouldConvertGuideRelicEventToCombat(ev)) {
@@ -98,7 +49,7 @@ const GameEventHandlers = {
     }
     switch (ev.type) {
       case 'rescue':     this._triggerRescue(ev);              break;
-      case 'supply':     this._triggerSupply(ev);              break;
+      case 'supply':     this._triggerSupply(ev, cell);        break;
       case 'forest_forage': this._triggerForestForage(ev);      break;
       case 'trap':       this._triggerTrap(ev);                break;
       case 'note':       this._triggerNote(ev);                break;

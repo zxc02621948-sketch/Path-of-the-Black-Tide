@@ -5,7 +5,7 @@ const EQUIPMENT = [
     name: '草藥包',
     icon: '草',
     iconImage: 'assets/items/herb-pack.png',
-    desc: '立即使用，恢復目標 30% 最大生命；輔助使用時恢復 40%。',
+    desc: '立即使用，恢復目標 30% 最大生命；隊伍有輔助時恢復 40%。',
     useType: 'instant',
     useInCombat: true,
     useOutOfCombat: true,
@@ -297,7 +297,7 @@ const GEARS = [
     name: '骨骰袋',
     icon: '骰',
     iconImage: 'assets/gears/bone-dice-bag.png',
-    desc: '每場戰鬥前 2 次，攻擊骰 1/2/3 會翻為 6/5/4。若因此觸發搏命者雙數，免疫該次反噬與減傷。',
+    desc: '每場戰鬥前 2 次，攻擊骰 1/2/3 會翻為 6/5/4。若搏命者擲出 1 被翻為 6，會直接觸發骰面 6 的大贏效果。',
     effect: { type: 'low_roll_flip', usesPerCombat: 2, map: { 1: 6, 2: 5, 3: 4 } },
   },
 ];

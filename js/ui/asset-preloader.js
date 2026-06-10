@@ -118,6 +118,7 @@ const AssetPreloader = {
       'assets/effects/fate-d12-burst-sprite.png',
       'assets/effects/lucky-d12-weakness-sprite.png',
       'assets/effects/lucky-d12-burst-sprite.png',
+      'assets/effects/weakpoint-hit-8frames.png',
       'assets/effects/resonance-awaken-charge.png',
       'assets/effects/resonance-awaken-wave.png',
       'assets/events/resonance-awaken-backdrop.png',

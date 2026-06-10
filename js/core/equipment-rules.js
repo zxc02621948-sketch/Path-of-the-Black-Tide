@@ -6,6 +6,15 @@ const EquipmentRules = {
 
   use(state, char, equip) {
     if (!char || !equip) return { used: false, log: null };
+    const combatBadgeMeta = {
+      source: equip.name,
+      sourceItemId: equip.id || '',
+      sourceItemName: equip.name || '',
+      sourceItemIcon: equip.icon || '',
+      sourceItemIconImage: equip.iconImage || '',
+      sourceCharId: char.id || '',
+      sourceCharName: char.name || '',
+    };
 
     if (equip.useType === 'instant') {
       if (equip.effect.type === 'heal' || equip.effect.type === 'heal_percent') {
@@ -22,12 +31,12 @@ const EquipmentRules = {
     }
 
     if (equip.useType === 'combat_mod') {
-      state.combatMods.push({ ...equip.effect, source: equip.name });
+      state.combatMods.push({ ...equip.effect, ...combatBadgeMeta });
       return { used: true, log: `${char.name} 激活道具【${equip.name}】，下場戰鬥生效。` };
     }
 
     if (equip.useType === 'roll_mod') {
-      state.rollMods.push({ ...equip.effect, source: equip.name });
+      state.rollMods.push({ ...equip.effect, ...combatBadgeMeta });
       return { used: true, log: `${char.name} 激活道具【${equip.name}】，下次判定生效。` };
     }
 

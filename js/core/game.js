@@ -2,6 +2,7 @@
 let G = {};
 
 const GUIDE_QUEST_DISABLED_KEY = 'bbn_guide_quest_disabled';
+const COMBAT_TUTORIAL_COMPLETED_KEY = 'bbn_combat_tutorial_completed';
 const CLASS_SIGNATURE_RELICS = {
   warrior: ['pain_mask', 'iron_scabbard', 'silver_bee_pin', 'pain_splinter_badge'],
   explorer: ['eagle_eye_feather', 'flaw_lens'],
@@ -27,6 +28,7 @@ const Game = {
       darkMonsters: [],
       darkMonsterRespawns: [],
       darkMonsterChasesToday: 0,
+      supportHerbPackGrantedDay: 0,
       eventCounts: {},
       darknessMilestones: {},
       nightIntroShown: false,
@@ -69,6 +71,7 @@ const Game = {
       modal: null,
       combat: null,
       gamblerRerollsLeft: 0,
+      gamblerExploreRerollDay: 0,
 
       log: [],
     };
@@ -106,6 +109,10 @@ const Game = {
       return;
     }
     const hasRelic = this._aliveSquad().some(char => char.relic || char.fusedRelic);
+    if (!hasRelic && this._isCombatTutorialCompleted()) {
+      G.guideQuest = { active: false, completed: true };
+      return;
+    }
     G.guideQuest = {
       active: true,
       stage: hasRelic ? 'find_altar' : 'find_relic',
@@ -279,6 +286,24 @@ const Game = {
     Render.fullRender();
   },
 
+  _isCombatTutorialCompleted() {
+    try {
+      return localStorage.getItem(COMBAT_TUTORIAL_COMPLETED_KEY) === 'true';
+    } catch {
+      return !!G.combatTutorial?.completed;
+    }
+  },
+
+  _markCombatTutorialCompleted() {
+    if (!G.combatTutorial) G.combatTutorial = { active: false, completed: false, firstCombatStarted: false };
+    G.combatTutorial.completed = true;
+    try {
+      localStorage.setItem(COMBAT_TUTORIAL_COMPLETED_KEY, 'true');
+    } catch {
+      // Storage may be unavailable; the current run still marks it completed.
+    }
+  },
+
   _revealGuideAltarTarget() {
     if (!G.guideQuest) return null;
     let target = null;
@@ -323,6 +348,7 @@ const Game = {
 
   _shouldUseCombatTutorialEnemy(opts = {}) {
     if (!G.combatTutorial) G.combatTutorial = { active: false, completed: false, firstCombatStarted: false };
+    if (this._isCombatTutorialCompleted()) return false;
     if (G.combatTutorial.completed || G.combatTutorial.firstCombatStarted) return false;
     if (opts.source === 'devTest' || opts.source === 'finalBoss') return false;
     return true;
@@ -440,11 +466,14 @@ const Game = {
     const endingDay = G.day || 1;
     const nextDay = endingDay + 1;
     const darknessDelta = G.phase === 'night' ? 2 : 1;
-    const phase = G.phase === 'night'
+    const dawnAfterThisDay = endingDay >= CONFIG.DAWN_DAY;
+    const phase = dawnAfterThisDay
+      ? 'dawn'
+      : G.phase === 'night'
       ? 'night'
-      : (nextDay >= CONFIG.DAWN_DAY ? 'dawn' : (nextDay === CONFIG.NIGHT_START_DAY ? 'nightfall' : 'day'));
-    const nextLabel = nextDay >= CONFIG.DAWN_DAY
-      ? '黎明將至'
+      : (nextDay === CONFIG.NIGHT_START_DAY ? 'nightfall' : 'day');
+    const nextLabel = dawnAfterThisDay
+      ? '最終決戰'
       : (nextDay === CONFIG.NIGHT_START_DAY && G.phase === 'day' ? '永夜滯留' : `第 ${nextDay} 天`);
     return {
       endingDay,
@@ -463,6 +492,7 @@ const Game = {
       return;
     }
 
+    const endedDay = G.day || 1;
     G.day++;
     G.actionsLeft = CONFIG.ACTIONS_PER_DAY;
     this._refreshRestPoints();
@@ -478,6 +508,7 @@ const Game = {
     G.gamblerRerollsLeft = 0;
     G.darkMonsterChasesToday = 0;
     this._syncGamblerRerollDisplay();
+    this._grantSupportHerbPackForDay?.();
 
     const dailyDarkness = G.phase === 'night' ? 2 : 1;
     this._applyDarkness(dailyDarkness, G.phase === 'night' ? '夜晚結束' : '白天結束');
@@ -488,7 +519,8 @@ const Game = {
     this._updateDarkMonstersDaily();
     this._maybeSpawnDailyDarkMonster();
     this._respawnRoutedDarkMonsters?.();
-    const hasPhaseTransition = (G.day === CONFIG.NIGHT_START_DAY && G.phase === 'day') || G.day >= CONFIG.DAWN_DAY;
+    const shouldTriggerDawn = endedDay >= CONFIG.DAWN_DAY;
+    const hasPhaseTransition = (G.day === CONFIG.NIGHT_START_DAY && G.phase === 'day') || shouldTriggerDawn;
     if (!hasPhaseTransition) {
       G.dayTransitionActive = false;
       this._flushSystemModal?.();
@@ -500,8 +532,9 @@ const Game = {
       this._enterNight();
       return;
     }
-    if (G.day >= CONFIG.DAWN_DAY) {
+    if (shouldTriggerDawn) {
       G.dayTransitionActive = false;
+      G.day = CONFIG.DAWN_DAY;
       this._triggerDawn(); return;
     }
 
@@ -571,12 +604,27 @@ const Game = {
       return;
     }
     G.finalBossSpawned = true;
-    this._log('第 20 天黎明前，夜幕之瞳在黑霧深處睜開。', 'danger');
-    this._triggerCombat({
-      type: 'enemy',
-      cleared: false,
-      content: { enemy: boss, reward: 'final_boss' },
-    }, { source: 'finalBoss' });
+    this._log('第 20 天結束，夜幕之瞳在黑霧深處睜開。', 'danger');
+    this._openModal({
+      title: '黎明前的黑潮',
+      desc: [
+        '第 20 天結束，最後的黑潮從邊境深處回望你們。',
+        `黑暗值：${G.darkness || 0}`,
+        '夜幕之瞳已經現身。整備最後一口氣，然後迎戰它。',
+      ].join('\n\n'),
+      choices: [{
+        label: '迎戰夜幕之瞳',
+        danger: true,
+        action: () => {
+          this._closeModal();
+          this._triggerCombat({
+            type: 'enemy',
+            cleared: false,
+            content: { enemy: boss, reward: 'final_boss' },
+          }, { source: 'finalBoss' });
+        },
+      }],
+    });
   },
 
   // Section.

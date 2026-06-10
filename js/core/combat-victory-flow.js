@@ -114,6 +114,10 @@ const GameCombatVictoryFlow = {
       this._settleTreasureMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
       return true;
     }
+    if (combatReward === 'warehouse_mimic') {
+      this._settleWarehouseMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
+      return true;
+    }
     if (combatReward === 'dark_gift_mimic') {
       enemy.darkGiftOpened = !!combatResult.darkGiftNativeOpen;
       this._settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
@@ -235,7 +239,7 @@ const GameCombatVictoryFlow = {
       combatAnims: this._combatResultAnims(attacker, combatResult, 250),
       dice: this._combatVictoryDice(attacker, roll, rollResult),
       choices: [{
-        label: '救出倖存者',
+        label: '繼續',
         action: () => {
           this._closeModal();
           this._triggerRescue({
@@ -279,7 +283,10 @@ const GameCombatVictoryFlow = {
       cell.content = { relic: { ...droppedRelic } };
       cell.cleared = false;
       cell.type = 'relic';
-      if (tutorialDrop && G.combatTutorial) G.combatTutorial.guaranteedRelicDropped = true;
+      if (tutorialDrop && G.combatTutorial) {
+        G.combatTutorial.guaranteedRelicDropped = true;
+        this._markCombatTutorialCompleted?.();
+      }
       const dropPrefix = tutorialDrop ? '教學戰鬥獎勵' : `${enemy.name} 掉落聖物`;
       this._log(`${dropPrefix}「${droppedRelic.name}」。`, 'reward');
     }
@@ -360,6 +367,7 @@ const GameCombatVictoryFlow = {
 
   _shouldGuaranteeCombatTutorialRelic(enemy, combatReward = null) {
     const tutorial = G.combatTutorial || null;
+    if (this._isCombatTutorialCompleted?.()) return false;
     if (!tutorial?.firstCombatStarted || tutorial.victoryHintShown || tutorial.guaranteedRelicDropped) return false;
     if (enemy?.id !== 'shadow_worm') return false;
     return this._canCombatDropRelic(enemy, combatReward);
@@ -368,7 +376,7 @@ const GameCombatVictoryFlow = {
   _canCombatDropRelic(enemy, combatReward = null) {
     if (!enemy) return false;
     if (enemy.boss || enemy.rescueBoss || enemy.echoGuardian || enemy.treasureMimic || enemy.darkGiftMimic) return false;
-    return !['rescue', 'corrupted', 'treasure_mimic', 'dark_gift_mimic', 'echo_site', 'dev_test'].includes(combatReward);
+    return !['rescue', 'corrupted', 'treasure_mimic', 'warehouse_mimic', 'dark_gift_mimic', 'echo_site', 'dev_test'].includes(combatReward);
   },
 
   _combatRelicDropChance(enemy) {

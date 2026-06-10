@@ -34,12 +34,26 @@ const GameCharacterDetails = {
     const fused = char.fusedRelic ? this._characterFusedRelicText(char.fusedRelic) : '無';
     const sideInfo = this._characterDetailSideInfo(char, cls);
     const resonanceInfo = this._characterResonanceDetailHtml(char);
+    const passiveHtml = this._characterPassiveSectionsHtml(cls);
     this._openModal({
       title: char.name + '（' + cls.name + '）',
       characterDetail: true,
-      descHtml: '<div class="character-detail-modal"><div class="character-detail-side">' + portrait + sideInfo + '</div><div class="character-detail-info"><div class="character-detail-grid"><div><span>HP</span><b>' + char.hp + '/' + char.maxHp + '</b></div><div><span>攻擊</span><b>' + (char.attack ?? cls.attack ?? 0) + '</b></div><div><span>狀態</span><b>' + (char.dead ? '倒下' : '存活') + '</b></div></div><div class="character-detail-stack">' + resonanceInfo + '<div class="character-detail-block"><strong>職業能力</strong><p>' + cls.passiveDesc + '</p></div><div class="character-detail-block"><strong>武器</strong><p>' + weapon + '</p></div><div class="character-detail-block"><strong>裝備</strong><p>' + gear + '</p></div><div class="character-detail-block"><strong>聖物</strong><p>' + relic + '</p><p>' + fused + '</p></div></div></div></div>',
+      descHtml: '<div class="character-detail-modal"><div class="character-detail-side">' + portrait + sideInfo + '</div><div class="character-detail-info"><div class="character-detail-grid"><div><span>HP</span><b>' + char.hp + '/' + char.maxHp + '</b></div><div><span>攻擊</span><b>' + (char.attack ?? cls.attack ?? 0) + '</b></div><div><span>狀態</span><b>' + (char.dead ? '倒下' : '存活') + '</b></div></div><div class="character-detail-stack">' + resonanceInfo + '<div class="character-detail-block"><strong>職業能力</strong>' + passiveHtml + '</div><div class="character-detail-block"><strong>武器</strong><p>' + weapon + '</p></div><div class="character-detail-block"><strong>裝備</strong><p>' + gear + '</p></div><div class="character-detail-block"><strong>聖物</strong><p>' + relic + '</p><p>' + fused + '</p></div></div></div></div>',
       choices: [{ label: '關閉', action: () => this._closeModal() }],
     });
+  },
+
+  _characterPassiveSectionsHtml(cls) {
+    const sections = typeof classPassiveSections === 'function' ? classPassiveSections(cls) : [];
+    if (!sections.length) {
+      return '<p>' + this._escapeHtmlLocal(cls?.passiveDesc || '') + '</p>';
+    }
+    return '<div class="passive-section-list character-passive-section-list">' + sections.map(section => (
+      '<div class="passive-section passive-section-' + this._escapeHtmlLocal(section.type || 'general') + '">' +
+        '<span class="passive-section-label">' + this._escapeHtmlLocal(section.label || '職業被動') + '</span>' +
+        '<span class="passive-section-text">' + this._escapeHtmlLocal(section.text || '') + '</span>' +
+      '</div>'
+    )).join('') + '</div>';
   },
 
   _characterFusedRelicText(relic) {

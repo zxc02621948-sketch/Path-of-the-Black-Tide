@@ -38,7 +38,11 @@ const GameDiceFlow = {
     const result = { ...base, value, charId: char?.id || null, charCls: char?.cls || null };
     if (diceType === 'combat') this._applyBoneDiceBagCombatRoll(char, result);
     if (diceType === 'combat') this._applyLuckyStarCombatRoll(char, result);
-    if (diceType === 'explore') this._applyExorcismRingExploreRoll(result, opts.successMin || 3);
+    if (diceType === 'explore') {
+      const successMin = opts.successMin || 3;
+      this._applyExorcismRingExploreRoll(result, successMin);
+      this._applyGamblerExploreReroll(result, char, successMin);
+    }
     return result;
   },
 
@@ -159,51 +163,63 @@ const GameDiceFlow = {
     return rollResult;
   },
 
+  _applyGamblerExploreReroll(rollResult, roller, successMin = 3) {
+    const threshold = Math.max(1, Number(successMin) || 3);
+    if (!rollResult || rollResult.value >= threshold) return rollResult;
+    if (rollResult.gamblerExploreReroll || G.gamblerExploreRerollDay === G.day) return rollResult;
+
+    const gambler = this._availableExploreGambler();
+    if (!gambler) return rollResult;
+
+    const before = {
+      raw: rollResult.raw,
+      value: rollResult.value,
+      floored: !!rollResult.floored,
+    };
+    G.gamblerExploreRerollDay = G.day || 1;
+    gambler.hp = Math.max(1, Math.max(0, gambler.hp || 0) - 1);
+
+    const second = Dice.roll('explore', roller);
+    rollResult.raw = second.raw;
+    rollResult.value = second.value;
+    rollResult.floored = !!second.floored;
+    rollResult.charId = roller?.id || null;
+    rollResult.charCls = roller?.cls || null;
+    rollResult.gamblerExploreReroll = {
+      gamblerId: gambler.id,
+      gamblerName: gambler.name,
+      hpCost: 1,
+      from: before.value,
+      fromRaw: before.raw,
+      to: second.value,
+      toRaw: second.raw,
+      successMin: threshold,
+    };
+
+    const tone = second.value >= threshold ? 'reward' : 'danger';
+    this._log(`${gambler.name} 壞命重擲：以 1 HP 為代價，${Dice.face(before.value)}（${before.value}）→ ${Dice.face(second.value)}（${second.value}）。`, tone);
+    return rollResult;
+  },
+
+  _availableExploreGambler() {
+    return this._aliveSquad().find(char => char.cls === 'scholar' && !char.dead && char.hp > 1) || null;
+  },
+
+  _gamblerExploreRerollText(rollResult) {
+    const info = rollResult?.gamblerExploreReroll;
+    if (!info) return '';
+    const name = info.gamblerName || '搏命者';
+    const cost = info.hpCost > 0 ? `，${name} -${info.hpCost} HP` : '';
+    return `壞命重擲${cost}：${Dice.face(info.from)}（${info.from}）→ ${Dice.face(info.to)}（${info.to}）。`;
+  },
+
   _exorcismRingHolder() {
     return this._aliveSquad().find(char =>
       char.fusedRelic?.id === 'exorcism_ring' || char.relic?.id === 'exorcism_ring'
     ) || null;
   },
-  _maybePromptGamblerReroll({ title, desc, diceType, char, rollResult, onAccept, onReroll }) {
-    const gambler = this._getAvailableGambler();
-    if (!gambler || rollResult.gamblerResolved) return false;
-    let resolved = false;
-
-    this._openModal({
-      title: '搏命者重擲',
-      desc: [
-        title,
-        desc,
-        `目前骰面：${Dice.face(rollResult.value)}（${rollResult.value}）`,
-        `今天剩餘重擲：${this._gamblerRerollsLeft()}`,
-        '可以接受目前結果，或消耗 1 次重擲。',
-      ].filter(Boolean).join('\n'),
-      choices: [
-        {
-          label: '接受目前結果',
-          action: () => {
-            if (resolved) return;
-            resolved = true;
-            rollResult.gamblerResolved = true;
-            this._closeModal();
-            onAccept(rollResult);
-          },
-        },
-        {
-          label: '重擲',
-          action: () => {
-            if (resolved) return;
-            resolved = true;
-            this._spendGamblerReroll();
-            const next = { ...Dice.roll(diceType, char), gamblerResolved: true, charId: char?.id || null, charCls: char?.cls || null };
-            this._log(`${gambler.name} 重擲後得到 ${Dice.face(next.value)}（${next.value}）。`, 'reward');
-            this._closeModal();
-            onReroll(next);
-          },
-        },
-      ],
-    });
-    return true;
+  _maybePromptGamblerReroll() {
+    return false;
   },
 
   _getAvailableGambler() {
@@ -211,7 +227,7 @@ const GameDiceFlow = {
   },
 
   _gamblerRerollsLeft() {
-    return Math.max(0, G.gamblerRerollsLeft || 0);
+    return 0;
   },
 
   _spendGamblerReroll() {

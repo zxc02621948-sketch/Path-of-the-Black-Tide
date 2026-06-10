@@ -54,6 +54,7 @@ const MapGen = {
       const { x, y } = altarPositions[i];
       if (i === 0) {
         grid[y][x].type = 'altar';
+        grid[y][x].revealed = true;
         grid[y][x].altarHidden = false;
         grid[y][x].altarUsedDay = 0;
       } else {
@@ -275,6 +276,11 @@ const MapGen = {
     }
     this._shuffle(candidates);
 
+    if (count >= 2) {
+      const spread = this._spreadAltarPositions(candidates, count, minDistance, size, cx, cy);
+      if (spread.length >= count) return spread;
+    }
+
     for (let requiredDistance = minDistance; requiredDistance >= 1; requiredDistance--) {
       const valid = [];
       for (const p of candidates) {
@@ -295,6 +301,86 @@ const MapGen = {
     }
     this._shuffle(fallback);
     return fallback.slice(0, count);
+  },
+
+  _spreadAltarPositions(candidates, count, minDistance, size, cx, cy) {
+    const buildSpread = requiredDistance => {
+      let best = [];
+      let bestScore = -Infinity;
+
+      for (const first of candidates) {
+        const picked = [first];
+        while (picked.length < count) {
+          let next = null;
+          let nextScore = -Infinity;
+          const pickedSectors = new Set(picked.map(pos => this._sectorKey(pos, size)));
+          const pickedQuadrants = new Set(picked.map(pos => this._quadrantKey(pos, cx, cy)));
+          const avgStart = picked.reduce((sum, pos) => sum + this.distance(pos.x, pos.y, cx, cy), 0) / picked.length;
+          for (const candidate of candidates) {
+            if (picked.includes(candidate)) continue;
+            const distances = picked.map(pos => this.distance(candidate.x, candidate.y, pos.x, pos.y));
+            const nearest = Math.min(...distances);
+            if (nearest < requiredDistance) continue;
+            const sector = this._sectorKey(candidate, size);
+            const quadrant = this._quadrantKey(candidate, cx, cy);
+            const startDistance = this.distance(candidate.x, candidate.y, cx, cy);
+            const score = nearest * 12
+              + (pickedQuadrants.has(quadrant) ? 0 : 24)
+              + (pickedSectors.has(sector) ? 0 : 10)
+              - Math.abs(startDistance - avgStart) * 1.5
+              + Math.random() * 2;
+            if (score > nextScore) {
+              next = candidate;
+              nextScore = score;
+            }
+          }
+          if (!next) break;
+          picked.push(next);
+        }
+
+        if (picked.length >= count) {
+          let pairDistance = 0;
+          for (let i = 0; i < picked.length; i++) {
+            for (let j = i + 1; j < picked.length; j++) {
+              pairDistance += this.distance(picked[i].x, picked[i].y, picked[j].x, picked[j].y);
+            }
+          }
+          const sectorCount = new Set(picked.map(pos => this._sectorKey(pos, size))).size;
+          const quadrantCount = new Set(picked.map(pos => this._quadrantKey(pos, cx, cy))).size;
+          const startDistances = picked.map(pos => this.distance(pos.x, pos.y, cx, cy));
+          const startSpread = Math.max(...startDistances) - Math.min(...startDistances);
+          const score = pairDistance * 10 + quadrantCount * 24 + sectorCount * 10 - startSpread * 1.5 + Math.random() * 2;
+          if (score > bestScore) {
+            best = picked;
+            bestScore = score;
+          }
+        }
+      }
+
+      return best;
+    };
+
+    for (let requiredDistance = minDistance; requiredDistance >= Math.max(1, minDistance - 2); requiredDistance--) {
+      const spread = buildSpread(requiredDistance);
+      if (spread.length >= count) return this._orderAltarPositions(spread, cx, cy);
+    }
+    for (let requiredDistance = minDistance; requiredDistance >= 1; requiredDistance--) {
+      const spread = buildSpread(requiredDistance);
+      if (spread.length >= count) return this._orderAltarPositions(spread, cx, cy);
+    }
+    return [];
+  },
+
+  _orderAltarPositions(positions, cx, cy) {
+    return [...positions].sort((a, b) => {
+      const da = this.distance(a.x, a.y, cx, cy);
+      const db = this.distance(b.x, b.y, cx, cy);
+      return da - db || Math.random() - 0.5;
+    });
+  },
+
+  _quadrantKey(pos, cx, cy) {
+    return `${pos.x < cx ? 'w' : 'e'},${pos.y < cy ? 'n' : 's'}`;
   },
 
   _ensureOpeningArea(grid, cx, cy) {

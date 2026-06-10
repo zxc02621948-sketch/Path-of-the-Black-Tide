@@ -89,7 +89,7 @@ const ENEMIES = [
     tierUpDays: 3,
     weakness: 2,
     weaknessEffect: { type: 'poison_weaken', desc: '毒粉潰散，本場戰鬥毒粉傷害 -1' },
-    abilities: [{ type: 'poison_dust', weakenReduction: 1 }],
+    abilities: [{ type: 'poison_dust', weakenReduction: 1, maxDamage: 3 }],
     attackTrail: 'poison_cloud',
     attackSfx: 'plagueMothSpawn',
     attackSfxVolume: 0.32,

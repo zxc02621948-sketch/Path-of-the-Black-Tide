@@ -61,6 +61,7 @@ const GameCombatInventoryFlow = {
       }
       G.combat.itemUsedRound = G.combat.round;
       if (item.useType === 'roll_mod') G.combat.rollItemUsedRound = G.combat.round;
+      if (item.useType === 'instant') this._rememberInstantCombatItemUse(char, item);
       if (result.log) this._log(result.log, 'reward');
     }
     G.combat.pendingInventoryItemIndex = null;
@@ -83,6 +84,25 @@ const GameCombatInventoryFlow = {
 
   _canUseCombatBag() {
     return !!G.combat && G.combat.itemUsedRound !== G.combat.round && this._combatActableSquad().length > 0;
+  },
+
+  _rememberInstantCombatItemUse(char, item) {
+    if (!G.combat || !char || !item) return;
+    const round = G.combat.round || 1;
+    const badges = Array.isArray(G.combat.instantItemBadges)
+      ? G.combat.instantItemBadges.filter(badge => badge.charId !== char.id)
+      : [];
+    badges.push({
+      charId: char.id,
+      round,
+      itemId: item.id || '',
+      name: item.name || '道具',
+      icon: item.icon || '',
+      iconImage: item.iconImage || '',
+      desc: item.desc || '',
+      instant: true,
+    });
+    G.combat.instantItemBadges = badges;
   },
 
 };

@@ -204,6 +204,7 @@ const GameSiteActions = {
     const rollResult = this._rollWithMods('explore', actor, { successMin: 4 });
     const roll = rollResult.value;
     const amount = roll === 6 ? 2 : roll >= 4 ? 1 : 0;
+    const rerollText = this._gamblerExploreRerollText(rollResult);
     if (amount > 0) this._applyDarkness(-amount, '神壇血祭');
 
     this._log(amount > 0
@@ -222,9 +223,10 @@ const GameSiteActions = {
         `${actor.name} 正在擲探索骰進行血祭判定。`,
       ].join('\n\n'),
       resultAppend: [
+        rerollText,
         `${actor.name} 擲出 ${Dice.face(roll)}（${roll}）。`,
         amount === 2 ? '大成功：黑暗 -2。' : amount === 1 ? '成功：黑暗 -1。' : '失敗：黑暗不變。',
-      ].join('\n\n'),
+      ].filter(Boolean).join('\n\n'),
       dice: { type: amount > 0 ? 'neutral' : 'danger', label: `${actor.name} 的探索骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, animate: true, charCls: rollResult.charCls },
       choices: [{ label: '離開神壇', action: () => { this._closeModal(); if (this._checkLose()) return; Render.fullRender(); } }],
     });
@@ -240,12 +242,14 @@ const GameSiteActions = {
 
     const dead = G.squad.filter(c => c.dead);
     const injured = this._aliveSquad().filter(c => c.hp < c.maxHp);
+    const groupRestLabel = this._siteRestHealLabel?.(0.30) ?? 30;
+    const firstAidLabel = this._siteRestHealLabel?.(0.50) ?? 50;
     const choices = [];
 
     choices.push({
-      label: '休息：全隊恢復 30% 最大 HP',
+      label: `休息：全隊恢復 ${groupRestLabel}% 最大 HP`,
       action: () => {
-        const healed = this._healAliveSquad(c => Math.ceil(c.maxHp * 0.30), true);
+        const healed = this._healAliveSquad(c => this._siteRestHealAmount?.(c, 0.30) ?? Math.ceil(c.maxHp * 0.30), true);
         this._log(healed.length > 0 ? '隊伍休息並恢復生命。' : '隊伍休息，但沒有人需要治療。', 'reward');
         this._markRestUsed(cell);
         this._closeModal();
@@ -255,13 +259,13 @@ const GameSiteActions = {
 
     if (injured.length > 0) {
       choices.push({
-        label: '急救：指定一名角色恢復 50% 最大 HP',
+        label: `急救：指定一名角色恢復 ${firstAidLabel}% 最大 HP`,
         action: () => {
           const targetChoices = injured.map(char => ({
             label: `${char.name}（HP ${char.hp}/${char.maxHp}）`,
             action: () => {
               const before = char.hp;
-              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.50));
+              const heal = this._restHealAmount(char, this._siteRestHealAmount?.(char, 0.50) ?? Math.ceil(char.maxHp * 0.50));
               char.hp = Math.min(char.maxHp, char.hp + heal);
               this._log(`${char.name} 恢復 ${char.hp - before} HP。`, 'reward');
               this._markRestUsed(cell);
@@ -276,7 +280,7 @@ const GameSiteActions = {
     }
 
     for (const char of dead) {
-      const reviveHp = Math.ceil(char.maxHp * 0.50);
+      const reviveHp = this._siteRestHealAmount?.(char, 0.50) ?? Math.ceil(char.maxHp * 0.50);
       choices.push({
         label: `救起 ${char.name}（${reviveHp} HP）`,
         action: () => {
@@ -294,11 +298,13 @@ const GameSiteActions = {
 
   _triggerEmberPoint(cell) {
     const injured = this._aliveSquad().filter(c => c.hp < c.maxHp);
+    const groupRestLabel = this._siteRestHealLabel?.(0.30) ?? 30;
+    const firstAidLabel = this._siteRestHealLabel?.(0.50) ?? 50;
     const choices = [
       {
-        label: '殘火治療：全隊恢復 30% 最大 HP',
+        label: `殘火治療：全隊恢復 ${groupRestLabel}% 最大 HP`,
         action: () => {
-          const healed = this._healAliveSquad(char => Math.ceil(char.maxHp * 0.30), false);
+          const healed = this._healAliveSquad(char => this._siteRestHealAmount?.(char, 0.30) ?? Math.ceil(char.maxHp * 0.30), true);
           if (healed.length > 0) this._log('殘火讓隊伍恢復生命。', 'reward');
           this._markRestUsed(cell);
           this._closeModal();
@@ -319,13 +325,13 @@ const GameSiteActions = {
 
     if (injured.length > 0) {
       choices.push({
-        label: '殘火急救：指定一名角色恢復 50% 最大 HP',
+        label: `殘火急救：指定一名角色恢復 ${firstAidLabel}% 最大 HP`,
         action: () => {
           const targetChoices = injured.map(char => ({
             label: `${char.name}（HP ${char.hp}/${char.maxHp}）`,
             action: () => {
               const before = char.hp;
-              const heal = this._restHealAmount(char, Math.ceil(char.maxHp * 0.50));
+              const heal = this._restHealAmount(char, this._siteRestHealAmount?.(char, 0.50) ?? Math.ceil(char.maxHp * 0.50));
               char.hp = Math.min(char.maxHp, char.hp + heal);
               this._log(`殘火讓 ${char.name} 恢復 ${char.hp - before} HP。`, 'reward');
               this._markRestUsed(cell);
@@ -340,7 +346,7 @@ const GameSiteActions = {
     }
 
     for (const char of G.squad.filter(c => c.dead)) {
-      const reviveHp = Math.ceil(char.maxHp * 0.50);
+      const reviveHp = this._siteRestHealAmount?.(char, 0.50) ?? Math.ceil(char.maxHp * 0.50);
       choices.push({
         label: `救起 ${char.name}（${reviveHp} HP）`,
         action: () => {

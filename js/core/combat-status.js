@@ -184,6 +184,15 @@ const CombatStatus = {
     return { before, after, added: Math.max(0, after - before) };
   },
 
+  clearBacklash(unit) {
+    if (!unit) return 0;
+    const before = Math.max(0, unit._gamblerBacklashStacks || 0);
+    unit._gamblerBacklashStacks = 0;
+    unit._gamblerBacklashRate = 0;
+    unit._gamblerBacklashPendingClear = false;
+    return before;
+  },
+
   applyIncomingRiskBonuses(unit, amount, opts = {}) {
     let damage = Math.max(0, amount || 0);
     if (!unit || damage <= 0) return damage;
@@ -208,7 +217,6 @@ const CombatStatus = {
         const rate = unit._gamblerBacklashRate || 0.20;
         const bonus = Math.max(1, Math.ceil(damage * rate * stacks));
         damage += bonus;
-        unit._gamblerBacklashPendingClear = true;
         if (logs) logs.push(`反噬：${unit.name} ${stacks} 層，本次${damageLabel} +${bonus}，${resultLabel} ${damage}`);
       }
     }
@@ -225,12 +233,7 @@ const CombatStatus = {
       unit._wagerDicePenaltyPendingClear = false;
       if (stacks > 0) cleared.push({ type: 'remorse', name: '懊悔', stacks });
     }
-    if (unit._gamblerBacklashPendingClear) {
-      const stacks = Math.max(0, unit._gamblerBacklashStacks || 0);
-      unit._gamblerBacklashStacks = 0;
-      unit._gamblerBacklashPendingClear = false;
-      if (stacks > 0) cleared.push({ type: 'backlash', name: '反噬', stacks });
-    }
+    if (unit._gamblerBacklashPendingClear) unit._gamblerBacklashPendingClear = false;
     return cleared;
   },
 

@@ -35,7 +35,9 @@ const GameEventTraps = {
     }
 
     const preDesc = `${ev.desc || ''}`;
-    const resultText = `${attacker.name} 正在進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${attacker.name} 擲出 ${Dice.face(roll)}（${roll}）：${success ? '成功通過。' : '失敗，觸發陷阱。'}`;
+    const rerollText = this._gamblerExploreRerollText(rollResult);
+    const rerollPrefix = rerollText ? `${rerollText}\n` : '';
+    const resultText = `${attacker.name} 正在進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${rerollPrefix}${attacker.name} 擲出 ${Dice.face(roll)}（${roll}）：${success ? '成功通過。' : '失敗，觸發陷阱。'}`;
     this._openModal({
       title: ev.name,
       desc: preDesc,
@@ -79,7 +81,9 @@ const GameEventTraps = {
     if (success) {
       this._completeProgressEvent(ev);
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
-      const resultText = `${attacker.name} 正在小心通過，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），安全通過。`;
+      const rerollText = this._gamblerExploreRerollText(rollResult);
+      const rerollPrefix = rerollText ? `${rerollText}\n` : '';
+      const resultText = `${attacker.name} 正在小心通過，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${rerollPrefix}擲出 ${Dice.face(roll)}（${roll}），安全通過。`;
       this._openModal({
         title: ev.name,
         desc: preDesc,
@@ -101,7 +105,9 @@ const GameEventTraps = {
     victim.hp = Math.max(0, victim.hp - damage);
     this._log(`${victim.name} 被黑霧侵蝕，受到 ${damage} 傷害。`, 'danger');
     const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
-    const resultText = `${attacker.name} 正在小心通過，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），通過失敗。${victim.name} 受到 ${damage} 傷害。`;
+    const rerollText = this._gamblerExploreRerollText(rollResult);
+    const rerollPrefix = rerollText ? `${rerollText}\n` : '';
+    const resultText = `${attacker.name} 正在小心通過，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${rerollPrefix}擲出 ${Dice.face(roll)}（${roll}），通過失敗。${victim.name} 受到 ${damage} 傷害。`;
     this._openModal({
       title: ev.name,
       desc: preDesc,
@@ -186,7 +192,9 @@ const GameEventTraps = {
     if (success) {
       this._completeProgressEvent(ev);
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
-      const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），成功通過。`;
+      const rerollText = this._gamblerExploreRerollText(rollResult);
+      const rerollPrefix = rerollText ? `${rerollText}\n` : '';
+      const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${rerollPrefix}擲出 ${Dice.face(roll)}（${roll}），成功通過。`;
       this._openModal({
         title: ev.name,
         desc: preDesc,
@@ -214,7 +222,9 @@ const GameEventTraps = {
       darknessText = `黑暗 +${ev.failDarknessChange}（${beforeDarkness} → ${G.darkness}）。`;
     }
     const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}`;
-    const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n擲出 ${Dice.face(roll)}（${roll}），解除失敗。${victim.name} 受到 ${damage} 傷害。${darknessText ? `\n${darknessText}` : ''}`;
+    const rerollText = this._gamblerExploreRerollText(rollResult);
+    const rerollPrefix = rerollText ? `${rerollText}\n` : '';
+    const resultText = `${attacker.name} 正在小心處理，進行探索骰判定，門檻 ${ev.successMin || 3}。\n\n${rerollPrefix}擲出 ${Dice.face(roll)}（${roll}），解除失敗。${victim.name} 受到 ${damage} 傷害。${darknessText ? `\n${darknessText}` : ''}`;
     const choices = [
       {
         label: '再次小心解除',

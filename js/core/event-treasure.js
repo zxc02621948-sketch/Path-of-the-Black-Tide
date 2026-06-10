@@ -260,6 +260,107 @@ const GameEventTreasure = {
     setTimeout(() => this._openTreasureMimicGearModal(cell, enemy, gear, combatLog), this._combatAnimWaitMs(combatAnims));
   },
 
+  _settleWarehouseMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
+    const reward = this._rollWarehouseMimicReward();
+    const rewardClass = reward.type === 'weapon'
+      ? 'equipment-inline-icon weapon-reward-inline-icon'
+      : reward.type === 'gear'
+        ? 'equipment-inline-icon gear-reward-inline-icon'
+        : 'equipment-inline-icon item-reward-icon';
+    this._log(`倉庫寶箱怪掉落${reward.label}「${reward.name}」。`, 'reward');
+    this._openModal({
+      title: '戰鬥勝利',
+      descHtml: `${this._modalTextHtml(`${enemy.name} 被擊敗。${finalHitDesc ? `\n${finalHitDesc}` : ''}`)}<br><br>箱體碎裂後留下 ${this._equipmentRewardLabelHtml(reward, '', rewardClass)}。<br>${this._modalTextHtml(reward.desc || '')}`,
+      typeText: false,
+      combatLog,
+      combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
+      dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: roll, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
+      choices: [],
+    });
+    setTimeout(() => this._openWarehouseMimicRewardAssignModal(cell, reward, combatLog), this._combatAnimWaitMs(combatAnims));
+  },
+
+  _rollWarehouseMimicReward() {
+    const roll = Math.random();
+    if (roll < 0.45) {
+      const weapon = randomWeaponForSquad(G.squad);
+      if (weapon) return { type: 'weapon', label: '武器', ...weapon };
+    }
+    if (roll < 0.75) {
+      const gear = randomGear(G.day);
+      return { type: 'gear', label: '角色裝備', ...gear };
+    }
+    const item = randomEquipment(G.day);
+    return { type: 'item', label: '道具', ...item };
+  },
+
+  _openWarehouseMimicRewardAssignModal(cell, reward, combatLog = []) {
+    if (reward.type === 'weapon') {
+      const assignOptions = this._aliveSquad().map(char => {
+        const current = char.weapon;
+        const upgraded = current?.id === reward.id && reward.upgradeTo ? getWeaponById(reward.upgradeTo) : null;
+        return {
+          char,
+          currentWeapon: current || null,
+          upgradedWeapon: upgraded || null,
+          actionLabel: upgraded ? '升級' : (current ? '替換' : '裝備'),
+          action: () => this._giveWeaponFromChest(cell, char, reward),
+        };
+      });
+      this._weaponAssignContext = { weapon: reward, options: assignOptions };
+      this._openModal({
+        title: `發現武器：${reward.name}`,
+        descHtml: `${this._weaponRewardCardHtml(reward)}${this._weaponAssignPanelHtml(assignOptions)}`,
+        typeText: false,
+        resultFx: 'event-reward',
+        combatLog,
+        choices: [{
+          label: '放棄武器',
+          className: 'relic-abandon-choice',
+          action: () => {
+            this._weaponAssignContext = null;
+            this._clearWeaponChest(cell);
+            this._log(`放棄倉庫寶箱怪掉落的武器「${reward.name}」。`, 'dim');
+            this._closeModal();
+            Render.fullRender();
+          },
+        }],
+      });
+      return;
+    }
+
+    if (reward.type === 'gear') {
+      this._openGearRewardModal({
+        gear: reward,
+        combatLog,
+        abandonLog: `放棄倉庫寶箱怪掉落的裝備「${reward.name}」。`,
+        clear: () => this._clearWeaponChest(cell),
+      });
+      return;
+    }
+
+    const addResult = this._addInventoryItem(reward);
+    this._clearWeaponChest(cell);
+    if (!addResult.added) {
+      this._openInventoryFullModal({
+        name: '倉庫寶箱怪',
+        desc: '寶箱怪碎裂後掉出一件道具，但背包已滿。',
+      }, reward, '');
+      return;
+    }
+    const countText = addResult.count > 1 ? ` x${addResult.count}` : '';
+    this._log(`倉庫寶箱怪掉落道具「${reward.name}」。`, 'reward');
+    this._openModal({
+      title: '獲得道具',
+      descHtml: `你們拾起 ${this._equipmentRewardLabelHtml(reward, countText)}。<br>${this._modalTextHtml(reward.desc || '')}`,
+      typeText: false,
+      resultFx: 'event-reward',
+      combatLog,
+      choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
   _settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatLog = [], finalHitDesc = '', combatAnims = null) {
     this._applyDarkness(-1, '黑匣擬態');
     const reward = this._rollDarkGiftMimicReward();

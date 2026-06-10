@@ -172,8 +172,9 @@ const GameCombatTooltips = {
     const titleText = isRemorse ? '懊悔' : '反噬';
     const sourceText = isRemorse
       ? '賭命骰子押注失敗時累積。'
-      : '搏命者攻擊骰為雙數時累積。';
-    const descText = `${char.name} 目前 ${stacks} 層，下一次受擊流程受到的傷害提高 ${stacks * rate}%。${sourceText}觸發受擊流程後清除。`;
+      : '搏命者攻擊骰為 1 時累積，骰面 6 可清除。';
+    const clearText = isRemorse ? '觸發受擊流程後清除。' : '會持續到戰鬥結束，或由搏命者骰面 6 清除。';
+    const descText = `${char.name} 目前 ${stacks} 層，受擊流程受到的傷害提高 ${stacks * rate}%。${sourceText}${clearText}`;
 
     let popover = document.getElementById('combat-status-popover');
     if (!popover) {

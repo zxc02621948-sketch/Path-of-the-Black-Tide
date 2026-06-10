@@ -219,7 +219,9 @@ document.addEventListener('DOMContentLoaded', () => {
     gameoverScr.classList.remove('active');
     startScreen.style.display = 'flex';
     startScreen.classList.add('active');
+    if (typeof G !== 'undefined') G = {};
     AudioManager?.stop?.(true);
+    AudioManager?.sync?.();
   });
 
   // ─── 檢查聖物庫狀態，決定是否顯示筆記按鈕 ───────────────

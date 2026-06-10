@@ -128,6 +128,7 @@ const GameRelicResonance = {
       resultSfx: sfxRes?.activateSfx || 'swordWoosh',
       resultSfxVolume: Number.isFinite(sfxRes?.activateSfxVolume) ? sfxRes.activateSfxVolume : 0.32,
       resultSfxDelay: 820,
+      interactionLockMs: 2000,
       choices: opts.choices || [{ label: '確認', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
   },
@@ -249,18 +250,18 @@ const GameRelicResonance = {
           '最終骰值等於破綻，或是任一破綻的倍數時，視為命中破綻，傷害 +3。',
           '若最終骰值是任一破綻的倍數，每個符合的破綻額外使傷害 +16。',
           '破綻為 1 時，所有最終骰值都視為它的倍數。',
-          '攻擊骰 6 仍觸發幸運星 +2；攻擊骰 12 觸發幸運星融合 +4。',
         ].join('\n');
       case 'star_hunter_eye':
         return [
-          `${res.bodyChar?.name || '持有者'} 每次使用弓攻擊前，若敵人沒有獵星產生的鷹眼暫時原生弱點，新增 1 個；命中後改為新的鷹眼暫時原生弱點。`,
-          '弓的追加攻擊傷害 +2。',
+          `${res.bodyChar?.name || '持有者'} 每次使用弓攻擊前，若敵人沒有獵星產生的鷹眼暫時原生弱點，新增 1 個。`,
+          '命中該弱點後進入鷹眼鎖定；本回合弓追擊不再需要命中原生弱點也能繼續。',
+          '未鎖定時弓追加攻擊傷害 +2；鷹眼鎖定期間改為追擊次數 x5。',
           '若同一回合觸發 2 次以上追加攻擊，最後一次追加攻擊的攻擊骰必定視為 6。',
           '這個強制 6 不會額外觸發原生弱點破除，也不會因此再延伸新的弓追擊。',
         ].join('\n');
       case 'star_breaker_eye':
         return [
-          `${res.bodyChar?.name || '持有者'} 使用弓主戰命中任一原生弱點時，破壞這次命中的原生弱點，額外造成 10 點固定傷害。`,
+          `${res.bodyChar?.name || '持有者'} 使用弓主戰命中任一原生弱點時，破壞這次命中的原生弱點，額外造成 20 點固定傷害。`,
           '任一原生弱點包含敵人的主要原生弱點、額外原生弱點與暫時原生弱點。',
           '同一回合可以破壞多個原生弱點。',
           '若敵人沒有可破壞的原生弱點，不會造成裂星破滅的固定傷害。',
@@ -337,7 +338,7 @@ const GameRelicResonance = {
           bodyChar: char,
           effect: {
             type: 'star_hunter_eye',
-            desc: `${char.name} 每次弓攻擊前可補上鷹眼暫時原生弱點；弓追擊傷害 +2，最後一次追擊可穩定為 6。`,
+            desc: `${char.name} 每次弓攻擊前可補上鷹眼暫時原生弱點；命中該弱點後，本回合弓追擊不再需要命中原生弱點。未鎖定時弓追擊傷害 +2，鎖定期間改為追擊次數 x5；最後一次追擊可穩定為 6。`,
           },
         });
       }

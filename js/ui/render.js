@@ -63,8 +63,10 @@ const Render = {
     const actionsMax = CONFIG.ACTIONS_PER_DAY || 3;
     const actionsDisplay = document.getElementById('actions-display');
     const actionsLeftEl = document.getElementById('actions-left');
+    const actionsMaxEl = document.getElementById('actions-max');
     const actionsHint = document.getElementById('actions-hint');
     if (actionsLeftEl) actionsLeftEl.textContent = actionsLeft;
+    if (actionsMaxEl) actionsMaxEl.textContent = actionsMax;
     if (actionsDisplay) {
       const pipWrap = actionsDisplay.querySelector('.action-pips');
       if (pipWrap && pipWrap.children.length !== actionsMax) {
@@ -179,6 +181,7 @@ const Render = {
 
           if (isPlayer) {
             el.classList.add('has-player');
+            el.classList.add('move-cross-center');
           }
 
           if (cell.content?.reward === 'rescue') {
@@ -210,6 +213,10 @@ const Render = {
           // Section.
           if (!isPlayer && MapGen.isAdjacent(G.playerX, G.playerY, x, y)) {
             el.classList.add('adjacent-highlight');
+            if (x === G.playerX && y === G.playerY - 1) el.classList.add('move-cross-north');
+            if (x === G.playerX && y === G.playerY + 1) el.classList.add('move-cross-south');
+            if (x === G.playerX - 1 && y === G.playerY) el.classList.add('move-cross-west');
+            if (x === G.playerX + 1 && y === G.playerY) el.classList.add('move-cross-east');
           }
 
           // Section.
@@ -851,23 +858,25 @@ const Render = {
   },
 
   _passiveDesc(cls) {
-    const map = {
-      warrior:  '戰鬥骰最低 3；主戰攻擊後，下回合獲得等同最終骰面一半（向上取整）的格檔，最多 4',
-      explorer: '主戰未命中原生弱點後標記可疑弱點；之後差 1 命中原生弱點時可消耗，視為命中。每個我方攻擊回合結束獲得 10% 閃避率；若探索者主戰，額外獲得最終骰面 x3% 閃避率，最多 50%。受擊時依閃避率判定，成功免傷，失敗則每 10% 傷害 -1；受擊後歸 0',
-      scholar:  '\u4e3b\u6230\u653b\u64ca\u6642\uff0c\u55ae\u6578\u8996\u70ba\u547d\u4e2d\u7834\u7dbb\uff0c\u4e26\u5237\u65b0\u6575\u4eba\u7834\u7dbb\u4e14\u672c\u6b21\u50b7\u5bb3 +1\uff1b\u96d9\u6578\u7372\u5f97 1 \u5c64\u53cd\u566c\uff0c\u4e0b\u4e00\u6b21\u53d7\u64ca\u6d41\u7a0b\u53d7\u5230\u7684\u50b7\u5bb3\u6bcf\u5c64 +20%\uff0c\u6700\u591a 2 \u5c64\uff0c\u89f8\u767c\u5f8c\u6e05\u7a7a\u3002\u6230\u9b25\u4e2d\u5be6\u969b\u640d\u5931 HP \u5f8c\uff0c\u4e0b\u56de\u5408\u7372\u5f97\u640d\u5931 HP x2 \u7684\u683c\u6a94',
-      support:  '我方攻擊回合結束時，若輔助存活，治療目前 HP 百分比最低的一名存活隊友 1 HP；若輔助是主戰者，改為治療最低兩名隊友各 1 HP。觸發後輔助仇恨 +1',
-    };
-    return map[cls] || '';
+    if (typeof classPassiveDesc === 'function') return classPassiveDesc(cls);
+    return CHARACTER_CLASSES[cls]?.passiveDesc || '';
   },
 
   _passiveShortDesc(cls) {
-    const map = {
-      warrior:  '戰鬥保底；下回合格檔',
-      explorer: '標記可疑弱點；累積閃避率',
-      scholar:  '破綻反噬；受傷轉格檔',
-      support:  '救急治療；提高仇恨',
-    };
-    return map[cls] || this._passiveDesc(cls);
+    return CHARACTER_CLASSES[cls]?.passiveShort || this._passiveDesc(cls);
+  },
+
+  _passiveSectionsHtml(clsOrId, className = 'passive-section-list') {
+    const sections = typeof classPassiveSections === 'function' ? classPassiveSections(clsOrId) : [];
+    if (!sections.length) {
+      return `<div class="${className}"><div class="passive-section-text">${this._escapeHtml(this._passiveDesc(clsOrId))}</div></div>`;
+    }
+    return `<div class="${className}">${sections.map(section => `
+      <div class="passive-section passive-section-${section.type || 'general'}">
+        <span class="passive-section-label">${this._escapeHtml(section.label || '職業被動')}</span>
+        <span class="passive-section-text">${this._escapeHtml(section.text || '')}</span>
+      </div>
+    `).join('')}</div>`;
   },
 
   _charPortraitHtml(char, cls, size = 'card') {
@@ -1310,7 +1319,7 @@ const Render = {
 
         <div class="char-detail-section">
           <div class="char-detail-section-title">職業被動</div>
-          <div class="char-detail-passive-name">${cls.passiveDesc}</div>
+          ${this._passiveSectionsHtml(cls)}
         </div>
 
         ${weapon ? `

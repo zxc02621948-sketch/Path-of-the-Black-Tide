@@ -29,7 +29,7 @@
   <link rel="preload" as="image" href="assets/effects/damage-digits/7.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/8.png">
   <link rel="preload" as="image" href="assets/effects/damage-digits/9.png">
-<link rel="stylesheet" href="style.css?v=start-squad-battle-art6">
+<link rel="stylesheet" href="style.css?v=cage-warden-scale1">
 </head>
 <body>
 <div id="app">
@@ -86,7 +86,7 @@
           <span class="action-pip filled"></span>
           <span class="action-pip filled"></span>
         </span>
-        <span class="actions-count"><span id="actions-left">3</span>&thinsp;/&thinsp;3</span>
+        <span class="actions-count"><span id="actions-left">4</span>&thinsp;/&thinsp;<span id="actions-max">4</span></span>
         <span id="actions-hint" class="actions-hint">選擇相鄰格</span>
         <button id="btn-field-rest" class="btn-small">原地休息</button>
         <button id="btn-end-day" class="btn-small">結束今天</button>
@@ -218,50 +218,50 @@
 </div><!-- /#app -->
 
 <!-- Scripts（順序不可改） -->
-<script src="js/config.js?v=dark-chase-limit1"></script>
-<script src="js/data/equipment.js?v=formal-icons1"></script>
-<script src="js/data/characters.js?v=formal-icons1"></script>
-<script src="js/data/relics.js?v=sword-law-guardian1"></script>
-<script src="js/data/enemies.js?v=sword-law-guardian1"></script>
-<script src="js/data/events.js?v=rarity-roll1"></script>
-<script src="js/data/resonances.js?v=iron-greatsword-sfx1"></script>
+<script src="js/config.js?v=support-passive1"></script>
+<script src="js/data/equipment.js?v=herb-support-party1"></script>
+<script src="js/data/characters.js?v=passive-sections1"></script>
+<script src="js/data/relics.js?v=lucky-star-order1"></script>
+<script src="js/data/enemies.js?v=plague-moth-cap1"></script>
+<script src="js/data/events.js?v=forest-forage-reward1"></script>
+<script src="js/data/resonances.js?v=resonance-desc-cleanup1"></script>
 <script src="js/core/dice.js?v=formal-icons1"></script>
-<script src="js/core/map.js?v=spread-map1"></script>
-<script src="js/core/combat-status.js?v=gambler-pain-block1"></script>
-  <script src="js/core/enemy-abilities.js?v=sword-law-multihit1"></script>
+<script src="js/core/map.js?v=altar-visible1"></script>
+<script src="js/core/combat-status.js?v=gambler-rework1"></script>
+  <script src="js/core/enemy-abilities.js?v=plague-moth-cap1"></script>
 <script src="js/core/weakness-effects.js?v=sword-law-guardian1"></script>
-<script src="js/core/combat.js?v=sword-law-multihit1"></script>
-<script src="js/core/relic-rules.js?v=pain-mask-desc1"></script>
-<script src="js/core/equipment-rules.js?v=rulesnotes2"></script>
-<script src="js/core/game.js?v=night-wording1"></script>
+<script src="js/core/combat.js?v=combat-log-weapon-name1"></script>
+<script src="js/core/relic-rules.js?v=lucky-star-order1"></script>
+<script src="js/core/equipment-rules.js?v=combat-item-badges1"></script>
+<script src="js/core/game.js?v=support-passive1"></script>
 <script src="js/core/inventory.js?v=reward-icons1"></script>
 <script src="js/ui/icon-render.js?v=weapon-icons1"></script>
-<script src="js/core/character-details.js?v=relic-title-icons1"></script>
-<script src="js/core/dice-flow.js?v=formal-icons1"></script>
-<script src="js/core/relic-resonance.js?v=resonance-charge-visible1"></script>
-<script src="js/core/game-state.js?v=night-wording1"></script>
-  <script src="js/core/combat-flow.js?v=sword-law-multihit1"></script>
-  <script src="js/core/combat-victory-flow.js?v=dark-respawn1"></script>
-  <script src="js/core/combat-tooltips.js?v=sword-law-guardian1"></script>
-  <script src="js/core/combat-inventory-flow.js?v=guide-item-target-fix1"></script>
+<script src="js/core/character-details.js?v=passive-sections1"></script>
+<script src="js/core/dice-flow.js?v=gambler-rework1"></script>
+<script src="js/core/relic-resonance.js?v=resonance-desc-cleanup1"></script>
+<script src="js/core/game-state.js?v=support-herb-notice1"></script>
+  <script src="js/core/combat-flow.js?v=wager-dice-fused1"></script>
+  <script src="js/core/combat-victory-flow.js?v=warehouse-cache1"></script>
+  <script src="js/core/combat-tooltips.js?v=gambler-rework1"></script>
+  <script src="js/core/combat-inventory-flow.js?v=combat-item-badges1"></script>
   <script src="js/core/combat-threat.js?v=sword-law-guardian1"></script>
-  <script src="js/core/combat-retreat.js?v=guide-combat-no-retreat1"></script>
-<script src="js/core/site-actions.js?v=transition-lock1"></script>
+  <script src="js/core/combat-retreat.js?v=warehouse-cache1"></script>
+<script src="js/core/site-actions.js?v=support-passive2"></script>
 <script src="js/core/echo-sites.js?v=sword-law-guardian1"></script>
-<script src="js/core/event-handlers.js?v=event-limit2"></script>
-<script src="js/core/event-treasure.js?v=reward-icons1"></script>
-<script src="js/core/event-encounters.js?v=gear-progress-trim1"></script>
-<script src="js/core/event-traps.js?v=event-injury-sfx1"></script>
+<script src="js/core/event-handlers.js?v=warehouse-cache1"></script>
+<script src="js/core/event-treasure.js?v=warehouse-cache1"></script>
+  <script src="js/core/event-encounters.js?v=warehouse-cache1"></script>
+<script src="js/core/event-traps.js?v=gambler-rework1"></script>
 <script src="js/core/event-notes.js?v=reserve-cleanup1"></script>
 <script src="js/core/dark-monsters.js?v=dark-chase-limit1"></script>
 <script src="js/ui/fx-player.js?v=fx-player-ambush1"></script>
 <script src="js/core/dev-tool.js?v=night-wording1"></script>
-<script src="js/ui/audio-manager.js?v=dual-banner-resonance-sfx1"></script>
-<script src="js/ui/render.js?v=night-wording1"></script>
-<script src="js/ui/modal-render.js?v=sword-law-multihit1"></script>
-<script src="js/ui/notes-render.js?v=notes-transparent-cards1"></script>
+<script src="js/ui/audio-manager.js?v=combat-bgm-watchdog1"></script>
+<script src="js/ui/render.js?v=passive-sections1"></script>
+<script src="js/ui/modal-render.js?v=rescue-choice-visible1"></script>
+<script src="js/ui/notes-render.js?v=resonance-desc-cleanup1"></script>
 <script src="js/ui/tutorial-render.js?v=notes-transparent-cards1"></script>
-<script src="js/ui/asset-preloader.js?v=sword-law-guardian1"></script>
-<script src="js/main.js?v=restart-audio1"></script>
+<script src="js/ui/asset-preloader.js?v=weakpoint-hit-fx1"></script>
+<script src="js/main.js?v=restart-audio2"></script>
 </body>
 </html>

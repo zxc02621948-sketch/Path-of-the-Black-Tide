@@ -10,6 +10,8 @@ const RenderModal = {
       clearInterval(this._modalTypeTimer);
       this._modalTypeTimer = null;
     }
+    this._clearModalInteractionLock();
+    this._clearModalSfxPlayback(true);
     const modal = document.getElementById('event-modal');
     const contentEl = modal.querySelector('.modal-content');
     const titleEl = document.getElementById('modal-title');
@@ -48,7 +50,7 @@ const RenderModal = {
     const activeResultFx = cfg.resultFx || '';
     if (cfg.eventSfx) {
       const eventSfxVolume = Number.isFinite(cfg.eventSfxVolume) ? cfg.eventSfxVolume : undefined;
-      AudioManager?.playSfx?.(cfg.eventSfx, eventSfxVolume);
+      this._playTrackedModalSfx(cfg.eventSfx, eventSfxVolume);
     }
     if (activeIntroFx) contentEl.classList.add(`event-intro-${activeIntroFx}`);
     if (cfg.titleHtml) {
@@ -200,6 +202,7 @@ const RenderModal = {
       }
       const combatBagPanel = sceneEl.querySelector('.combat-bag-panel');
       if (combatBagPanel) contentEl.appendChild(combatBagPanel);
+      this._bindCombatBannerTips(sceneEl);
 
       // Section.
       const enemyCard = sceneEl.querySelector('.hoverable-enemy');
@@ -397,8 +400,12 @@ const RenderModal = {
 
     choicesEl.innerHTML = '';
     const combatActionsEl = cfg.combat ? contentEl.querySelector('.combat-actions') : null;
-    if (combatActionsEl) combatActionsEl.innerHTML = '';
-    const actionHost = combatActionsEl || choicesEl;
+    const useModalChoices = !!cfg.useModalChoices;
+    if (combatActionsEl) {
+      combatActionsEl.innerHTML = '';
+      combatActionsEl.classList.toggle('combat-actions-inline-disabled', useModalChoices);
+    }
+    const actionHost = useModalChoices ? choicesEl : (combatActionsEl || choicesEl);
     for (const choice of (cfg.choices || [])) {
       const btn = document.createElement('button');
       const combatContinueClass = cfg.combat && choice.label === '繼續' ? ' combat-continue-choice' : '';
@@ -428,7 +435,7 @@ const RenderModal = {
       });
       actionHost.appendChild(btn);
     }
-    choicesEl.classList.toggle('modal-choices-empty', !!combatActionsEl);
+    choicesEl.classList.toggle('modal-choices-empty', !!combatActionsEl && !useModalChoices);
 
     // Section.
     descEl.classList.toggle('has-combat-log-open', !!(cfg.combat && cfg.combatLog && cfg.combatLog.length > 0));
@@ -458,6 +465,11 @@ const RenderModal = {
       setTimeout(() => this._positionCombatIntentArrow(), 160);
     } else {
       this._unbindCombatIntentArrowResize();
+    }
+
+    if (!cfg.combat) {
+      const interactionLockMs = this._modalInteractionLockMs(cfg, activeIntroFx, activeResultFx);
+      if (interactionLockMs > 0) this._lockModalInteractions(contentEl, interactionLockMs);
     }
 
     // Section.
@@ -494,7 +506,7 @@ const RenderModal = {
         const intentArrow = combatSceneEl.querySelector('.combat-intent-arrow');
         combatSceneEl.classList.add('combat-anim-locked-scene');
         if (cfg.syncAudioAfterCombatAnims) {
-          choicesEl.classList.add('combat-result-waiting');
+          if (!useModalChoices) choicesEl.classList.add('combat-result-waiting');
           combatActionsEl?.classList.add('combat-result-waiting');
         }
         if (intentArrow) intentArrow.hidden = true;
@@ -1003,28 +1015,150 @@ const RenderModal = {
     if (!id) return;
     const delay = Math.max(0, delayMs || 0);
     if (id === 'eventInjury') {
-      const playInjury = () => AudioManager?.playEventInjurySfx?.(volume);
+      const playInjury = () => this._trackModalSfxAudio(AudioManager?.playEventInjurySfx?.(volume));
       if (delay > 0) {
-        setTimeout(playInjury, delay);
+        this._scheduleModalSfx(playInjury, delay);
         return;
       }
       if (typeof requestAnimationFrame === 'function') {
-        requestAnimationFrame(playInjury);
+        this._scheduleModalSfxFrame(playInjury);
       } else {
         playInjury();
       }
       return;
     }
-    const play = () => AudioManager?.playSfx?.(id, volume);
+    const play = () => this._playTrackedModalSfx(id, volume);
     if (delay > 0) {
-      setTimeout(play, delay);
+      this._scheduleModalSfx(play, delay);
       return;
     }
     if (typeof requestAnimationFrame === 'function') {
-      requestAnimationFrame(play);
+      this._scheduleModalSfxFrame(play);
     } else {
       play();
     }
+  },
+
+  _playTrackedModalSfx(id, volume) {
+    return this._trackModalSfxAudio(AudioManager?.playSfx?.(id, volume));
+  },
+
+  _trackModalSfxAudio(audio) {
+    if (!audio) return null;
+    if (!this._modalSfxAudios) this._modalSfxAudios = [];
+    this._modalSfxAudios.push(audio);
+    audio.addEventListener?.('ended', () => {
+      if (!this._modalSfxAudios) return;
+      this._modalSfxAudios = this._modalSfxAudios.filter(item => item !== audio);
+    }, { once: true });
+    return audio;
+  },
+
+  _scheduleModalSfx(callback, delayMs = 0) {
+    if (!this._modalSfxTimers) this._modalSfxTimers = [];
+    const timer = setTimeout(() => {
+      this._modalSfxTimers = (this._modalSfxTimers || []).filter(item => item !== timer);
+      callback();
+    }, Math.max(0, delayMs || 0));
+    this._modalSfxTimers.push(timer);
+    return timer;
+  },
+
+  _scheduleModalSfxFrame(callback) {
+    if (typeof requestAnimationFrame !== 'function') {
+      callback();
+      return null;
+    }
+    if (!this._modalSfxFrames) this._modalSfxFrames = [];
+    const frame = requestAnimationFrame(() => {
+      this._modalSfxFrames = (this._modalSfxFrames || []).filter(item => item !== frame);
+      callback();
+    });
+    this._modalSfxFrames.push(frame);
+    return frame;
+  },
+
+  _clearModalSfxPlayback(stopAudio = false) {
+    (this._modalSfxTimers || []).forEach(timer => clearTimeout(timer));
+    (this._modalSfxFrames || []).forEach(frame => {
+      if (typeof cancelAnimationFrame === 'function') cancelAnimationFrame(frame);
+    });
+    this._modalSfxTimers = [];
+    this._modalSfxFrames = [];
+    if (stopAudio) {
+      (this._modalSfxAudios || []).forEach(audio => {
+        try {
+          audio.pause();
+          audio.currentTime = 0;
+        } catch (err) {}
+      });
+    }
+    this._modalSfxAudios = [];
+  },
+
+  _modalInteractionLockMs(cfg = {}, activeIntroFx = '', activeResultFx = '') {
+    if (cfg.combat || cfg.combatAnims || cfg.characterDetail || cfg.wagerModal) return 0;
+    const explicit = Number(cfg.interactionLockMs);
+    if (Number.isFinite(explicit)) return Math.max(0, explicit);
+    const resultFxDurations = {
+      'resonance-awaken': 1900,
+      'event-discover': 1400,
+      'event-reward': 1300,
+      'event-quiet': 1450,
+      'event-ambush': 1500,
+      'event-hit': 900,
+      'event-dark-hit': 1000,
+      'event-clear': 900,
+    };
+    const introFxDurations = {
+      scene: 760,
+      discover: 900,
+      reward: 860,
+      quiet: 900,
+    };
+    let lockMs = 0;
+    if (activeResultFx) lockMs = Math.max(lockMs, resultFxDurations[activeResultFx] || 1000);
+    if (activeIntroFx) lockMs = Math.max(lockMs, introFxDurations[activeIntroFx] || 700);
+    if (cfg.eventSfx) lockMs = Math.max(lockMs, 900);
+    if (cfg.resultSfx) {
+      const delay = Number.isFinite(cfg.resultSfxDelay) ? Math.max(0, cfg.resultSfxDelay) : 0;
+      lockMs = Math.max(lockMs, delay + 1000);
+    }
+    return lockMs;
+  },
+
+  _lockModalInteractions(contentEl, lockMs = 0) {
+    if (!contentEl || lockMs <= 0) return;
+    this._clearModalInteractionLock();
+    contentEl.classList.add('modal-interaction-locked');
+    this._modalInteractionLockHandler = event => {
+      if (!contentEl.classList.contains('modal-interaction-locked')) return;
+      if (!event.target?.closest?.('button')) return;
+      event.preventDefault();
+      event.stopImmediatePropagation();
+    };
+    contentEl.addEventListener('click', this._modalInteractionLockHandler, true);
+    this._modalInteractionLockTimer = setTimeout(() => {
+      this._modalInteractionLockTimer = null;
+      contentEl.classList.remove('modal-interaction-locked');
+      if (this._modalInteractionLockHandler) {
+        contentEl.removeEventListener('click', this._modalInteractionLockHandler, true);
+        this._modalInteractionLockHandler = null;
+      }
+    }, Math.max(0, lockMs || 0));
+  },
+
+  _clearModalInteractionLock() {
+    if (this._modalInteractionLockTimer) {
+      clearTimeout(this._modalInteractionLockTimer);
+      this._modalInteractionLockTimer = null;
+    }
+    const contentEl = document.querySelector('#event-modal .modal-content');
+    if (contentEl && this._modalInteractionLockHandler) {
+      contentEl.removeEventListener('click', this._modalInteractionLockHandler, true);
+    }
+    this._modalInteractionLockHandler = null;
+    contentEl?.classList.remove('modal-interaction-locked');
   },
 
   _playModalResultFx(contentEl, fx) {
@@ -1770,6 +1904,7 @@ const RenderModal = {
       setTimeout(applyRemainingBlocks, 80);
     }
 
+    let weakpointVisualScheduled = false;
     for (let i = 0; i < followHits; i++) {
       setTimeout(() => {
         const attackerEl = playerAttacker ? findAllyUnit(playerAttacker) : null;
@@ -1819,7 +1954,19 @@ const RenderModal = {
                   }, 160);
                 }
                 if (visualHitEffect && (!['slash', 'strike', 'pierce'].includes(visualHitEffect) || visualHitEffect !== attackTrail)) {
-                  this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                  const duplicateWeakpointHit = visualHitEffect === 'weakpoint-hit' && weakpointVisualScheduled;
+                  if (!duplicateWeakpointHit) {
+                    if (visualHitEffect === 'weakpoint-hit') weakpointVisualScheduled = true;
+                    const playVisualHitEffect = () => {
+                      this._showCombatHitEffect(enemyCard, visualHitEffect, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, damage: damageEvent.damage, tier: fxTier });
+                      if (visualHitEffect === 'weakpoint-hit') AudioManager?.playSfx?.('weakpointHit', damageEvent.weakpointSfxVolume ?? 0.46);
+                    };
+                    if (visualHitEffect === 'weakpoint-hit') {
+                      setTimeout(playVisualHitEffect, damageEvent.weakpointDelayMs ?? 520);
+                    } else {
+                      playVisualHitEffect();
+                    }
+                  }
                 }
                 const showDamageNumber = () => this._showCombatDamageNumber(enemyCard, damageEvent.damage, {
                   side: 'enemy',
@@ -2077,7 +2224,7 @@ const RenderModal = {
       const backlashHtml = backlashStacks > 0 && !isDown ? `
         <button type="button" class="combat-status-badge backlash"
           onclick="event.stopPropagation(); Game.showCombatStatusDetail('${char.id}', 'backlash', event)"
-          title="反噬 ${backlashStacks} 層，下次受擊流程受到的傷害提高 ${backlashStacks * 20}%">
+          title="反噬 ${backlashStacks} 層，受擊流程受到的傷害提高 ${backlashStacks * 20}%，持續到戰鬥結束或骰面 6 清除">
           <img src="assets/icons/backlash-icon.png" alt="反噬">
           <strong>+${backlashStacks * 20}%</strong>
         </button>
@@ -2091,17 +2238,72 @@ const RenderModal = {
           ${wagerActive ? `<small>${wagerFaces.join(' ')}</small>` : '<span class="wager-state">押注</span>'}
         </button>
       ` : '';
-      const bannerHtml = Array.isArray(char.activeBanners) && char.activeBanners.length > 0
-        ? char.activeBanners.map(banner => {
-          const bannerLevel = Math.max(1, Math.floor(Number(banner?.level) || 1));
-          const bannerName = banner?.shortName || banner?.faceName || '旗面';
+      const bannerSlots = Array.isArray(char.bannerSlots) ? char.bannerSlots : [];
+      const bannerHtml = bannerSlots.length > 0 && !isDown
+        ? bannerSlots.map(slot => {
+          const activeBanner = slot.activeBanner || null;
+          const icon = activeBanner?.iconImage || slot.iconImage || 'assets/relics/war-banner.png';
+          if (activeBanner) {
+            const bannerLevel = Math.max(1, Math.floor(Number(activeBanner?.level) || 1));
+            const bannerName = activeBanner?.shortName || activeBanner?.faceName || '旗面';
+            const click = slot.canPlan
+              ? `Game.toggleCombatBannerPlan('${this._escapeAttr(char.id)}', '${this._escapeAttr(slot.id)}')`
+              : `Game.showCombatBannerDetail('${char.id}', '${activeBanner.relicId}', '${activeBanner.faceId}', event)`;
+            const title = slot.canPlan
+              ? `${slot.name}｜目前：${activeBanner.faceName || bannerName}｜點擊後下次主戰優先更換旗面｜可出現：${slot.faceText || '旗面'}`
+              : `${slot.name}｜${activeBanner.faceName || bannerName}`;
+            const tipTitle = `${slot.name}・${activeBanner.faceName || bannerName}`;
+            const tipDetail = activeBanner.detail || slot.detail || '';
+            const tipHint = slot.canPlan
+              ? '點擊：下次主戰優先更換旗面。'
+              : '點擊：查看旗面效果。';
+            return `
+              <button type="button"
+                class="combat-banner-badge${slot.canPlan ? ' changeable' : ''}${slot.planned ? ' planned' : ''}"
+                onclick="event.stopPropagation(); ${click}"
+                data-banner-tip-title="${this._escapeAttr(tipTitle)}"
+                data-banner-tip-detail="${this._escapeAttr(tipDetail)}"
+                data-banner-tip-hint="${this._escapeAttr(tipHint)}"
+                data-banner-tip-icon="${this._escapeAttr(icon)}"
+                aria-label="${this._escapeAttr(title)}">
+                <span class="banner-icon"><img src="${this._escapeAttr(icon)}" alt=""></span>
+                <span>${bannerName}</span>
+                <strong>${bannerLevel}階</strong>
+              </button>
+            `;
+          }
+          const iconHtml = slot.iconImage
+            ? `<img src="${this._escapeAttr(slot.iconImage)}" alt="">`
+            : `<span>${this._escapeHtml(slot.icon || '旗')}</span>`;
+          const title = `${slot.name}｜主戰時會自動補立；點擊後下次主戰優先舉此旗｜可出現：${slot.faceText || '旗面'}｜${slot.detail || ''}`;
+          const tipHint = slot.planned
+            ? '已指定：下次主戰優先舉此旗。'
+            : '主戰時會自動補立；點擊可指定下次主戰優先舉此旗。';
+          return `
+            <button type="button"
+              class="combat-banner-choice-toggle${slot.planned ? ' planned' : ''}"
+              onclick="event.stopPropagation(); Game.toggleCombatBannerPlan('${this._escapeAttr(char.id)}', '${this._escapeAttr(slot.id)}')"
+              data-banner-tip-title="${this._escapeAttr(slot.name || '旗子')}"
+              data-banner-tip-detail="${this._escapeAttr(slot.detail || '')}"
+              data-banner-tip-hint="${this._escapeAttr(tipHint)}"
+              data-banner-tip-icon="${this._escapeAttr(slot.iconImage || '')}"
+              aria-label="舉起${this._escapeAttr(slot.name || '旗子')}">
+              ${iconHtml}
+            </button>
+          `;
+        }).join('')
+        : '';
+      const itemBadgeHtml = Array.isArray(char.combatItemBadges) && char.combatItemBadges.length > 0 && !isDown
+        ? char.combatItemBadges.map(badge => {
+          const name = badge?.name || '道具';
+          const desc = badge?.desc || '道具效果生效中';
+          const stateType = badge?.stateType || 'combat';
           return `
           <button type="button"
-            class="combat-banner-badge"
-            onclick="event.stopPropagation(); Game.showCombatBannerDetail('${char.id}', '${banner.relicId}', '${banner.faceId}', event)">
-            <span class="banner-icon"><img src="assets/relics/war-banner.png" alt=""></span>
-            <span>${bannerName}</span>
-            <strong>${bannerLevel}階</strong>
+            class="combat-status-badge item-effect ${stateType === 'instant' ? 'instant' : ''}"
+            onclick="event.stopPropagation()"
+            title="${this._escapeAttr(`${name}：${desc}`)}">
+            ${EquipmentIcon.html(badge, 'combat-item-badge-icon')}
           </button>
         `;
         }).join('')
@@ -2126,7 +2328,7 @@ const RenderModal = {
           ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           ${isDown ? this._combatBloodSplatterHtml(char.id || char.name, 'ally') : ''}
-          <div class="combat-unit-main">
+          <div class="combat-unit-main${evasionBadgeHtml ? ' has-fixed-evasion' : ''}">
             <span class="combat-sprite">${this._combatClassIconHtml(char.cls, cls)}</span>
             <span class="combat-name">${char.name}</span>
             ${gazeBadgeHtml}
@@ -2139,6 +2341,7 @@ const RenderModal = {
             ${backlashHtml}
             ${wagerHtml}
             ${bannerHtml}
+            ${itemBadgeHtml}
           </div>
           <div class="combat-stat-line">攻擊 ${char.attack ?? cls.attack ?? 0}${threat > 0 ? `　仇恨 ${threat}/10` : ''}</div>
           <div class="combat-threat-meter${threat > 0 ? '' : ' empty'}" title="${threat > 0 ? `仇恨 ${threat}/10` : ''}"><span style="width:${Math.min(100, threat * 10)}%"></span></div>
@@ -2282,13 +2485,20 @@ const RenderModal = {
     const nextButton = tutorial.step === 'guard_cooldown'
       ? '<button type="button" class="combat-tutorial-next" onclick="Game.continueCombatTutorial()">下一步</button>'
       : '';
+    const dismissButtons = tutorial.bannerGuide
+      ? `<div class="combat-tutorial-dismiss" data-banner-guide>
+          <button type="button" onclick="event.stopPropagation(); Game.dismissBannerGuide(false)">我知道了</button>
+          <button type="button" onclick="event.stopPropagation(); Game.dismissBannerGuide(true)">不再顯示</button>
+        </div>`
+      : '';
     return `
-      <div class="combat-tutorial-card target-${tutorial.target || 'none'}" data-step="${tutorial.step || ''}">
+      <div class="combat-tutorial-card target-${tutorial.target || 'none'}" data-step="${tutorial.step || ''}" ${tutorial.bannerGuide ? 'data-banner-guide' : ''}>
         <div class="combat-tutorial-step">戰鬥教學</div>
         <div class="combat-tutorial-title">${this._escapeHtml(tutorial.title || '')}</div>
         <div class="combat-tutorial-body">${this._escapeHtml(tutorial.body || '')}</div>
         <div class="combat-tutorial-cta">${this._escapeHtml(tutorial.cta || '')}</div>
         ${nextButton}
+        ${dismissButtons}
       </div>
     `;
   },
@@ -2305,6 +2515,14 @@ const RenderModal = {
     if (target === 'guard') scene.querySelector('.combat-guard-button')?.classList.add('combat-tutorial-highlight');
     if (target === 'bag') scene.querySelector('.combat-bag-button')?.classList.add('combat-tutorial-highlight');
     if (target === 'bag_item') scene.querySelector('.combat-bag-item[data-item-id="whetstone"]')?.classList.add('combat-tutorial-highlight');
+    if (target === 'banner' && tutorial.targetId) {
+      scene.querySelectorAll('.combat-unit.ally').forEach(el => {
+        if (el.dataset.charId !== tutorial.targetId) return;
+        el.querySelectorAll('.combat-banner-choice-toggle, .combat-banner-badge.changeable').forEach(btn => {
+          btn.classList.add('combat-tutorial-highlight');
+        });
+      });
+    }
     if (target === 'guard_ally' && tutorial.targetId) {
       scene.querySelectorAll('.combat-unit.ally').forEach(el => {
         if (el.dataset.charId === tutorial.targetId) el.classList.add('combat-tutorial-highlight');
@@ -2646,7 +2864,7 @@ const RenderModal = {
     const cls = CHARACTER_CLASSES[char.cls];
     const rows = [];
     rows.push(`<div class="cct-name">${this._combatClassIconHtml(char.cls, cls)} ${char.name}（${cls.name}）</div>`);
-    rows.push(`<div class="cct-row"><span class="cct-label">被動</span>${cls.passiveDesc}</div>`);
+    rows.push(this._combatPassiveSectionsHtml(cls));
     if (char.weapon) rows.push(`<div class="cct-row"><span class="cct-label">武器</span>${EquipmentIcon.label(char.weapon, 'equipment-inline-icon weapon-tooltip-icon')}：${char.weapon.desc}</div>`);
     if (char.gear)   rows.push(`<div class="cct-row"><span class="cct-label">裝備</span>${EquipmentIcon.label(char.gear, 'equipment-inline-icon gear-tooltip-icon')}：${char.gear.desc}</div>`);
     if (char.relic)  rows.push(`<div class="cct-row"><span class="cct-label">聖物</span>${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-tooltip-icon')}：${typeof relicEffectDesc === 'function' ? relicEffectDesc(char.relic, false) : char.relic.desc}</div>`);
@@ -2656,9 +2874,78 @@ const RenderModal = {
       rows.push(`<div class="cct-row"><span class="cct-label">共鳴</span>${res.name}：${res.effect?.desc || '共鳴效果已啟動。'}</div>`);
     }
     if (char.wagerDiceMissStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">懊悔</span>${char.wagerDiceMissStacks} 層，下次受擊流程受到的傷害提高 ${char.wagerDiceMissStacks * 30}%</div>`);
-    if (char.gamblerBacklashStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">反噬</span>${char.gamblerBacklashStacks} 層，下次受擊流程受到的傷害提高 ${char.gamblerBacklashStacks * 20}%</div>`);
+    if (char.gamblerBacklashStacks > 0) rows.push(`<div class="cct-row"><span class="cct-label">反噬</span>${char.gamblerBacklashStacks} 層，受擊流程受到的傷害提高 ${char.gamblerBacklashStacks * 20}%，持續到戰鬥結束或骰面 6 清除</div>`);
     if (char.threat > 0) rows.push(`<div class="cct-row"><span class="cct-label">仇恨</span>${char.threat}/10，單體意圖更容易鎖定此角色；被單體攻擊命中後仇恨減半</div>`);
     return rows.join('');
+  },
+
+  _combatPassiveSectionsHtml(cls) {
+    const sections = typeof classPassiveSections === 'function' ? classPassiveSections(cls) : [];
+    if (!sections.length) {
+      return `<div class="cct-row"><span class="cct-label">被動</span>${this._escapeHtml(cls?.passiveDesc || '')}</div>`;
+    }
+    return `<div class="cct-row cct-passive-list">${sections.map(section => `
+      <div class="cct-passive-section">
+        <span class="cct-label">${this._escapeHtml(section.label || '職業被動')}</span>${this._escapeHtml(section.text || '')}
+      </div>
+    `).join('')}</div>`;
+  },
+
+  _bindCombatBannerTips(sceneEl) {
+    const buttons = sceneEl?.querySelectorAll?.('.combat-banner-badge, .combat-banner-choice-toggle');
+    if (!buttons?.length) return;
+    let tip = document.getElementById('combat-float-tip');
+    if (!tip) {
+      tip = document.createElement('div');
+      tip.id = 'combat-float-tip';
+      document.body.appendChild(tip);
+    }
+    buttons.forEach(button => {
+      const showTip = ev => {
+        ev.stopPropagation();
+        const title = button.dataset.bannerTipTitle || '旗子';
+        const detail = button.dataset.bannerTipDetail || '';
+        const hint = button.dataset.bannerTipHint || '';
+        const icon = button.dataset.bannerTipIcon || '';
+        tip.innerHTML = this._combatBannerTipHtml(title, detail, hint, icon);
+        tip.classList.add('visible');
+        this._positionCombatFloatTip(tip, ev);
+      };
+      const moveTip = ev => {
+        ev.stopPropagation();
+        this._positionCombatFloatTip(tip, ev);
+      };
+      const hideTip = ev => {
+        ev.stopPropagation();
+        tip.classList.remove('visible');
+      };
+      button.addEventListener('mouseenter', showTip);
+      button.addEventListener('mousemove', moveTip);
+      button.addEventListener('mouseleave', hideTip);
+      button.addEventListener('focus', showTip);
+      button.addEventListener('blur', hideTip);
+    });
+  },
+
+  _combatBannerTipHtml(title, detail, hint, icon = '') {
+    const iconHtml = icon
+      ? `<img class="equipment-inline-icon relic-tooltip-icon" src="${this._escapeAttr(icon)}" alt="">`
+      : '';
+    return [
+      `<div class="cct-name">${iconHtml}${this._escapeHtml(title)}</div>`,
+      detail ? `<div class="cct-row">${this._escapeHtml(detail)}</div>` : '',
+      hint ? `<div class="cct-row"><span class="cct-label">操作</span>${this._escapeHtml(hint)}</div>` : '',
+    ].join('');
+  },
+
+  _positionCombatFloatTip(tip, ev = null) {
+    const rect = ev?.currentTarget?.getBoundingClientRect?.() || null;
+    const xBase = Number.isFinite(ev?.clientX) ? ev.clientX : (rect ? rect.left : window.innerWidth / 2);
+    const yBase = Number.isFinite(ev?.clientY) ? ev.clientY : (rect ? rect.bottom : window.innerHeight / 2);
+    const x = xBase + 16;
+    const y = yBase + 12;
+    tip.style.left = `${Math.max(8, Math.min(x, window.innerWidth - tip.offsetWidth - 8))}px`;
+    tip.style.top = `${Math.max(8, Math.min(y, window.innerHeight - tip.offsetHeight - 8))}px`;
   },
 
   _combatClassIconHtml(clsId, cls = null) {
@@ -2670,6 +2957,8 @@ const RenderModal = {
   },
 
   hideModal() {
+    this._clearModalInteractionLock();
+    this._clearModalSfxPlayback(true);
     this._hideCombatTip();
     this._hideCombatBannerPopover();
     this._hideCombatStatusPopover();

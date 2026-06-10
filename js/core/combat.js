@@ -8,7 +8,7 @@ const CombatRules = {
     const banners = Array.isArray(banner) ? banner.filter(Boolean) : (banner ? [banner] : []);
 
     const weapon = attacker.weapon;
-    const weaponLabel = weapon ? `${weapon.icon} ${weapon.name}` : '徒手';
+    const weaponLabel = weapon ? weapon.name : '徒手';
     logs.push(`主戰：${attacker.name}（${weaponLabel}）`);
 
     const supporters = squad.filter(c => c.id !== attacker.id && c.hp > 0 && !c.dead && c.gear);
@@ -84,10 +84,6 @@ const CombatRules = {
     const luckyStar = attacker.fusedRelic?.effect?.type === 'lucky_star'
       ? attacker.fusedRelic
       : (attacker.relic?.effect?.type === 'lucky_star' ? attacker.relic : null);
-    const luckyStarImmuneGamblerPenalty = !!luckyStar && (
-      (luckyStar.effect?.forcedSixImmuneGamblerPenalty && rollResult.luckyStarForced && roll === 6) ||
-      (luckyStar.effect?.finalSixTwelveImmuneGamblerPenalty && (roll === 6 || roll === 12))
-    );
     if (luckyStar && roll === 6) {
       const bonus = luckyStar.effect.sixDamageBonus || 2;
       damage += bonus;
@@ -194,6 +190,8 @@ const CombatRules = {
       roll % 2 === 1 &&
       !tempWeaknessHit &&
       !gamblerTempWeaknessHit;
+    const scholarOddBonus = 2;
+    let scholarOddBonusApplied = false;
     const eagleFeatherNativeHit = !!eagleFeatherNativeCandidate && allowFinalNativeWeakness && !realWeaknessHit && weapon?.effect?.type === 'bow_followup';
     const nativeWeaknessFace = suspiciousFlawSource || (activeNativeWeaknesses.includes(roll) ? roll : diceRaw);
     const weaknessHit = realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit || tempWeaknessHit || gamblerTempWeaknessHit || scholarOddFlawHit;
@@ -307,8 +305,9 @@ const CombatRules = {
         ? `共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，觸發「${eff.desc || ''}」。`
         : `追擊命中共鳴弱點：最終骰值 ${roll} = 原生弱點 ${resonanceWeaknessSource} x2，不觸發破除效果。`);
     } else if (tempWeaknessHit || scholarOddFlawHit) {
-      const bonus = rollResult.dodecaLuckyDice ? 3 : 1;
+      const bonus = scholarOddFlawHit ? scholarOddBonus : (rollResult.dodecaLuckyDice ? 3 : 1);
       damage += bonus;
+      if (scholarOddFlawHit) scholarOddBonusApplied = true;
       logs.push(scholarOddFlawHit
         ? `搏命者：單數攻擊視為命中破綻，傷害 +${bonus}`
         : `命中破綻，傷害 +${bonus}`);
@@ -327,8 +326,9 @@ const CombatRules = {
     }
 
     if (scholarOddFlawHit && (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit)) {
-      const bonus = rollResult.dodecaLuckyDice ? 3 : 1;
+      const bonus = scholarOddBonus;
       damage += bonus;
+      scholarOddBonusApplied = true;
       logs.push(`搏命者：單數攻擊額外視為命中破綻，傷害 +${bonus}`);
     }
 
@@ -375,8 +375,16 @@ const CombatRules = {
     }
 
     const gamblerFace = roll;
-    const gamblerEvenBacklash = attacker.cls === 'scholar' && gamblerFace % 2 === 0;
+    const scholarOneBacklash = attacker.cls === 'scholar' && gamblerFace === 1;
+    const scholarSixBurst = attacker.cls === 'scholar' && gamblerFace === 6;
     const dodecaOddRefresh = gamblerFace % 2 === 1 && (attacker.cls === 'scholar' || gamblerFace >= 7);
+    const applyScholarOddDamage = () => {
+      if (attacker.cls !== 'scholar' || gamblerFace % 2 !== 1 || scholarOddBonusApplied) return;
+      const bonus = tempWeaknessHit ? 1 : scholarOddBonus;
+      damage += bonus;
+      scholarOddBonusApplied = true;
+      logs.push(`搏命者：單數攻擊，本次傷害 +${bonus}`);
+    };
 
     if ((rollResult.dodecaFateDice || rollResult.dodecaLuckyDice) && dodecaOddRefresh) {
       if (rollResult.dodecaFateDice) {
@@ -395,10 +403,7 @@ const CombatRules = {
           ? `十二面幸運骰：單數 ${gamblerFace}，刷新 ${enemy.gamblerTempWeaknesses.length} 個搏命破綻：${enemy.gamblerTempWeaknesses.join('、')}`
           : `十二面幸運骰：單數 ${gamblerFace}，沒有可用骰面刷新破綻`);
       }
-      if (attacker.cls === 'scholar') {
-        damage += 1;
-        logs.push(`搏命者：單數攻擊，本次傷害 +1`);
-      }
+      applyScholarOddDamage();
     } else if ((rollResult.dodecaFateDice || rollResult.dodecaLuckyDice) && gamblerFace % 2 === 1 && attacker.cls !== 'scholar') {
       logs.push(`十二面骰：非搏命者擲出低單數 ${gamblerFace}，不刷新弱點。`);
     } else if (attacker.cls === 'scholar') {
@@ -407,18 +412,21 @@ const CombatRules = {
         logs.push(enemy.gamblerTempWeakness
           ? `搏命者：單數攻擊，刷新搏命破綻 ${enemy.gamblerTempWeakness}`
           : '搏命者：沒有可用骰面刷新破綻');
-        damage += 1;
-        logs.push(`搏命者：單數攻擊，本次傷害 +1`);
-      } else {
-        if (luckyStarImmuneGamblerPenalty) {
-          logs.push(`幸運星：${attacker.name} 免疫本次雙數副作用`);
-        } else if (rollResult.boneDiceBagSuppressScholarBacklash) {
-          logs.push('骨骰袋：本次低骰補正變為偶數，不觸發雙數反噬');
-        } else {
-          const { before, after } = CombatStatus.addBacklash(attacker, 1, { maxStacks: 2, rate: 0.20 });
-          logs.push(`搏命者：雙數反噬，${attacker.name} 反噬 ${before} → ${after} 層`);
-        }
+        applyScholarOddDamage();
       }
+    }
+
+    if (scholarOneBacklash) {
+      const { before, after } = CombatStatus.addBacklash(attacker, 1, { maxStacks: 2, rate: 0.20 });
+      logs.push(`搏命者：骰面 1 反噬，${attacker.name} 反噬 ${before} → ${after} 層`);
+    }
+
+    if (scholarSixBurst) {
+      damage += 6;
+      const cleared = CombatStatus.clearBacklash(attacker);
+      logs.push(cleared > 0
+        ? `搏命者：骰面 6 大贏，傷害 +6，清除反噬 ${cleared} 層`
+        : '搏命者：骰面 6 大贏，傷害 +6');
     }
 
     if (weapon?.effect?.type === 'healing_staff') {
@@ -649,10 +657,13 @@ const CombatRules = {
     const fateDiceBaseFx = !!rollResult.dodecaFateDice;
     const luckyDiceBurstFx = !!rollResult.dodecaLuckyDice && roll === 12;
     const luckyDiceWeaknessFx = !!rollResult.dodecaLuckyDice && !luckyDiceBurstFx && tempWeaknessHit;
+    const weakpointHitFx = nativeWeaknessBreakHit && !fateDiceBurstFx && !fateDiceNativeWeaknessFx && !luckyDiceBurstFx && !luckyDiceWeaknessFx;
     const primaryAttackTrail = weapon?.family === 'bow'
       ? 'pierce'
       : (['sword', 'dagger', 'katana'].includes(weapon?.family) ? 'slash' : 'strike');
-    const primaryHitEffect = weapon?.effect?.type === 'bow_followup'
+    const primaryHitEffect = weakpointHitFx
+      ? 'weakpoint-hit'
+      : weapon?.effect?.type === 'bow_followup'
       ? 'pierce'
       : (realWeaknessHit || eagleFeatherNativeHit || resonanceWeaknessHit)
         ? 'eagle-mark'
@@ -660,6 +671,10 @@ const CombatRules = {
     logs.push(`最終傷害：${damage}`);
     const primaryHpBefore = enemy.hp;
     enemy.hp = Math.max(0, enemy.hp - damage);
+    const primaryKillsEnemy = primaryHpBefore > 0 && enemy.hp <= 0;
+    const primaryResolvedHitEffect = weakpointHitFx && primaryKillsEnemy
+      ? primaryAttackTrail
+      : primaryHitEffect;
     const rapierStrike = !!rapierRelic &&
       weapon?.family === 'sword' &&
       roll <= Math.max(1, rapierRelic.effect?.maxRoll || 3) &&
@@ -675,7 +690,7 @@ const CombatRules = {
         enemyBlockAbsorbed,
         hitEffect: (luckyDiceBurstFx || luckyDiceWeaknessFx)
           ? ''
-          : (fateDiceBaseFx && !fateDiceNativeWeaknessFx ? 'slash' : primaryHitEffect),
+          : (fateDiceBaseFx && !fateDiceNativeWeaknessFx ? 'slash' : primaryResolvedHitEffect),
         attackTrail: luckyDiceBurstFx
           ? 'lucky_d12_burst'
           : luckyDiceWeaknessFx

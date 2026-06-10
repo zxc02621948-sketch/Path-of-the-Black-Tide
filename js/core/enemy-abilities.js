@@ -634,13 +634,18 @@ const EnemyAbilities = {
         const reduction = enemy.abilityState?.poisonWeakened
           ? Math.max(0, ability.weakenReduction || 1)
           : 0;
-        const beforeReduction = roll + bonus;
+        const cap = Number.isFinite(ability.maxDamage)
+          ? Math.max(1, ability.maxDamage)
+          : Infinity;
+        const beforeCap = roll + bonus;
+        const beforeReduction = Math.min(beforeCap, cap);
         const damage = Math.max(1, beforeReduction - reduction);
         result.enemyDiceRoll = roll;
         result.enemyDiceSides = 3;
         result.aoeCounter = damage;
         result.enemyAttackFlow = true;
-        logs.push(`${enemy.name} 毒粉骰 ${roll}：全體傷害 ${damage}${reduction > 0 ? `（毒粉潰散 -${reduction}）` : ''}。`);
+        const capText = Number.isFinite(cap) && beforeCap > cap ? `（毒粉上限 ${cap}）` : '';
+        logs.push(`${enemy.name} 毒粉骰 ${roll}：全體傷害 ${damage}${capText}${reduction > 0 ? `（毒粉潰散 -${reduction}）` : ''}。`);
       },
     },
 

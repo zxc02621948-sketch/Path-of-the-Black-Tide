@@ -419,6 +419,64 @@ const GameStateHelpers = {
     return healed;
   },
 
+  _livingSupportChar() {
+    return this._aliveSquad().find(char => char.cls === 'support') || null;
+  },
+
+  _supportRestHealBonusRate() {
+    return this._livingSupportChar() ? (CONFIG.SUPPORT_REST_HEAL_BONUS ?? 0.10) : 0;
+  },
+
+  _siteRestHealAmount(char, baseRate) {
+    const rate = baseRate + this._supportRestHealBonusRate();
+    return Math.ceil(char.maxHp * rate);
+  },
+
+  _siteRestHealLabel(baseRate) {
+    const rate = baseRate + this._supportRestHealBonusRate();
+    return Math.round(rate * 100);
+  },
+
+  _grantSupportHerbPackForDay() {
+    const interval = CONFIG.SUPPORT_HERB_INTERVAL_DAYS ?? 5;
+    if (interval <= 0 || !G.day || G.day <= 1 || G.day % interval !== 0) return;
+    if (G.supportHerbPackGrantedDay === G.day) return;
+
+    const support = this._livingSupportChar();
+    if (!support) return;
+
+    const herb = getEquipById?.('herb_pack');
+    if (!herb) return;
+
+    G.supportHerbPackGrantedDay = G.day;
+    const result = this._addInventoryItem?.(herb);
+    if (!result?.added) {
+      this._log(`${support.name} 整理出草藥包，但背包已滿，無法帶走。`, 'dim');
+      this._queueSupportHerbPackNotice(support, herb, null, true);
+      return;
+    }
+
+    const countText = result.count > 1 ? ` x${result.count}` : '';
+    this._log(`${support.name} 整理補給：獲得 ${herb.name}${countText}。`, 'reward');
+    this._queueSupportHerbPackNotice(support, herb, countText, false);
+  },
+
+  _queueSupportHerbPackNotice(support, herb, countText = '', inventoryFull = false) {
+    const itemLabel = this._equipmentRewardLabelHtml
+      ? this._equipmentRewardLabelHtml(herb, countText, 'equipment-inline-icon item-reward-icon')
+      : `${herb?.name || '草藥包'}${countText || ''}`;
+    const descHtml = inventoryFull
+      ? `${this._escapeHtmlLocal(support?.name || '輔助')} 在新一天開始時整理出 ${itemLabel}。<br><br>但小隊背包已滿，這個草藥包無法帶走。`
+      : `${this._escapeHtmlLocal(support?.name || '輔助')} 在新一天開始時整理出 ${itemLabel}。<br><br>已放入小隊背包，可以在需要時使用。`;
+    this._queueSystemModal?.({
+      title: '輔助整備',
+      descHtml,
+      typeText: false,
+      resultFx: inventoryFull ? null : 'event-reward',
+      choices: [{ label: '知道了', action: () => { this._closeModal(); Render.fullRender(); } }],
+    });
+  },
+
   _markRestUsed(cell) {
     cell.cleared = true;
     cell.restUsedDay = G.day;

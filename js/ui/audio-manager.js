@@ -18,6 +18,7 @@ const AudioManager = {
     bowShot: 'assets/audio/sfx/bow-shot.wav',
     swordWoosh: 'assets/audio/sfx/sword-woosh.wav',
     daggerWoosh: 'assets/audio/sfx/dagger-woosh.wav',
+    weakpointHit: 'assets/audio/sfx/weakpoint-hit.wav',
     resonancePainBurst: 'assets/audio/sfx/resonance-pain-burst.wav',
     resonancePainTorment: 'assets/audio/sfx/resonance-pain-torment.wav',
     resonanceIronGreatsword: 'assets/audio/sfx/resonance-iron-greatsword.wav',
@@ -73,6 +74,10 @@ const AudioManager = {
   currentAudio: null,
   fadeTimer: null,
   fadeTokens: new WeakMap(),
+  retryTimers: {},
+  watchdogTimer: null,
+  healthSnapshot: null,
+  quietSince: 0,
   unlocked: false,
   wantedId: '',
   resumeTrackIds: ['exploreEarly', 'exploreNight'],
@@ -116,6 +121,7 @@ const AudioManager = {
     this.wantedId = nextId;
     if (!this.unlocked || this.pageHidden) return;
     this.play(nextId);
+    this.ensureBgmWatchdog();
   },
 
   resolveTrackId() {
@@ -138,6 +144,8 @@ const AudioManager = {
 
   play(trackId) {
     if (!trackId || this.pageHidden) return;
+    this.wantedId = trackId;
+    this.ensureBgmWatchdog();
     if (this.currentId === trackId) {
       if (!this.currentAudio) {
         this.currentId = '';
@@ -152,6 +160,7 @@ const AudioManager = {
     }
     const audio = this.trackAudio(trackId);
     if (!audio) return;
+    this.cancelRetry(trackId);
     const previousId = this.currentId;
     this.currentId = trackId;
     const previous = this.currentAudio;
@@ -166,6 +175,7 @@ const AudioManager = {
     this.currentAudio = audio;
     audio.play()
       .then(() => {
+        this.cancelRetry(trackId);
         this.fade(audio, 0, this.trackVolume(trackId), this.fadeMs);
         if (previous) {
           this.fade(previous, previous.volume, 0, this.fadeMs, () => {
@@ -177,7 +187,7 @@ const AudioManager = {
       .catch(() => {
         this.currentAudio = previous || null;
         this.currentId = previous ? previousId : '';
-        setTimeout(() => this.sync(), 250);
+        this.scheduleRetry(trackId);
       });
   },
 
@@ -192,14 +202,120 @@ const AudioManager = {
     }
     audio.play()
       .then(() => {
+        this.cancelRetry(this.currentId);
         if (audio.volume <= 0) this.fade(audio, audio.volume, this.trackVolume(this.currentId), this.fadeMs);
       })
       .catch(() => {
+        const trackId = this.currentId;
         if (this.currentAudio === audio) {
           this.currentAudio = null;
           this.currentId = '';
         }
+        this.scheduleRetry(trackId);
       });
+  },
+
+  scheduleRetry(trackId, attempt = 1) {
+    if (!trackId || this.retryTimers[trackId] || this.pageHidden) return;
+    this.ensureBgmWatchdog();
+    const delay = Math.min(1200, 160 * attempt);
+    this.retryTimers[trackId] = setTimeout(() => {
+      delete this.retryTimers[trackId];
+      if (this.wantedId !== trackId || this.pageHidden) return;
+      this.play(trackId);
+      const audio = this.currentAudio;
+      if (this.wantedId === trackId && (!audio || audio.paused)) {
+        this.scheduleRetry(trackId, attempt + 1);
+      }
+    }, delay);
+  },
+
+  cancelRetry(trackId = '') {
+    if (trackId) {
+      if (this.retryTimers[trackId]) clearTimeout(this.retryTimers[trackId]);
+      delete this.retryTimers[trackId];
+      return;
+    }
+    Object.keys(this.retryTimers).forEach(id => this.cancelRetry(id));
+  },
+
+  ensureBgmWatchdog() {
+    if (this.watchdogTimer || !this.unlocked || this.pageHidden || !this.wantedId) return;
+    this.watchdogTimer = setInterval(() => this.checkBgmHealth(), 700);
+  },
+
+  cancelBgmWatchdog() {
+    if (this.watchdogTimer) clearInterval(this.watchdogTimer);
+    this.watchdogTimer = null;
+    this.healthSnapshot = null;
+    this.quietSince = 0;
+  },
+
+  checkBgmHealth() {
+    if (!this.unlocked || this.pageHidden) return;
+    const desiredId = this.resolveTrackId();
+    if (!desiredId) {
+      this.stop();
+      return;
+    }
+    if (desiredId !== this.wantedId) {
+      this.sync();
+      return;
+    }
+    const audio = this.currentAudio;
+    if (this.currentId !== desiredId || !audio) {
+      this.forceReplay(desiredId);
+      return;
+    }
+    if (audio.paused || audio.ended || audio.error) {
+      this.forceReplay(desiredId);
+      return;
+    }
+
+    const now = performance.now();
+    const targetVolume = this.trackVolume(desiredId);
+    const tooQuiet = audio.volume <= Math.max(0.02, targetVolume * 0.08);
+    if (tooQuiet) {
+      if (!this.quietSince) this.quietSince = now;
+      if (now - this.quietSince > 1400) {
+        this.fade(audio, audio.volume, targetVolume, 260);
+        this.quietSince = now;
+      }
+    } else {
+      this.quietSince = 0;
+    }
+
+    const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
+    const snapshot = this.healthSnapshot;
+    if (!snapshot || snapshot.trackId !== desiredId) {
+      this.healthSnapshot = { trackId: desiredId, currentTime, at: now };
+      return;
+    }
+    if (Math.abs(currentTime - snapshot.currentTime) > 0.03) {
+      this.healthSnapshot = { trackId: desiredId, currentTime, at: now };
+      return;
+    }
+    if (now - snapshot.at > 2400) {
+      this.forceReplay(desiredId);
+    }
+  },
+
+  forceReplay(trackId) {
+    if (!trackId || this.wantedId !== trackId || this.pageHidden) return;
+    const audio = this.currentAudio;
+    if (audio) {
+      this.fadeTokens.set(audio, {});
+      this.rememberTrackTime(this.currentId, audio);
+      try {
+        audio.pause();
+      } catch (err) {}
+      delete this.preloadedTracks[trackId];
+    }
+    this.currentAudio = null;
+    this.currentId = '';
+    this.healthSnapshot = null;
+    this.quietSince = 0;
+    this.play(trackId);
   },
 
   rememberTrackTime(trackId, audio) {
@@ -226,8 +342,8 @@ const AudioManager = {
     if (this.pageHidden) return;
     const button = ev.target?.closest?.('button');
     if (!button || button.disabled) return;
-    this.playSfx('button');
     this.sync();
+    this.playSfx('button');
   },
 
   handleDocumentHover(ev) {
@@ -249,23 +365,24 @@ const AudioManager = {
   },
 
   playSfx(id, volume = this.sfxVolume) {
-    if (!this.unlocked || this.pageHidden) return;
+    if (!this.unlocked || this.pageHidden) return null;
     const src = this.sfx[id];
-    if (!src) return;
+    if (!src) return null;
     const audio = this.preloadedSfx[id]?.cloneNode?.() || new Audio(src);
     audio.volume = volume;
     audio.play().catch(() => {});
+    return audio;
   },
 
   playRandomSfx(ids = [], volume = this.sfxVolume) {
     const pool = Array.isArray(ids) ? ids.filter(id => this.sfx[id]) : [];
-    if (!pool.length) return;
+    if (!pool.length) return null;
     const id = pool[Math.floor(Math.random() * pool.length)];
-    this.playSfx(id, volume);
+    return this.playSfx(id, volume);
   },
 
   playEventInjurySfx(volume = 0.5) {
-    this.playRandomSfx(['eventInjury1', 'eventInjury2', 'eventInjury3', 'eventInjury4', 'eventInjury5'], volume);
+    return this.playRandomSfx(['eventInjury1', 'eventInjury2', 'eventInjury3', 'eventInjury4', 'eventInjury5'], volume);
   },
 
   playDayTransitionSfx(phase = 'day') {
@@ -338,11 +455,27 @@ const AudioManager = {
     audio.loop = true;
     audio.preload = 'auto';
     audio.volume = 0;
+    this.bindTrackHealthEvents(trackId, audio);
     try {
       audio.load();
     } catch (err) {}
     this.preloadedTracks[trackId] = audio;
     return audio;
+  },
+
+  bindTrackHealthEvents(trackId, audio) {
+    if (!audio || audio._bbnHealthBound) return;
+    audio._bbnHealthBound = true;
+    ['ended', 'error', 'stalled', 'emptied', 'abort'].forEach(eventName => {
+      audio.addEventListener(eventName, () => {
+        if (this.currentAudio !== audio || this.wantedId !== trackId || this.pageHidden) return;
+        this.forceReplay(trackId);
+      });
+    });
+    audio.addEventListener('pause', () => {
+      if (this.currentAudio !== audio || this.wantedId !== trackId || this.pageHidden) return;
+      this.scheduleRetry(trackId);
+    });
   },
 
   trackVolume(trackId) {
@@ -352,6 +485,8 @@ const AudioManager = {
   stop(immediate = false) {
     this.wantedId = '';
     this.currentId = '';
+    this.cancelRetry();
+    this.cancelBgmWatchdog();
     const audio = this.currentAudio;
     this.currentAudio = null;
     if (!audio) return;

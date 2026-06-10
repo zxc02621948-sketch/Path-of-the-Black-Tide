@@ -58,6 +58,7 @@ const GameCombatFlow = {
       battleDrum: null,
       banner: null,
       banners: [],
+      bannerPlans: {},
       bandageUsed: {},
       threat: {},
       eagleFeatherDamageUsed: false,
@@ -79,6 +80,8 @@ const GameCombatFlow = {
 
     G.combatMods = [...G.combatMods];
     this._showCombatModal();
+    AudioManager?.sync?.();
+    setTimeout(() => AudioManager?.sync?.(), 120);
     const spawnSfx = G.combat.enemy.spawnSfx || (G.combat.enemy.darkMonster ? 'darkMonsterGrowl' : '');
     const spawnSfxVolume = G.combat.enemy.spawnSfx ? (G.combat.enemy.spawnSfxVolume ?? 0.5) : 0.62;
     if (spawnSfx) setTimeout(() => AudioManager?.playSfx?.(spawnSfx, spawnSfxVolume), 120);
@@ -140,61 +143,13 @@ const GameCombatFlow = {
     }
 
     if (!forcedRollResult) {
-      if (!opts.bowFollowUp && !opts.bannerPrompted && this._canRaiseBannerBeforeAttack(attacker)) {
-        this._promptRaiseBannerBeforeAttack(attacker, opts);
-        return;
+      if (!opts.bowFollowUp) {
+        const pendingBanner = this._combatPendingBannerForAttacker(attacker);
+        if (pendingBanner) opts = { ...opts, pendingBanner };
       }
       G.combat.wagerDice = !opts.bowFollowUp ? this._combatWagerDiceForAttacker(attacker) : null;
       const rollResult = this._rollWithMods('combat', attacker);
       if (opts.starHunterForceSix) this._applyStarHunterForceSix(rollResult);
-      const canReroll  = attacker.cls === 'scholar' &&
-                         this._gamblerRerollsLeft() > 0 &&
-                         !rollResult.gamblerResolved &&
-                         !rollResult.pollutionLocked &&
-                         !opts.starHunterForceSix;
-      if (canReroll) {
-        let resolved = false;
-        this._openModal({
-          title: '搏命者重擲',
-          desc: [
-            `${attacker.name} 擲出攻擊骰。`,
-            `目標：${enemy.name}`,
-            `目前骰面：${Dice.face(rollResult.value)}（${rollResult.value}）`,
-            `${attacker.name} 今天剩餘重擲：${this._gamblerRerollsLeft()}`,
-            '可以接受目前結果，或消耗 1 次重擲。',
-          ].join('\n'),
-          dice: { type: 'combat', label: `${attacker.name} 的攻擊骰`, value: rollResult.value, raw: rollResult.raw, floored: rollResult.floored, charCls: rollResult.charCls, sides: rollResult.sides, dodecaFateDice: rollResult.dodecaFateDice, dodecaLuckyDice: rollResult.dodecaLuckyDice },
-          choices: [
-            {
-              label: '使用目前結果',
-              action: () => {
-                if (resolved) return;
-                resolved = true;
-                this._showCombatDicePreview(rollResult, attacker, () => {
-                  this._closeModal();
-                  this._combatAttackAnim(attacker, () => this._doCombatRound(attacker, { ...rollResult, gamblerResolved: true }, opts));
-                });
-              },
-            },
-            {
-              label: `重擲（${attacker.name}）`,
-              action: () => {
-                if (resolved) return;
-                resolved = true;
-                this._spendGamblerReroll();
-                const next = { ...this._rollWithMods('combat', attacker), gamblerResolved: true };
-                if (opts.starHunterForceSix) this._applyStarHunterForceSix(next);
-                this._log(`${attacker.name} 重擲後得到 ${Dice.face(next.value)}（${next.value}）。`, 'reward');
-                this._showCombatDicePreview(next, attacker, () => {
-                  this._closeModal();
-                  this._combatAttackAnim(attacker, () => this._doCombatRound(attacker, next, opts));
-                });
-              },
-            },
-          ],
-        });
-        return;
-      }
       // 先顯示骰子動畫，再進入攻擊結算。
       this._showCombatDicePreview(rollResult, attacker, () => {
         this._combatAttackAnim(attacker, () => this._doCombatRound(attacker, rollResult, opts));
@@ -376,6 +331,12 @@ const GameCombatFlow = {
     }
 
     if (enemyDead) {
+      if (!combatResult.skipSupportTeamHeal) {
+        this._applySupportTeamHeal(attacker, combatResult.logs, combatResult, {
+          addThreat: false,
+          logWhenNoHeal: false,
+        });
+      }
       this._handleCombatVictory({
         attacker,
         enemy,
@@ -778,38 +739,116 @@ const GameCombatFlow = {
     }).filter(entry => entry && entry.faces.length > 0);
   },
 
-  _promptRaiseBannerBeforeAttack(attacker, opts = {}) {
-    const entries = this._bannerRelics(attacker).filter(entry =>
+  toggleCombatBannerPlan(charId, relicId) {
+    if (!G.combat || G.phase === 'over' || G.combat.actionInProgress) return;
+    if (this._combatItemTargeting() || this._combatGuardTargeting()) return;
+    const char = G.squad.find(c => c.id === charId);
+    if (!char || char.dead || char.hp <= 0) return;
+    const entry = this._bannerRelics(char).find(candidate =>
+      candidate.relic.id === relicId &&
+      candidate.faces.some(face => !this._sameBannerFaceActive(candidate.relic.id, face.id))
+    );
+    if (!entry) return;
+    if (!G.combat.bannerPlans) G.combat.bannerPlans = {};
+    const current = G.combat.bannerPlans[char.id];
+    if (current?.relicId === relicId) {
+      delete G.combat.bannerPlans[char.id];
+    } else {
+      G.combat.bannerPlans[char.id] = { relicId };
+    }
+    if (G) G.bannerGuideDismissed = true;
+    this._showCombatModal();
+  },
+
+  _combatPendingBannerForAttacker(attacker) {
+    const plan = G.combat?.bannerPlans?.[attacker?.id];
+    if (plan && G.combat?.bannerPlans) delete G.combat.bannerPlans[attacker.id];
+    const entry = plan
+      ? this._eligibleBannerEntries(attacker).find(candidate => candidate.relic.id === plan.relicId)
+      : this._autoBannerEntryForAttacker(attacker);
+    if (!entry) return null;
+    const face = this._autoBannerFace(entry);
+    return face ? { entry, face } : null;
+  },
+
+  _eligibleBannerEntries(char) {
+    return this._bannerRelics(char).filter(entry =>
       entry.faces.some(face => !this._sameBannerFaceActive(entry.relic.id, face.id))
     );
-    const choices = [];
-    for (const entry of entries) {
-      choices.push({
-        label: `舉起 ${entry.relic.name}`,
-        action: () => this._resolveRaiseBannerBeforeAttack(attacker, entry, opts),
-      });
+  },
+
+  _autoBannerEntryForAttacker(attacker) {
+    const entries = this._eligibleBannerEntries(attacker);
+    if (entries.length === 0) return null;
+    const activeRelicIds = new Set(
+      this._activeCombatBanners()
+        .filter(banner => banner.ownerId === attacker?.id)
+        .map(banner => banner.relicId)
+    );
+    const missingEntries = entries.filter(entry => !activeRelicIds.has(entry.relic.id));
+    if (missingEntries.length === 0) return null;
+    if (this._hasDualBannerResonance(attacker)) {
+      return missingEntries.find(entry => entry.relic.id === attacker.fusedRelic?.id) || missingEntries[0];
     }
-    choices.push({
-      label: '不舉旗',
-      action: () => {
-        this._doCombatRound(attacker, null, { ...opts, bannerPrompted: true });
-      },
-    });
-    this._openModal({
-      title: '舉旗',
-      desc: this._hasDualBannerResonance(attacker)
-        ? `${attacker.name} 可以在攻擊前選擇要舉起哪一件旗。旗面會自動決定，雙旗戰陣可同時維持 1 面戰爭旗與 1 面鷹眼旗。`
-        : `${attacker.name} 可以在攻擊前選擇是否舉旗。旗面會自動決定，新旗面會取代目前旗面。`,
-      combat: {
-        ...this._buildCombatScene(G.combat.enemy, attacker, this._combatStatusText()),
-        selectable: false,
-        itemTargeting: false,
-        showBag: false,
-        inventory: this._combatInventoryView(),
-        canUseBag: false,
-        rollItemBlocked: true,
-      },
-      choices,
+    return missingEntries[0];
+  },
+
+  _combatBannerSlotsForChar(char, allowPlanning = false) {
+    const activeByRelic = new Map(this._activeCombatBanners().map(banner => [banner.relicId, banner]));
+    const plannedRelicId = G.combat?.bannerPlans?.[char?.id]?.relicId || null;
+    return this._bannerRelics(char)
+      .map(entry => {
+        const active = activeByRelic.get(entry.relic.id);
+        const canPlan = allowPlanning && entry.faces.some(face => !this._sameBannerFaceActive(entry.relic.id, face.id));
+        if (!active && !canPlan) return null;
+        const availableFaces = entry.faces
+          .filter(face => !this._sameBannerFaceActive(entry.relic.id, face.id))
+          .map(face => face.name)
+          .filter(Boolean);
+        return {
+          id: entry.relic.id,
+          name: entry.relic.name || '旗子',
+          icon: entry.relic.icon || '旗',
+          iconImage: entry.relic.iconImage || '',
+          activeBanner: active ? this._combatBannerView(active) : null,
+          canPlan,
+          planned: plannedRelicId === entry.relic.id,
+          faceText: availableFaces.length > 0 ? availableFaces.join(' / ') : '沒有可替換旗面',
+          detail: this._bannerEntryDetail(entry, null),
+        };
+      })
+      .filter(Boolean);
+  },
+
+  _combatBannerGuideView(targetId = '') {
+    return {
+      step: 'banner_guide',
+      target: 'banner',
+      targetId,
+      title: '舉旗與換面',
+      body: '主戰時會自動補立還沒在場上的旗。雙旗戰陣會先舉融合旗，再補另一面；已立起的旗不會自動換面。',
+      cta: '想指定優先舉哪面旗，或想在下次主戰更換旗面時，再點角色框內的旗子圖示。',
+      bannerGuide: true,
+    };
+  },
+
+  _shouldShowBannerGuide() {
+    if (G?.bannerGuideDismissed) return false;
+    try {
+      return localStorage.getItem('bbn_banner_guide_disabled') !== 'true';
+    } catch {
+      return true;
+    }
+  },
+
+  dismissBannerGuide(persist = false) {
+    if (G) G.bannerGuideDismissed = true;
+    if (persist) {
+      try { localStorage.setItem('bbn_banner_guide_disabled', 'true'); } catch {}
+    }
+    document.querySelectorAll('[data-banner-guide], .combat-tutorial-card[data-step="banner_guide"]').forEach(el => el.remove());
+    document.querySelectorAll('.combat-banner-choice-toggle.combat-tutorial-highlight, .combat-banner-badge.changeable.combat-tutorial-highlight').forEach(el => {
+      el.classList.remove('combat-tutorial-highlight');
     });
   },
 
@@ -884,6 +923,7 @@ const GameCombatFlow = {
     const raised = {
       relicId: entry.relic.id,
       name: entry.relic.name,
+      iconImage: entry.relic.iconImage || '',
       faceId: face.id,
       faceName: face.name,
       faceType: face.type,
@@ -960,9 +1000,11 @@ const GameCombatFlow = {
       relicId: banner.relicId,
       faceId: banner.faceId,
       name: banner.name,
+      iconImage: banner.iconImage || '',
       faceName: banner.faceName,
       shortName: this._combatBannerShortName(banner),
       level: banner.level || 1,
+      detail: this._combatBannerDetailText(banner),
     };
   },
 
@@ -1635,6 +1677,7 @@ const GameCombatFlow = {
       return;
     }
     if (G.combat) G.combat.attackerId = char.id;
+    if (G.combat) G.combat.instantItemBadges = [];
     this._advanceCombatTutorial('attack_role', null);
     document.querySelectorAll('.combat-unit.ally.active').forEach(el => el.classList.remove('active'));
     document.querySelector(`.combat-unit.ally[data-char-id="${char.id}"]`)?.classList.add('active');
@@ -2287,12 +2330,15 @@ const GameCombatFlow = {
     return logs;
   },
 
-  _applySupportTeamHeal(attacker, logs = [], combatResult = null) {
+  _applySupportTeamHeal(attacker, logs = [], combatResult = null, options = {}) {
     const support = (G.squad || []).find(char => char?.cls === 'support' && char.hp > 0 && !char.dead);
     if (!support) return 0;
     if (!G.combat.threat) G.combat.threat = {};
+    const addThreat = options.addThreat !== false;
+    const logWhenNoHeal = options.logWhenNoHeal !== false;
     const beforeThreat = Math.max(0, G.combat.threat[support.id] || 0);
-    G.combat.threat[support.id] = Math.min(10, beforeThreat + 1);
+    if (addThreat) G.combat.threat[support.id] = Math.min(10, beforeThreat + 1);
+    const afterThreat = Math.max(0, G.combat.threat[support.id] || 0);
     const targetCount = support.id === attacker?.id ? 2 : 1;
     const targets = (G.squad || [])
       .filter(char => char && char.hp > 0 && !char.dead && char.hp < char.maxHp)
@@ -2325,9 +2371,11 @@ const GameCombatFlow = {
       ];
     }
     if (healed.length > 0) {
-      logs.push(`輔助：${support.name} 穩住傷勢，${healed.join('、')} HP，仇恨 ${beforeThreat} → ${G.combat.threat[support.id]}。`);
-    } else {
-      logs.push(`輔助：${support.name} 維持治療陣線，仇恨 ${beforeThreat} → ${G.combat.threat[support.id]}。`);
+      const threatText = addThreat ? `，仇恨 ${beforeThreat} → ${afterThreat}` : '';
+      logs.push(`輔助：${support.name} 穩住傷勢，${healed.join('、')} HP${threatText}。`);
+    } else if (logWhenNoHeal) {
+      const threatText = addThreat ? `，仇恨 ${beforeThreat} → ${afterThreat}` : '';
+      logs.push(`輔助：${support.name} 維持治療陣線${threatText}。`);
     }
     return healed.length;
   },
@@ -2462,7 +2510,7 @@ const GameCombatFlow = {
     const faceButtons = faces.map(face => `<button type="button" class="wager-face-btn" data-face="${face}">${face}</button>`).join('');
     const descHtml = `
       <div class="wager-dice-panel">
-        <p>${attacker.name} 可以在主戰前押注 ${faceCount} 個骰面。弓的追加攻擊會沿用這次押注。</p>
+        <p>${attacker.name} 可押注 ${faceCount} 個骰面。押注會持續到取消或改押注，弓的追加攻擊也會沿用。</p>
         <div class="wager-face-grid">${faceButtons}</div>
         <p class="wager-dice-hint">押中：該擊傷害 +${effect.damageBonus || 4}。沒押中：懊悔 +1 層，最多 ${effect.maxMissStacks || 2} 層。</p>
       </div>
@@ -2751,11 +2799,21 @@ const GameCombatFlow = {
   _buildCombatScene(enemy, attacker, status) {
     const inCombat = !!G.combat;
     const intent = inCombat ? G.combat.intent : (enemy?._victoryIntent || null);
-    const activeBanners = this._activeCombatBanners();
     const attackerId = attacker?.id || G.combat?.attackerId || null;
+    const allowBannerPlanning = inCombat
+      && !G.combat.actionInProgress
+      && !this._combatItemTargeting()
+      && !this._combatGuardTargeting()
+      && this._combatTutorialAllows('attack');
+    const combatTutorial = this._combatTutorialView();
+    const bannerGuideCharId = allowBannerPlanning && this._shouldShowBannerGuide()
+      ? (G.squad || []).find(c =>
+        c && !c.dead && c.hp > 0 && this._combatBannerSlotsForChar(c, allowBannerPlanning).length > 0
+      )?.id || null
+      : null;
     return {
       status,
-      tutorial: this._combatTutorialView(),
+      tutorial: combatTutorial || (bannerGuideCharId ? this._combatBannerGuideView(bannerGuideCharId) : null),
       attackerId,
       intentLabel: intent ? this._combatIntentLabel(intent, enemy) : null,
       intent: this._combatIntentView(intent, enemy),
@@ -2850,11 +2908,50 @@ const GameCombatFlow = {
           }
           : null,
         threat: G.combat?.threat?.[c.id] || 0,
-        activeBanners: activeBanners
-          .filter(banner => banner.ownerId === c.id)
-          .map(banner => this._combatBannerView(banner)),
+        combatItemBadges: this._combatItemBadgesForChar(c),
+        bannerSlots: this._combatBannerSlotsForChar(c, allowBannerPlanning),
       })),
     };
+  },
+
+  _combatItemBadgesForChar(char) {
+    if (!G.combat || !char) return [];
+    const badges = [];
+    const seen = new Set();
+    const pushBadge = (raw, stateType) => {
+      if (!raw || raw.sourceCharId !== char.id) return;
+      const id = `${stateType}:${raw.sourceItemId || raw.sourceItemName || raw.source || raw.type}`;
+      if (seen.has(id)) return;
+      seen.add(id);
+      badges.push({
+        id,
+        stateType,
+        type: raw.type || '',
+        name: raw.sourceItemName || raw.source || '道具',
+        icon: raw.sourceItemIcon || '',
+        iconImage: raw.sourceItemIconImage || '',
+        desc: this._combatItemBadgeDesc(raw),
+      });
+    };
+    for (const mod of G.combatMods || []) pushBadge(mod, 'combat');
+    for (const mod of G.rollMods || []) pushBadge(mod, 'roll');
+    for (const badge of G.combat.instantItemBadges || []) {
+      if (badge?.charId !== char.id || badge.round !== (G.combat.round || 1)) continue;
+      const id = `instant:${badge.itemId || badge.name}`;
+      if (seen.has(id)) continue;
+      seen.add(id);
+      badges.push({ ...badge, id, stateType: 'instant' });
+    }
+    return badges;
+  },
+
+  _combatItemBadgeDesc(mod) {
+    if (!mod) return '道具效果生效中';
+    if (mod.type === 'attack_bonus') return `攻擊骰 +${mod.value}`;
+    if (mod.type === 'damage_reduce') return `本次受傷 -${mod.value}`;
+    if (mod.type === 'reroll_keep_high') return '下次擲骰重骰取高';
+    if (mod.type === 'floor_one') return `下次擲骰 1 視為 ${mod.value}`;
+    return '道具效果生效中';
   },
 
   _combatIntentView(intent, enemy) {
@@ -2940,16 +3037,20 @@ const GameCombatFlow = {
         };
     }
     if (type === 'aoe') {
-      const poisonDust = Array.isArray(enemy.abilities) && enemy.abilities.some(ability => ability?.type === 'poison_dust');
+      const poisonDust = Array.isArray(enemy.abilities)
+        ? enemy.abilities.find(ability => ability?.type === 'poison_dust')
+        : null;
       if (poisonDust) {
         const bonusText = baseAttack + attackBonus > 0 ? `+${baseAttack + attackBonus}` : '';
+        const cap = Number.isFinite(poisonDust.maxDamage) ? Math.max(1, poisonDust.maxDamage) : null;
+        const capText = cap ? `，最多 ${cap}` : '';
         const weakenedText = enemy.abilityState?.poisonWeakened ? '，已潰散 -1' : '';
         return {
           type,
           ...target,
           icon: 'assets/icons/intent-attack-all.png',
-          text: `骰${bonusText}`,
-          title: `全體毒粉，造成 骰（三面骰）${bonusText} 傷害${weakenedText}，最低 1`,
+          text: cap ? `骰最多${cap}` : `骰${bonusText}`,
+          title: `全體毒粉，造成 骰（三面骰）${bonusText} 傷害${capText}${weakenedText}，最低 1`,
         };
       }
       const damage = Math.max(1, baseAttack - 2) + attackBonus;
