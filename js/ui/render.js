@@ -1373,7 +1373,13 @@ const Render = {
           <div class="class-card-stat">HP ${cls.maxHp}　攻擊 ${cls.attack}</div>
         </div>
       `;
-      card.addEventListener('click', () => onToggle(clsId));
+      card.addEventListener('click', () => {
+        if (this._squadDetailHidden()) {
+          this._openMobileClassDetail(clsId, selected, onToggle);
+        } else {
+          onToggle(clsId);
+        }
+      });
       card.addEventListener('mouseenter', () => {
         // Section.
         if (selected.length === 0) {
@@ -1384,6 +1390,47 @@ const Render = {
       });
       container.appendChild(card);
     }
+  },
+
+  // 手機版：側欄被 CSS 藏起來時為 true（桌面側欄可見 → false，行為不變）
+  _squadDetailHidden() {
+    const p = document.querySelector('.squad-select-detail');
+    return !!p && getComputedStyle(p).display === 'none';
+  },
+
+  // 手機版：點卡片改開詳情彈窗，重用 _renderCharDetail 的內容
+  _openMobileClassDetail(clsId, selected, onToggle) {
+    document.getElementById('mobile-class-detail-backdrop')?.remove();
+    const cls = CHARACTER_CLASSES[clsId];
+    if (!cls) return;
+    const max = (typeof CONFIG !== 'undefined' && CONFIG.STARTING_SQUAD_SIZE) || 2;
+    const isSelected = selected.includes(clsId);
+    const full = selected.length >= max;
+    let actionBtn;
+    if (isSelected) {
+      actionBtn = '<button type="button" class="mcd-select mcd-remove" data-act="toggle">移除這位</button>';
+    } else if (!full) {
+      actionBtn = '<button type="button" class="mcd-select" data-act="toggle">選這位</button>';
+    } else {
+      actionBtn = '<div class="mcd-full-note">已選滿，先移除一位再換</div>';
+    }
+    const backdrop = document.createElement('div');
+    backdrop.id = 'mobile-class-detail-backdrop';
+    backdrop.className = 'mobile-class-detail-backdrop';
+    backdrop.innerHTML =
+      '<div class="mobile-class-detail-modal" role="dialog" aria-label="' + cls.name + '">' +
+        '<div id="mobile-class-detail-panel" class="mobile-class-detail-panel"></div>' +
+        '<div class="mobile-class-detail-actions">' + actionBtn +
+          '<button type="button" class="mcd-back" data-act="back">返回</button>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(backdrop);
+    this._renderCharDetail(clsId, 'mobile-class-detail-panel');
+    backdrop.addEventListener('click', (e) => {
+      const act = e.target && e.target.dataset ? e.target.dataset.act : null;
+      if (e.target === backdrop || act === 'back') { backdrop.remove(); return; }
+      if (act === 'toggle') { backdrop.remove(); onToggle(clsId); }
+    });
   },
 
   renderLibrarySelect(container, libraryRelics = [], selectedClasses = [], selectedLibraryRelicId = null, onLibraryToggle = null, selectedLibraryCarrierCls = null, onCarrierToggle = null) {
