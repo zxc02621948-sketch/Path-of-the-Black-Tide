@@ -686,7 +686,7 @@ const Game = {
     this._unlockNote(relic.id);
 
     const ownerStillDead = droppedRelic?._droppedBy
-      && G.squad.some(c => c.dead && c.name === droppedRelic._droppedBy);
+      && G.squad.some(c => (c.dead || c.hp <= 0) && c.name === droppedRelic._droppedBy);
     if (ownerStillDead) {
       const lore = this._getFirstLore(relic.id);
       const slotLabel = droppedRelic._droppedSlot === 'fusedRelic' ? '融合聖物' : '攜帶聖物';
@@ -699,7 +699,7 @@ const Game = {
     }
 
     if (droppedRelic?._droppedBy) {
-      const owner = G.squad.find(c => !c.dead && c.name === droppedRelic._droppedBy);
+      const owner = G.squad.find(c => !c.dead && c.hp > 0 && c.name === droppedRelic._droppedBy);
       if (owner) {
         this._openDroppedRelicReturnModal(cell, droppedRelic, relic, owner, clearRelic);
         return;

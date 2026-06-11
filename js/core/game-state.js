@@ -223,7 +223,7 @@ const GameStateHelpers = {
       desc: [
         `第 ${CONFIG.NIGHT_START_DAY || 10} 天開始，夜色不再退去，邊境進入永夜。`,
         '黑夜結束今天時不再扣生命，但黑暗會更快壯大，並強化最終尾王。',
-        '黑暗每日上升得更快，黑暗化身也會持續追蹤小隊。休息點會變成殘火點，可用來治療、救起倒下隊友，或點燃火把暫時提高黑夜視野。',
+        '黑暗每日上升得更快，黑暗化身也會持續追蹤小隊。休息點會變成殘火點，可用來治療或救起倒下隊友。',
       ].join('\n\n'),
       choices: [{ label: '進入永夜', action: () => { this._closeModal(); Render.fullRender(); } }],
     });
@@ -258,10 +258,7 @@ const GameStateHelpers = {
   // Game Dark Monsters methods live in js/core/dark-monsters.js.
 
   _checkLose() {
-    const dead = G.squad.filter(c => c.hp <= 0 && !c.dead);
-    for (const char of dead) {
-      this._markCharDead(char);
-    }
+    this._markNewlyFallenSquad();
 
     this._updateResonances();
 
@@ -361,6 +358,12 @@ const GameStateHelpers = {
     G.squad = G.squad.filter(c => c.id !== char.id);
   },
 
+  _markNewlyFallenSquad() {
+    const fallen = (G.squad || []).filter(c => c && c.hp <= 0 && !c.dead);
+    for (const char of fallen) this._markCharDead(char);
+    return fallen;
+  },
+
   _markCharDead(char) {
     char.hp = 0;
     char.dead = true;
@@ -372,20 +375,15 @@ const GameStateHelpers = {
     }
     this._log(`${char.name} 倒下了。`, 'danger');
 
-    if (char.fusedRelic) {
-      this._dropRelicAt(G.playerX, G.playerY, char.fusedRelic, char.name, 'fusedRelic');
-      this._log(`${char.name} 的融合遺落物「${char.fusedRelic.name}」留在原地。`, 'dim');
-      this._log(`${char.name} 的融合聖物失去效果。`, 'danger');
-      this._removeRelicEffect(char, char.fusedRelic);
-      this._removeFusionBonus(char, char.fusedRelic);
-      char.fusedRelic = null;
-    }
-
     if (char.relic) {
       this._dropRelicAt(G.playerX, G.playerY, char.relic, char.name, 'relic');
       this._removeRelicEffect(char, char.relic);
       this._log(`${char.name} 的遺落物「${char.relic.name}」留在原地。`, 'dim');
       char.relic = null;
+    }
+
+    if (char.fusedRelic) {
+      this._log(`${char.name} 的融合聖物沒有掉落。`, 'dim');
     }
   },
 

@@ -752,7 +752,11 @@ const CombatRules = {
       const loss = Math.max(0, greatswordResonance.effect?.momentumLossOnMiss || 0);
       const collapseThreshold = Math.max(0, greatswordResonance.effect?.momentumCollapseThreshold || 0);
       const before = Math.max(0, attacker._greatswordMomentum || 0);
-      if (collapseThreshold > 0 && before >= collapseThreshold) {
+      const reliefAvail = Math.max(0, weapon?.effect?.greatswordReliefPerCombat || 0) > 0 && !attacker._swordGreatswordReliefUsed;
+      if (reliefAvail && before > 0) {
+        attacker._swordGreatswordReliefUsed = true;
+        logs.push(`${weapon.name}：裁衡劍化解本場第一次氣勢流失，氣勢維持 ${before}。`);
+      } else if (collapseThreshold > 0 && before >= collapseThreshold) {
         const keepRate = Math.max(0, Math.min(1, greatswordResonance.effect?.momentumCollapseKeepRate ?? 0.5));
         attacker._greatswordMomentum = Math.floor(before * keepRate);
         logs.push(`${greatswordResonance.name}：氣勢過盛卻未打出重劍，氣勢崩落 ${before - attacker._greatswordMomentum}（${before} → ${attacker._greatswordMomentum}）。`);
@@ -769,7 +773,8 @@ const CombatRules = {
       const minChance = Math.max(0, rapierRelic.effect?.minChance || 0);
       const maxFollowUps = Math.max(1, rapierRelic.effect?.maxFollowUps || 10);
       const relicGuaranteedFollowUps = Math.max(0, rapierRelic.effect?.guaranteedFollowUps || 0);
-      const guaranteedFollowUps = relicGuaranteedFollowUps + Math.max(0, rapierResonance?.effect?.guaranteedFollowUps || 0);
+      const weaponGuaranteedFollowUps = Math.max(0, weapon?.effect?.rapierGuaranteedBonus || 0);
+      const guaranteedFollowUps = relicGuaranteedFollowUps + Math.max(0, rapierResonance?.effect?.guaranteedFollowUps || 0) + weaponGuaranteedFollowUps;
       const followDamageStep = Math.max(0, rapierResonance?.effect?.followDamageStep || 0);
       const followDamageMaxBonus = Number.isFinite(rapierResonance?.effect?.followDamageMaxBonus)
         ? Math.max(0, rapierResonance.effect.followDamageMaxBonus)

@@ -32,7 +32,7 @@ const EquipmentRules = {
 
     if (equip.useType === 'combat_mod') {
       state.combatMods.push({ ...equip.effect, ...combatBadgeMeta });
-      return { used: true, log: `${char.name} 激活道具【${equip.name}】，下場戰鬥生效。` };
+      return { used: true, log: `${char.name} 激活道具【${equip.name}】，下一次攻擊生效。` };
     }
 
     if (equip.useType === 'roll_mod') {

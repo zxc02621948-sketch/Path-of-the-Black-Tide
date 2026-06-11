@@ -257,4 +257,16 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     }
   });
+
+  // ─── 離開前警告：一局進行中時，攔截誤觸重整／關閉分頁 ─────────
+  // 本遊戲不保存當前進度（重整即失去這一局），因此在遊戲進行中
+  // （phase 為 day/night、且隊伍存在）提示瀏覽器原生確認對話框。
+  window.addEventListener('beforeunload', (e) => {
+    const runActive = typeof G !== 'undefined' && G && G.phase && G.phase !== 'over'
+      && Array.isArray(G.squad) && G.squad.length > 0;
+    if (runActive) {
+      e.preventDefault();
+      e.returnValue = '';
+    }
+  });
 });

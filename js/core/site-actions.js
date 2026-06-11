@@ -5,6 +5,10 @@ const GameSiteActions = {
     return this._aliveSquad().some(char => char.hp < char.maxHp);
   },
 
+  _fallenSquad() {
+    return (G.squad || []).filter(char => char && (char.dead || char.hp <= 0));
+  },
+
   fieldRest() {
     if (!this._canFieldRest()) {
       Render.renderTopBar();
@@ -240,7 +244,7 @@ const GameSiteActions = {
       return;
     }
 
-    const dead = G.squad.filter(c => c.dead);
+    const dead = this._fallenSquad();
     const injured = this._aliveSquad().filter(c => c.hp < c.maxHp);
     const groupRestLabel = this._siteRestHealLabel?.(0.30) ?? 30;
     const firstAidLabel = this._siteRestHealLabel?.(0.50) ?? 50;
@@ -311,16 +315,6 @@ const GameSiteActions = {
           Render.fullRender();
         },
       },
-      {
-        label: `點燃火把：接下來 ${CONFIG.TORCH_SAFE_MOVES} 次黑夜移動視野 +1`,
-        action: () => {
-          G.torchActive = CONFIG.TORCH_SAFE_MOVES;
-          this._log('火把被點燃，接下來的黑夜移動視野提高。', 'reward');
-          this._markRestUsed(cell);
-          this._closeModal();
-          Render.fullRender();
-        },
-      },
     ];
 
     if (injured.length > 0) {
@@ -345,7 +339,7 @@ const GameSiteActions = {
       });
     }
 
-    for (const char of G.squad.filter(c => c.dead)) {
+    for (const char of this._fallenSquad()) {
       const reviveHp = this._siteRestHealAmount?.(char, 0.50) ?? Math.ceil(char.maxHp * 0.50);
       choices.push({
         label: `救起 ${char.name}（${reviveHp} HP）`,
@@ -358,7 +352,7 @@ const GameSiteActions = {
       });
     }
 
-    this._openModal({ title: '殘火點', desc: '黑夜中的殘火仍留有一點溫度，可以治療或點燃火把。', choices });
+    this._openModal({ title: '殘火點', desc: '黑夜中的殘火仍留有一點溫度，可以治療或救起倒下隊友。', choices });
   },
 };
 

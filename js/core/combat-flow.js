@@ -26,6 +26,7 @@ const GameCombatFlow = {
       char._serratedOilUsedRound = false;
       char._greatswordMomentum = 0;
       char._rapierGuaranteedFollowUpsUsed = 0;
+      char._swordGreatswordReliefUsed = false;
       char._warriorGuardPendingBlock = 0;
       char._gamblerPainPendingBlock = 0;
       char._evasionChancePending = 0;
@@ -56,6 +57,7 @@ const GameCombatFlow = {
       wagerDice: null,
       wagerDicePlans: {},
       battleDrum: null,
+      battleDrumBlock: null,
       banner: null,
       banners: [],
       bannerPlans: {},
@@ -329,6 +331,8 @@ const GameCombatFlow = {
         this._log(`${char.name} 的搏命餘響：下次攻擊骰 +${mod.value}。`, 'reward');
       }
     }
+    const attackFlowFallen = this._markNewlyFallenSquad?.() || [];
+    if (attackFlowFallen.length > 0) this._updateResonances();
 
     if (enemyDead) {
       if (!combatResult.skipSupportTeamHeal) {
@@ -1441,6 +1445,8 @@ const GameCombatFlow = {
         if (appliedDeferredEnemyAction) {
           if (this._handleCombatDefeatAfterAnimation(combatResult, attacker, enemy, roll, rollResult)) return;
         }
+        const newlyFallen = this._markNewlyFallenSquad?.() || [];
+        if (newlyFallen.length > 0) this._updateResonances();
         if (!combatResult.skipExplorerEvasionGain && !combatResult.explorerEvasionGainApplied) {
           this._applyExplorerEvasionGain(attacker, roll, combatResult.logs);
           combatResult.explorerEvasionGainApplied = true;
@@ -2327,6 +2333,7 @@ const GameCombatFlow = {
     this._applyPendingWarriorGuardBlocks(logs);
     this._applyPendingGamblerPainBlocks(logs);
     this._applyPendingExplorerEvasionGain(logs);
+    this._applyBattleDrumTeamBlock(logs);
     return logs;
   },
 
@@ -2411,6 +2418,25 @@ const GameCombatFlow = {
       const result = CombatStatus.addEvasionChance(char, pending);
       if (result.added <= 0) continue;
       logs.push(`探索者：${char.name} 身法成形，閃避率 ${result.before}% → ${result.after}%。`);
+    }
+  },
+
+  _applyBattleDrumTeamBlock(logs = []) {
+    const buff = G.combat?.battleDrumBlock;
+    if (!buff || (buff.rounds || 0) <= 0) return;
+    const value = Math.max(0, Math.floor(buff.value || 0));
+    const granted = [];
+    if (value > 0) {
+      for (const char of G.squad || []) {
+        if (!char || char.dead || char.hp <= 0) continue;
+        CombatStatus.raiseBlock(char, CombatStatus.getBlock(char) + value);
+        granted.push(char.name);
+      }
+    }
+    buff.rounds = Math.max(0, (buff.rounds || 0) - 1);
+    if (buff.rounds <= 0) G.combat.battleDrumBlock = null;
+    if (granted.length > 0) {
+      logs.push(`星盤戰鼓：鼓聲穩住陣腳，全體格檔 +${value}（鼓勢剩 ${buff.rounds} 回合）`);
     }
   },
 
@@ -2615,6 +2641,16 @@ const GameCombatFlow = {
     };
     if (logs) {
       logs.push(`戰鼓：${attacker.name} 敲響戰鼓，接下來 ${G.combat.battleDrum.remaining} 次我方主戰攻擊 +${G.combat.battleDrum.value} 攻擊`);
+    }
+    if ((effect.teamBlockRounds || 0) > 0) {
+      G.combat.battleDrumBlock = {
+        ownerId: attacker.id,
+        rounds: effect.teamBlockRounds,
+        value: effect.teamBlockValue || 1,
+      };
+      if (logs) {
+        logs.push(`星盤戰鼓：鼓聲穩住陣腳，接下來 ${effect.teamBlockRounds} 個回合全體格檔 +${effect.teamBlockValue || 1}`);
+      }
     }
   },
 

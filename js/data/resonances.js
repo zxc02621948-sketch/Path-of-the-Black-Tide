@@ -69,7 +69,7 @@ const RESONANCES = [
     activateSfx: 'resonanceRapier',
     activateSfxVolume: 0.44,
     relics: ['silver_bee_pin', 'iron_scabbard'],
-    desc: '\u6c89\u9435\u528d\u9798\u4e0d\u518d\u89f8\u767c\u91cd\u528d\uff0c\u6539\u70ba\u5f37\u5316\u523a\u528d\uff1a\u672c\u6b21\u523a\u528d\u6bcf\u6210\u529f\u9023\u64ca 1 \u6b21\uff0c\u5f8c\u7e8c\u9023\u64ca\u50b7\u5bb3 +1\u3002',
+    desc: '\u6c89\u9435\u528d\u9798\u4e0d\u518d\u89f8\u767c\u91cd\u528d\uff0c\u6539\u70ba\u5f37\u5316\u523a\u528d\uff1a\u672c\u6b21\u523a\u528d\u6bcf\u6210\u529f\u9023\u64ca 1 \u6b21\uff0c\u5f8c\u7e8c\u9023\u64ca\u50b7\u5bb3\u984d\u5916 +1\uff0c\u6700\u591a +5\u3002',
     bodyRequiresFused: 'silver_bee_pin',
     squadEffect: { type: 'none', desc: '此共鳴必須由同一角色同時持有兩件聖物才會啟動。' },
     bodyEffect: {

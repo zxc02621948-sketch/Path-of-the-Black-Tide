@@ -29,7 +29,7 @@ const EQUIPMENT = [
     name: '磨刀石',
     icon: '石',
     iconImage: 'assets/items/whetstone.png',
-    desc: '本場戰鬥主戰攻擊 +1。',
+    desc: '下一次主戰攻擊 +1。',
     useType: 'combat_mod',
     useInCombat: true,
     useOutOfCombat: false,
@@ -108,7 +108,7 @@ const WEAPONS = [
     name: '祈癒杖',
     icon: '+',
     iconImage: 'assets/weapons/healing-staff.png',
-    desc: '主戰時，命中原生弱點後，全隊恢復 1 HP。',
+    desc: '主戰時，本次攻擊無視敵人格檔；命中原生弱點後，全隊恢復 1 HP。',
     effect: { type: 'healing_staff', healOnRealWeakness: 1 },
   },
   {
@@ -136,8 +136,8 @@ WEAPONS.push(
     name: '裁衡劍',
     icon: '劍',
     iconImage: 'assets/weapons/balanced-sword.png',
-    desc: '主戰時，最終骰面 1-3 傷害 +2；4 以上傷害 +4。',
-    effect: { type: 'sword_high_low', lowMax: 3, lowBonus: 2, highBonus: 4 },
+    desc: '主戰時，最終骰面 1-3 傷害 +2；4 以上傷害 +4。劍系聖物加成：刺劍連擊每次額外保底 1 次；重劍氣勢的失手流失每場戰鬥可化解 1 次。',
+    effect: { type: 'sword_high_low', lowMax: 3, lowBonus: 2, highBonus: 4, rapierGuaranteedBonus: 1, greatswordReliefPerCombat: 1 },
   },
   {
     id: 'bow_plus',
@@ -146,7 +146,7 @@ WEAPONS.push(
     name: '逐星弓',
     icon: '弓',
     iconImage: 'assets/weapons/star-chaser-bow.png',
-    desc: '主戰時，命中原生弱點後可追加攻擊。追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次。',
+    desc: '主戰時，命中原生弱點後，可追加攻擊一次。每次追加攻擊若再次命中原生弱點，可繼續追加攻擊，但追擊不會觸發敵人的原生弱點破除效果。每回合最多額外追擊 3 次。',
     effect: { type: 'bow_followup', maxPerRound: 3 },
   },
   {
@@ -166,8 +166,8 @@ WEAPONS.push(
     name: '星盤戰鼓',
     icon: '鼓',
     iconImage: 'assets/weapons/battle-drum-plus.png',
-    desc: '主戰攻擊後，敲響戰鼓：接下來 3 次我方主戰攻擊 +1 攻擊。不可疊加，可重新敲響刷新次數。持鼓者主戰時，骰面附加傷害減半。',
-    effect: { type: 'battle_drum', attackBonus: 1, durationAttacks: 3, diceDamageRate: 0.5 },
+    desc: '主戰攻擊後，敲響戰鼓：接下來 3 次我方主戰攻擊 +1 攻擊，並在接下來 3 個回合開始時讓全體獲得 1 點格檔。不可疊加，可重新敲響刷新。持鼓者主戰時，骰面附加傷害減半。',
+    effect: { type: 'battle_drum', attackBonus: 1, durationAttacks: 3, diceDamageRate: 0.5, teamBlockRounds: 3, teamBlockValue: 1 },
   },
   {
     id: 'healing_staff_plus',

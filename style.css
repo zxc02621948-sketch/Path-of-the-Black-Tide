@@ -5481,11 +5481,6 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   overflow: visible;
 }
 
-.combat-unit-main.has-fixed-evasion {
-  padding-right: 40px;
-  box-sizing: border-box;
-}
-
 .combat-status-badge {
   display: inline-flex;
   flex-direction: column;
@@ -5558,11 +5553,9 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 .combat-status-badge.evasion {
-  position: absolute;
-  top: 1px;
-  right: 0;
-  z-index: 4;
   color: #cdeeff;
+  flex: 0 0 28px;
+  order: 0;
 }
 
 .combat-status-badge.evasion span {
@@ -7151,14 +7144,14 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   width: 185px;
   height: 185px;
   border-radius: 0;
-  background: url("assets/effects/star-hunter-eye-sprite.png") 0 0 / 400% 200% no-repeat;
+  background: url("assets/effects/star-hunter-eye-sprite.png?v=2") 0 0 / 400% 200% no-repeat;
   box-shadow: none;
   filter: brightness(1.18) saturate(1.14)
-    drop-shadow(0 0 7px rgba(255, 235, 132, .62))
-    drop-shadow(0 0 14px rgba(255, 126, 20, .32));
+    drop-shadow(0 0 7px rgba(170, 205, 255, .62))
+    drop-shadow(0 0 14px rgba(78, 126, 255, .34));
   animation:
-    star-hunter-eye-impact .54s cubic-bezier(.12, .76, .2, 1) forwards,
-    star-hunter-eye-frames .54s steps(1, end) forwards;
+    star-hunter-eye-impact .4s cubic-bezier(.12, .76, .2, 1) forwards,
+    star-hunter-eye-frames .4s steps(1, end) forwards;
 }
 
 .combat-attack-trail.trail-star-hunter-eye::after {
@@ -7709,11 +7702,15 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 }
 
 @keyframes star-hunter-eye-frames {
-  0%   { background-position: 0 0; }
-  22%  { background-position: 33.333% 0; }
-  48%  { background-position: 66.666% 0; }
-  74%,
-  100% { background-position: 100% 0; }
+  0%    { background-position: 0% 0%; }
+  12.5% { background-position: 33.333% 0%; }
+  25%   { background-position: 66.666% 0%; }
+  37.5% { background-position: 100% 0%; }
+  50%   { background-position: 0% 100%; }
+  62.5% { background-position: 33.333% 100%; }
+  75%   { background-position: 66.666% 100%; }
+  87.5%,
+  100%  { background-position: 100% 100%; }
 }
 
 @keyframes star-breaker-impact {

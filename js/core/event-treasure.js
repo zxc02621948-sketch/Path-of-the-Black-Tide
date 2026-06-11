@@ -400,7 +400,7 @@ const GameEventTreasure = {
     return { type: 'gear', label: '角色裝備', ...gear };
   },
 
-  _openDarkGiftRewardAssignModal(cell, reward, combatLog = []) {
+  _openDarkGiftRewardAssignModal(cell, reward, combatLog = [], sourceLabel = '黑匣擬態') {
     if (reward.type === 'weapon') {
       const assignOptions = this._aliveSquad().map(char => {
         const current = char.weapon;
@@ -426,7 +426,7 @@ const GameEventTreasure = {
           action: () => {
             this._weaponAssignContext = null;
             this._clearWeaponChest(cell);
-            this._log(`放棄黑匣擬態掉落的武器「${reward.name}」。`, 'dim');
+            this._log(`放棄${sourceLabel}掉落的武器「${reward.name}」。`, 'dim');
             this._closeModal();
             Render.fullRender();
           },

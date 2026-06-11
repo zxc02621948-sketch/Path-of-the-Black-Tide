@@ -252,11 +252,9 @@ const Render = {
           if (cell.droppedRelics?.length > 0) {
             const dropBadge = document.createElement('div');
             dropBadge.className = 'cell-drop-badge';
-            const isDeathDrop = cell.droppedRelics.some(relic => relic?._droppedBy);
+            const relic = cell.droppedRelics.find(item => item?.iconImage) || cell.droppedRelics[0] || null;
             const dropImg = document.createElement('img');
-            dropImg.src = isDeathDrop
-              ? 'assets/ui/treasure-chest-map.png'
-              : (cell.droppedRelics.find(relic => relic?.iconImage)?.iconImage || 'assets/site-thumbnail.png');
+            dropImg.src = relic?.iconImage || 'assets/site-thumbnail.png';
             dropImg.alt = '';
             dropBadge.appendChild(dropImg);
             dropBadge.title = cell.droppedRelics.some(relic => relic?._droppedBy) ? '此處有遺落物' : '此處有掉落聖物';
@@ -650,8 +648,8 @@ const Render = {
       const isDeathDrop = cell.droppedRelics.some(relic => relic?._droppedBy);
       const relic = cell.droppedRelics.find(item => item?.iconImage) || cell.droppedRelics[0] || null;
       return {
-        src: isDeathDrop ? 'assets/ui/treasure-chest-map.png' : (relic?.iconImage || 'assets/site-thumbnail.png'),
-        alt: isDeathDrop ? '遺落物' : '掉落聖物',
+        src: relic?.iconImage || 'assets/site-thumbnail.png',
+        alt: isDeathDrop ? (relic?.name ? `遺落物：${relic.name}` : '遺落物') : (relic?.name || '掉落聖物'),
         className: isDeathDrop ? 'dropped-relic-map-icon dropped-relic-death' : 'dropped-relic-map-icon',
       };
     }
@@ -747,7 +745,7 @@ const Render = {
     if (cell.type === 'enemy') return '敵人';
     if (cell.type === 'chest') return cell.content?.chestKind === 'dark_gift' ? '黑暗贈禮' : '寶箱';
     if (cell.type === 'relic') return '聖物';
-    if (cell.type === 'rest')  return G.phase === 'night' ? '殘火點，可治療或點燃火把' : '休息點，回血';
+    if (cell.type === 'rest')  return G.phase === 'night' ? '殘火點，可治療或救起隊友' : '休息點，回血';
     if (cell.type === 'altar' && cell.visited) return '神壇，血祭 / 融合';
     if (cell.visited) return '已探索，無事';
     return '未知';

@@ -1468,7 +1468,12 @@ const RenderModal = {
       badge.outerHTML = html;
     } else {
       const statusRow = unit.querySelector('.combat-unit-main') || unit;
-      statusRow.insertAdjacentHTML('beforeend', html);
+      const nameEl = statusRow.querySelector('.combat-name');
+      if (nameEl) {
+        nameEl.insertAdjacentHTML('afterend', html);
+      } else {
+        statusRow.insertAdjacentHTML('afterbegin', html);
+      }
     }
   },
 
@@ -1590,7 +1595,7 @@ const RenderModal = {
       : targetEl.classList.contains('has-card-bg') && fixedTargetTrail
       ? targetRect.top + 118
       : (impactRect === targetRect ? targetRect.top + (opts.side === 'ally' ? 54 : 72) : impactRect.top + impactRect.height / 2);
-    const wanderingHitTrail = opts.side === 'enemy' && ['pierce', 'silver_bee_pin', 'star_hunter_eye'].includes(trail);
+    const wanderingHitTrail = opts.side === 'enemy' && ['pierce', 'silver_bee_pin'].includes(trail);
     if (wanderingHitTrail) {
       const spotRect = this._combatEnemyImageImpactRect(targetEl, impactRect);
       const spot = this._combatWanderingHitSpot(targetEl, spotRect, trail);
@@ -1642,7 +1647,7 @@ const RenderModal = {
       strike: 620,
       silver_bee_pin: 620,
       iron_scabbard: 940,
-      star_hunter_eye: 720,
+      star_hunter_eye: 480,
       star_breaker: 820,
       fate_d12_weakness: 760,
       fate_d12_burst: 900,
@@ -2328,13 +2333,13 @@ const RenderModal = {
           ${isFollowUpStatus ? `<div class="combat-followup-badge"><strong>${combat.followUpLabel || '追擊'}</strong><span>${combat.followUpHint || '點擊追擊'}</span></div>` : ''}
           ${battleArt ? `<div class="combat-character-art" aria-hidden="true"><img src="${battleArt}" alt=""></div>` : ''}
           ${isDown ? this._combatBloodSplatterHtml(char.id || char.name, 'ally') : ''}
-          <div class="combat-unit-main${evasionBadgeHtml ? ' has-fixed-evasion' : ''}">
+          <div class="combat-unit-main">
             <span class="combat-sprite">${this._combatClassIconHtml(char.cls, cls)}</span>
             <span class="combat-name">${char.name}</span>
+            ${evasionBadgeHtml}
             ${gazeBadgeHtml}
             ${woundBadgeHtml}
             ${blockBadgeHtml}
-            ${evasionBadgeHtml}
             ${intimidateHtml}
             ${pollutionHtml}
             ${remorseHtml}

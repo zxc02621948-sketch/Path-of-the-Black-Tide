@@ -123,6 +123,10 @@ const GameCombatVictoryFlow = {
       this._settleDarkGiftMimicVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
       return true;
     }
+    if (combatReward === 'fallen_traveler') {
+      this._settleFallenTravelerVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
+      return true;
+    }
     if (combatReward === 'echo_site') {
       this._settleEchoSiteVictory(cell, enemy, attacker, roll, rollResult, combatResult.logs, finalHitDesc, this._combatResultAnims(attacker, combatResult, 250));
       return true;
@@ -333,6 +337,37 @@ const GameCombatVictoryFlow = {
         },
       }],
     });
+  },
+
+  _settleFallenTravelerVictory(cell, enemy, attacker, roll, rollResult, logs, finalHitDesc, combatAnims) {
+    const weapon = randomWeaponForSquad(G.squad);
+    if (!weapon) {
+      cell.type = 'empty';
+      cell.content = null;
+      cell.cleared = true;
+      this._openModal({
+        title: '倒下的旅人',
+        desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n你們從旅人身邊取回他的遺物，卻已經沒有你們用得上的武器了。`,
+        combatLog: logs,
+        combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+        combatAnims,
+        dice: this._combatVictoryDice(attacker, roll, rollResult),
+        choices: [{ label: '繼續', action: () => { this._closeModal(); Render.fullRender(); } }],
+      });
+      return;
+    }
+    const reward = { type: 'weapon', label: '武器', ...weapon };
+    this._log(`倒下的旅人留下武器「${weapon.name}」。`, 'reward');
+    this._openModal({
+      title: '倒下的旅人',
+      desc: `${enemy.name} 被擊敗。\n${finalHitDesc}\n\n守在屍體旁的威脅散去，旅人手裡的武器終於能取下。`,
+      combatLog: logs,
+      combat: this._buildCombatScene(enemy, attacker, `${attacker.name} 擊敗 ${enemy.name}`),
+      combatAnims,
+      dice: this._combatVictoryDice(attacker, roll, rollResult),
+      choices: [],
+    });
+    setTimeout(() => this._openDarkGiftRewardAssignModal(cell, reward, logs, '倒下的旅人'), this._combatAnimWaitMs(combatAnims));
   },
 
   _openCombatVictoryTutorialIfNeeded(onDone = null) {

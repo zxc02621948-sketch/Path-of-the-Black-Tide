@@ -4,7 +4,7 @@
 //
 // 升階公式：tierIdx = floor((day - 1) / tierUpDays)，上限為 tiers.length - 1
 // 傷害公式：damage = max(0, 攻擊力 + 骰值)，格檔由意圖決定（每回合重置）
-// 角色攻擊力：戰士 5 / 搏命者 4 / 探索者 3 / 輔助 2
+// 角色攻擊力：戰士 4 / 搏命者 5 / 探索者 3 / 輔助 2
 //
 // 意圖類型：
 //   attack       → 攻擊主戰者（弱/中型傷害 = enemy.attack + 三面骰）
@@ -607,6 +607,14 @@ function randomEnemyForDay(isNight, dayOverride = null) {
     .filter(e => baseTiers.includes(e.tier));
   const base = pool[Math.floor(Math.random() * pool.length)];
   return resolveEnemyTier(base, day);
+}
+
+// 強制取一隻「最高階」的中階怪（resolveEnemyTier 會把階級索引 cap 在最後一階）。
+function getMaxTierMediumEnemy() {
+  const pool = ENEMIES.filter(e => e.tier === 'medium' && !e.boss && !e.rescueBoss && Array.isArray(e.tiers));
+  if (pool.length === 0) return randomEnemyForDay(false, 999);
+  const base = pool[Math.floor(Math.random() * pool.length)];
+  return resolveEnemyTier(base, 999);
 }
 
 function randomEnemy(isNight) {

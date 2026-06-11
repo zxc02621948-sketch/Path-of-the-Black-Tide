@@ -2,9 +2,11 @@
 const GameEventEncounters = {
   _triggerTerrainCombat(cell, ev) {
     cell.cleared = false;
-    const enemy = randomEnemy(G.phase === 'night');
+    const enemy = ev.combatEnemyResolver === 'max_medium' && typeof getMaxTierMediumEnemy === 'function'
+      ? getMaxTierMediumEnemy()
+      : randomEnemy(G.phase === 'night');
     cell.type = 'enemy';
-    cell.content = { enemy, event: ev };
+    cell.content = { enemy, event: ev, reward: ev.combatReward || null };
     this._openModal({
       title: ev.name,
       desc: `${this._eventDiceText(ev)}${ev.desc || ''}`,
@@ -205,25 +207,29 @@ const GameEventEncounters = {
       // Section.
       const heal = ev.heal || CONFIG.DEFAULT_SUPPLY_HEAL;
       const healed = [];
-      if (ev.healTarget === 'lowest') {
-        const target = this._aliveSquad().sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
-        if (target) {
-          const before = target.hp;
-          target.hp = Math.min(target.maxHp, target.hp + heal);
-          if (target.hp > before) healed.push(`${target.name} +${target.hp - before}`);
-        }
-      } else {
-        for (const char of this._aliveSquad()) {
-          const before = char.hp;
-          char.hp = Math.min(char.maxHp, char.hp + heal);
-          if (char.hp > before) healed.push(`${char.name} +${char.hp - before}`);
+      if (!ev.skipHeal) {
+        if (ev.healTarget === 'lowest') {
+          const target = this._aliveSquad().sort((a, b) => (a.hp / a.maxHp) - (b.hp / b.maxHp))[0];
+          if (target) {
+            const before = target.hp;
+            target.hp = Math.min(target.maxHp, target.hp + heal);
+            if (target.hp > before) healed.push(`${target.name} +${target.hp - before}`);
+          }
+        } else {
+          for (const char of this._aliveSquad()) {
+            const before = char.hp;
+            char.hp = Math.min(char.maxHp, char.hp + heal);
+            if (char.hp > before) healed.push(`${char.name} +${char.hp - before}`);
+          }
         }
       }
       const progress = this._resolveProgressEventForModal(ev, null);
-      this._log(healed.length > 0 ? `${ev.name}：${healed.join('、')} HP。` : `${ev.name}：隊伍在此地稍作休整。`, healed.length > 0 ? 'reward' : 'dim');
-      const healText = healed.length > 0
-        ? `隊伍在此地稍作休整，恢復生命：${healed.join('、')}。`
-        : '隊伍在此地稍作休整，整理補給與傷勢。';
+      this._log(healed.length > 0 ? `${ev.name}：${healed.join('、')} HP。` : `${ev.name}：${ev.skipHeal ? '循著線索找到方向。' : '隊伍在此地稍作休整。'}`, healed.length > 0 ? 'reward' : 'dim');
+      const healText = ev.skipHeal
+        ? '你們循著線索前進，沒有找到可帶走的補給，但已經記下了方向。'
+        : (healed.length > 0
+          ? `隊伍在此地稍作休整，恢復生命：${healed.join('、')}。`
+          : '隊伍在此地稍作休整，整理補給與傷勢。');
       const preDesc = `${this._eventDiceText(ev)}${ev.desc || ''}\n\n${healText}${eventInfo}`;
       this._openModal({
         title: ev.name,

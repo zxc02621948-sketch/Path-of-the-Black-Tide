@@ -22,6 +22,7 @@ const EVENT_POOL = {
       category: 3,
       weight: 3,
       heal: 2,
+      skipHeal: true,
       revealRescueBoss: true,
       condition: state => state?.canRevealRescueBoss?.() !== false,
     },
@@ -364,6 +365,7 @@ const EVENT_POOL = {
       category: 3,
       weight: 1,
       heal: 2,
+      skipHeal: true,
       healTarget: 'lowest',
       revealRescueBoss: true,
       revealIfNoRescue: 1,
@@ -393,6 +395,7 @@ const EVENT_POOL = {
       category: 3,
       weight: 2,
       heal: 2,
+      skipHeal: true,
       revealRescueBoss: true,
       condition: state => state?.canRevealRescueBoss?.() !== false,
     },
@@ -506,6 +509,22 @@ function createFateGamblingTableEvent(baseEvent = null) {
   };
 }
 
+function createFallenTravelerEvent() {
+  return {
+    id: 'fallen_traveler',
+    name: '倒下的旅人',
+    type: 'combat',
+    rarity: 'epic',
+    weight: 1,
+    maxPerRun: 2,
+    category: 3,
+    combatEnemyResolver: 'max_medium',
+    combatReward: 'fallen_traveler',
+    desc: '循著微弱的氣息找去，人已經沒了呼吸。他的武器仍握在手裡，但某個東西守在屍體旁，不讓你們靠近。',
+    condition: state => state?.canFindWeaponDrop?.() !== false,
+  };
+}
+
 const EVENT_RARITY_WEIGHTS = {
   common: 62,
   rare: 27,
@@ -582,8 +601,9 @@ function randomTerrainEvent(terrainType, state = null) {
 }
 
 function _specialTerrainEvents(terrainType) {
-  if (terrainType !== 'empty') return [];
-  return [createFateGamblingTableEvent()];
+  const extras = [createFallenTravelerEvent()];
+  if (terrainType === 'empty') extras.push(createFateGamblingTableEvent());
+  return extras;
 }
 
 function randomEmptyEvent(state = null) {

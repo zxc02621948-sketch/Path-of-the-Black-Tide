@@ -131,6 +131,7 @@ const GameEventHandlers = {
       canRevealAltarClue: () => this._canRevealAltarClue(),
       canRevealRescueBoss: () => this._canRevealRescueBoss(),
       canFindEventRelic: () => this._canFindEventRelic(),
+      canFindWeaponDrop: () => this._canFindWeaponDrop(),
       canPlaceTreasureChest: () => this._canPlaceTreasureChest(),
     });
   },
@@ -159,6 +160,10 @@ const GameEventHandlers = {
   _canFindEventRelic() {
     const pool = this._getAvailableRelics(this._relicRewardPoolForPhase(), { ignoreWeaponRequirements: true });
     return pool.length > 0;
+  },
+
+  _canFindWeaponDrop() {
+    return typeof randomWeaponForSquad === 'function' ? !!randomWeaponForSquad(G.squad) : true;
   },
 
   _canPlaceTreasureChest() {
