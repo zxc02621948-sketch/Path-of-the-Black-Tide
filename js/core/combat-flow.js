@@ -6,7 +6,10 @@ const GameCombatFlow = {
   _triggerCombat(cell, opts = {}) {
     let tutorialCombat = false;
     if (this._shouldUseCombatTutorialEnemy(opts)) {
-      const tutorialEnemy = typeof getEnemyById === 'function' ? getEnemyById('shadow_worm') : null;
+      const tutorialBase = typeof getEnemyById === 'function' ? getEnemyById('shadow_worm') : null;
+      const tutorialEnemy = tutorialBase && typeof resolveEnemyTier === 'function'
+        ? resolveEnemyTier(tutorialBase, G.day || 1)
+        : tutorialBase;
       if (tutorialEnemy) {
         cell.content = { ...(cell.content || {}), enemy: tutorialEnemy };
         G.combatTutorial = { active: true, step: 'enemy_detail', completed: false, firstCombatStarted: true };
