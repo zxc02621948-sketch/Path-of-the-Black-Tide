@@ -222,7 +222,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (typeof G !== 'undefined') G = {};
     AudioManager?.stop?.(true);
     AudioManager?.sync?.();
+    Render.renderCareerStrip?.();
   });
+
+  // 起始畫面生涯印記
+  Render.renderCareerStrip?.();
 
   // ─── 檢查聖物庫狀態，決定是否顯示筆記按鈕 ───────────────
   const lib = localStorage.getItem('bbn_library_unlocked') !== 'false';

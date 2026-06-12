@@ -810,9 +810,6 @@ const RenderModal = {
     const roleDiceEl = faceEl.querySelector('.combat-card-dice');
     const sides = Math.max(1, Number(roleDiceEl?.dataset.sides || diceEl.dataset.sides || 6));
 
-    let count = 0;
-    const STEPS = 10;
-    const MS = 75;
     AudioManager?.playSfx?.('dice');
     if (roleDiceEl) {
       roleDiceEl.classList.add('dice-rolling');
@@ -821,20 +818,16 @@ const RenderModal = {
       diceEl.classList.add('dice-rolling');
       this._setModalDiceFace(faceEl, roleDiceEl, Math.ceil(Math.random() * sides));
     }
-    const timer = setInterval(() => {
-      count++;
-      if (count < STEPS) {
-        this._setModalDiceFace(faceEl, roleDiceEl, Math.ceil(Math.random() * sides));
-      } else {
-        clearInterval(timer);
-        this._setModalDiceFace(faceEl, roleDiceEl, finalValue);
-        diceEl.classList.remove('dice-rolling');
-        if (roleDiceEl) roleDiceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-pip-settled');
-        if (valueEl) valueEl.style.visibility = '';
-        if (onDone) onDone.call(this);
-      }
-    }, MS);
+    diceSpinRun(sides, () => {
+      this._setModalDiceFace(faceEl, roleDiceEl, Math.ceil(Math.random() * sides));
+    }, () => {
+      this._setModalDiceFace(faceEl, roleDiceEl, finalValue);
+      diceEl.classList.remove('dice-rolling');
+      if (roleDiceEl) roleDiceEl.classList.remove('dice-rolling');
+      diceEl.classList.add('dice-pip-settled');
+      if (valueEl) valueEl.style.visibility = '';
+      if (onDone) onDone.call(this);
+    });
   },
 
   _setModalDiceFace(faceEl, roleDiceEl, value) {
@@ -853,23 +846,16 @@ const RenderModal = {
     if (!diceEl) return;
     const finalValue = Number(dice?.value || 1);
     const sides = Math.max(1, Number(diceEl.dataset.sides || dice?.sides || 6));
-    let count = 0;
-    const STEPS = 10;
-    const MS = 72;
     AudioManager?.playSfx?.('dice');
     diceEl.classList.add('dice-rolling');
     this._setModalDiceFace(null, diceEl, Math.ceil(Math.random() * sides));
-    const timer = setInterval(() => {
-      count++;
-      if (count < STEPS) {
-        this._setModalDiceFace(null, diceEl, Math.ceil(Math.random() * sides));
-        return;
-      }
-      clearInterval(timer);
+    diceSpinRun(sides, () => {
+      this._setModalDiceFace(null, diceEl, Math.ceil(Math.random() * sides));
+    }, () => {
       this._setModalDiceFace(null, diceEl, finalValue);
       diceEl.classList.remove('dice-rolling');
       diceEl.classList.add('dice-pip-settled');
-    }, MS);
+    });
   },
 
   _revealModalAfterDice() {
@@ -1345,6 +1331,8 @@ const RenderModal = {
       fill.style.width = `${pct}%`;
       fill.classList.toggle('critical', pct <= 25);
       fill.classList.toggle('low', pct > 25 && pct <= 50);
+      const ghost = document.querySelector('.combat-enemy-hp-ghost');
+      if (ghost) ghost.style.width = `${pct}%`;
     }
     if (text && max > 0) text.textContent = `${hp}/${max}`;
   },
@@ -1513,6 +1501,12 @@ const RenderModal = {
       }
     }
     if (!pop.children.length && !pop.textContent) return;
+    if (opts.kind !== 'heal' && (tier === 'surge' || tier === 'finisher')) {
+      const stamp = document.createElement('span');
+      stamp.className = `combat-damage-stamp stamp-${tier}`;
+      stamp.textContent = tier === 'finisher' ? '終結' : '重擊';
+      pop.appendChild(stamp);
+    }
     const x = targetRect.left - sceneRect.left + targetRect.width / 2;
     const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104) + (opts.offsetY || 0);
     pop.style.left = `${Math.round(x)}px`;
@@ -1734,8 +1728,13 @@ const RenderModal = {
       this._pulseCombatWorldImpact(tier);
     }
     if (tier === 'finisher') {
+      const flash = document.createElement('div');
+      flash.className = 'combat-finisher-flash';
+      flash.setAttribute('aria-hidden', 'true');
+      sceneEl.appendChild(flash);
+      FxPlayer.removeAfter(flash, 220);
       sceneEl.classList.add('combat-hit-stop');
-      setTimeout(() => sceneEl.classList.remove('combat-hit-stop'), 110);
+      setTimeout(() => sceneEl.classList.remove('combat-hit-stop'), 150);
     }
   },
 
@@ -1936,7 +1935,7 @@ const RenderModal = {
                 const visualHitEffect = relicFx || dedicatedSpriteTrail ? '' : (hitEffect === 'eagle-mark' && layeredWeaponHit ? 'weak-flash' : hitEffect);
                 const heavyRelicImpact = ['iron_scabbard', 'star_breaker'].includes(relicFx);
                 this._pulseCombatImpact(combatScene, damageEvent.damage, { tier: fxTier });
-                if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, damageEvent.sfxVolume ?? 0.44);
+                if (damageEvent.sfx) AudioManager?.playSfx?.(damageEvent.sfx, damageEvent.sfxVolume ?? 0.44, { rate: 1 + Math.min(4, i) * 0.05 });
                 this._showCombatAttackTrail(enemyCard, attackTrail, { side: 'enemy', scene: combatScene, sourceEl: attackerEl, weaponFamily: damageEvent.weaponFamily || '', palette: damageEvent.attackPalette || '', damage: damageEvent.damage, tier: fxTier, trailExtendPx: damageEvent.trailExtendPx || 0 });
                 if (Number.isFinite(damageEvent.enemyBlockAfter)) {
                   this._setDisplayedEnemyBlock(damageEvent.enemyBlockAfter);
@@ -2452,7 +2451,7 @@ const RenderModal = {
         </div>
         <div class="combat-enemy-name">${combat.enemy.name}</div>
         <div class="combat-hp-row">
-          <div class="combat-hp-bar"><div class="combat-hp-fill combat-enemy-hp-fill ${enemyHpClass}" style="width:${enemyHpPct}%"></div></div>
+          <div class="combat-hp-bar"><div class="combat-hp-ghost combat-enemy-hp-ghost" style="width:${enemyHpPct}%"></div><div class="combat-hp-fill combat-enemy-hp-fill ${enemyHpClass}" style="width:${enemyHpPct}%"></div></div>
           <span class="combat-enemy-hp-text" data-max-hp="${combat.enemy.maxHp}">${combat.enemy.hp}/${combat.enemy.maxHp}</span>
         </div>
         <div class="combat-enemy-divider" aria-hidden="true"></div>
@@ -2470,8 +2469,8 @@ const RenderModal = {
           <div class="combat-actions"></div>
           <div class="combat-vs">VS</div>
           <div class="combat-bottom-tools">
-            <button class="${guardButtonClass}" ${guardButtonAction} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}">${guardTargeting ? '取消格檔' : '格檔'}${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
-            <button class="${bagButtonClass}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon" src="assets/ui/bag-icon.png" alt="">背包</button>
+            <button class="${guardButtonClass}" ${guardButtonAction} title="${guardTargeting ? '取消格檔指定' : (combat.canGuard ? '格檔：選一名角色，擲骰並獲得等同骰數的格檔；不消耗主戰' : `格檔冷卻：還需 ${combat.guardCooldown || 0} 回合`)}"><img class="combat-action-icon" src="assets/icons/block-icon-clean.png" alt=""><span class="combat-action-label">${guardTargeting ? '取消格檔' : '格檔'}</span>${combat.canGuard || guardTargeting ? '' : `<small>${combat.guardCooldown || 0}</small>`}</button>
+            <button class="${bagButtonClass}" ${combat.canUseBag ? 'onclick="Game.openCombatBag()"' : 'disabled'} title="小隊背包"><img class="combat-bag-icon combat-action-icon" src="assets/ui/bag-icon.png" alt=""><span class="combat-action-label">背包</span></button>
           </div>
         </div>
         ${itemTargeting ? `<button class="btn-tiny combat-cancel-item" onclick="Game.cancelCombatItemTargeting()">取消道具</button>` : ''}

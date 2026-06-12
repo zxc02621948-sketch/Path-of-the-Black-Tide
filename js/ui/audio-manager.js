@@ -102,7 +102,6 @@ const AudioManager = {
     window.addEventListener('pagehide', () => this.handlePageVisibility(true));
     window.addEventListener('pageshow', () => this.handlePageVisibility(document.hidden));
     this.handlePageVisibility(document.hidden);
-    this.preloadTracks();
   },
 
   unlock() {
@@ -364,12 +363,18 @@ const AudioManager = {
     return window.matchMedia('(hover: hover) and (pointer: fine)').matches;
   },
 
-  playSfx(id, volume = this.sfxVolume) {
+  playSfx(id, volume = this.sfxVolume, opts = null) {
     if (!this.unlocked || this.pageHidden) return null;
     const src = this.sfx[id];
     if (!src) return null;
     const audio = this.preloadedSfx[id]?.cloneNode?.() || new Audio(src);
     audio.volume = volume;
+    if (opts && Number.isFinite(opts.rate) && opts.rate > 0) {
+      try {
+        audio.playbackRate = opts.rate;
+        audio.preservesPitch = false;
+      } catch (e) { /* 老瀏覽器不支援 preservesPitch */ }
+    }
     audio.play().catch(() => {});
     return audio;
   },

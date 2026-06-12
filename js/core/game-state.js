@@ -268,6 +268,22 @@ const GameStateHelpers = {
   },
 
   _endGame(result) {
+    // 死法快照（要在清空 combat 前抓）＋生涯統計
+    G.deathInfo = (result === 'lose' && G.combat?.enemy) ? {
+      name: G.combat.enemy.name || '',
+      level: G.combat.enemy.darkMonsterCombatLevel ?? G.combat.enemy.darkMonsterLevel ?? null,
+      isAvatar: (G.combat.enemy.darkMonsterCombatLevel ?? G.combat.enemy.darkMonsterLevel) != null,
+      night: G.phase === 'night',
+      day: G.day,
+    } : null;
+    try {
+      const career = JSON.parse(localStorage.getItem('bbn_career') || '{}');
+      career.runs = (career.runs || 0) + 1;
+      career.bestDay = Math.max(career.bestDay || 0, G.day || 0);
+      if (result === 'dawn') career.dawnCount = (career.dawnCount || 0) + 1;
+      if (result === 'evacuate') career.evacuateCount = (career.evacuateCount || 0) + 1;
+      localStorage.setItem('bbn_career', JSON.stringify(career));
+    } catch (e) { /* localStorage 不可用時略過 */ }
     this._clearSquadCombatCarryover?.();
     G.combat = null;
     G.phase = 'over';

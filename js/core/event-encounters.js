@@ -126,6 +126,9 @@ const GameEventEncounters = {
         });
       }
     }
+    if (choices.length === 0) {
+      choices.push({ label: '離開', action: () => { this._closeModal(); Render.fullRender(); } });
+    }
     this._log(`發現倖存者：${newChar.name}。`, 'reward');
 
     this._openModal({

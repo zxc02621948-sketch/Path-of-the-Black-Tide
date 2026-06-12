@@ -15,7 +15,54 @@
 
 ---
 
-## 最新 session（2026-06-11）：獵星之眼共鳴效果重做
+## 最新 session（2026-06-11 深夜）：設計三刀（design-blade1，全部本地未推）
+
+來源：5 視角設計顧問團工作流（評審由主線完成）。**所有改動 `?v=design-blade1`**，涉及 9 檔。
+
+### 第一刀：視覺識別
+- **字體真的運上船**（重大）：CSS 一直引用 Noto Serif TC 但從未載入，Windows 玩家看到新細明體。index.html 加 Google Fonts（700/900, swap）；style.css 49-72 重排：襯線只給展示級（modal h2/過場/gameover/combat-name/主按鈕，900 重量），小字（btn-small/各面板標題等）回無襯線 600；數字 tabular-nums。已驗證 `document.fonts.check` = true。
+- **色彩憲法**：紫只屬於黑潮——共鳴面板/共鳴 tag/融合名/resonating 全改青系（#8fd8cd 家族）；地圖引導目標與相鄰高亮從青改燈火金（青從此只屬聖物/共鳴）。
+- **三層框格**：style.css 11308 群組拆開——華麗金框只留 #map-panel/.title-card/#gameover-results；top-bar/log/right/effects/notes-shortcut/squad 退成靜默容器（border-soft）；log/right 加 saturate(.9) brightness(.95)、hover/focus-within 回亮。#resonance-panel 從群組排除（用自己的青色樣式）。
+- **地圖主角化**：grid 200→184px｜25vw cap 380px；--map-cell-size 上限 52→60px；map-panel 雙層金框＋光暈；**.has-player 修復**（原 alpha .08 幾乎隱形→金圈+呼吸 player-cell-breathe）；ruins/cave 地形外光暈移除、非霧格 saturate .97。
+- **黑暗刻度**：.darkness-bar::before 畫 25%/35%/60% 刻度線；render.js renderTopBar 動態插 #darkness-next（「距化身甦醒 N」三段文案，430px 以下隱藏）。
+
+### 第二刀：手感
+- **減速骰**：新全域 helper `diceSpinRun(sides, onTick, onSettle)`（dice.js 尾部，d6=10 步 45→235ms，d12=13 步）。換掉 5 處等速 setInterval：combat-flow `_showCombatDicePreview/_showCombatGuardDicePreview/_showModalDicePreview`、modal-render `_animateModalDice/_animateCombatEnemyDice`。callback 時序＝spinMs+320/360 不變。注意：背景分頁計時器節流（瀏覽器行為，舊代碼亦然）。
+- **終結演出**：finisher 白閃幀（.combat-finisher-flash，overlay .17s）＋hit-stop 110→150ms＋damage-pop 也凍結；surge/finisher 傷害數字加「重擊/終結」襯線蓋章（.combat-damage-stamp）。
+- **連擊音高**：playSfx 第三參數 opts.rate（playbackRate+preservesPitch=false）；counter 迴圈每追擊 +5%（上限 +20%）。
+- **Juice**：敵 HP 殘影條（.combat-hp-ghost，markup+_setDisplayedEnemyHp 同步，transition .55s ease .32s）；傷害數字逐位彈入；dice-pip-settle 放大至 1.55+金環。
+
+### 第三刀：回響
+- **死法具名**：game-state `_endGame` 開頭快照 `G.deathInfo`（清 combat 前）；render showGameOver lose 文案→「第 N 天夜裡，XX Lv.Y 終結了這支小隊」；化身擊殺時 gameover intro 播 darkMonsterGrowl。
+- **覆盤 tips**：依死因最多 2 條規則式建議（devoured/化身/早期陣亡/沒融合過）。
+- **共鳴剪影牆**：relic-resonance 啟動時寫 localStorage `bbn_resonances_seen`；結算渲染 9 顆（Render._resonanceGallery 寫死 id+icon，圖檔已驗證存在），未見證=黑剪影。
+- **生涯印記**：_endGame 寫 `bbn_career`（runs/bestDay/dawnCount/evacuateCount）；start-screen 新 #career-strip（index.html）＋ Render.renderCareerStrip()（main.js 開機與 restart 時呼叫）；無黎明紀錄時附「黎明，尚未有人見過。」
+
+### 驗證
+8 JS node --check 全過；runtime：字體載入 true、生涯印記顯示/隱藏正確、進遊戲（darkness-next/56px 格/呼吸玩家格/靜默頂欄/側欄退場）、dev-tool 木樁戰（新骰路徑 rolling、殘影條存在）。**待使用者前景實測**：減速骰手感、終結白閃/蓋章、連擊音高、死亡結算（具名+tips+剪影牆）、整體審美。
+
+---
+
+## 上一批（2026-06-11 晚）：全面優化批次（27 代理審計 → 驗證 → 實作；全部本地未推）
+
+審計流程：6 維度並行掃描＋對抗性驗證（驗證刷掉約一半假警報，含 4/5 個假 critical）。實作項目：
+
+1. **救援事件空選項軟鎖防護**（`event-encounters.js` `_triggerRescue`）：choices 空陣列時補「離開」fallback。順帶觀察待使用者拍板：**滿隊救援沒有「婉拒邀請」選項（被迫換人）——是否刻意？**
+2. **全站觸控/可點回饋**（`style.css`，.btn-small 區後）：`.choice-btn/.class-card/.btn-small` 補 `:focus-visible` 金色 outline；以上＋`.char-card/.map-cell` 補 `:active` brightness 按壓回饋（觸控無 hover 的解）。
+3. **手機 390px**（皆在 `@media (max-width:430px)` 內）：隱藏 `.actions-hint`＋`#actions-display` nowrap（殺掉換行整行）、`#top-bar` row-gap 4px、`.darkness-bar` margin-top 2px、`#top-controls .btn-small` min-height 44px、`#actions-display .btn-small` 40px、`.combat-bag-close` 40px、手機選角底頁 safe-area 左右 inset。**實測：top-bar 172→137px（16% 螢幕）、按鈕全達 40px+、無橫向溢出。**
+4. **載入效能**：`audio-manager.js` init() 移除 `preloadTracks()`（unlock 保留）→ 頁面載入省 ~40MB（驗證：重載零互動 preloadedTracks=0）；`index.html` **45 個 script 全加 defer**（驗證：全域齊備＋完整流程通）；移除 damage-digits ×10 preload；title-logo preload 去 fetchpriority。
+5. **黑鐵王冠融合預覽**（`relics.js`）：補 `fusedEffect`（與 effect 同欄位）→ 融合前預覽文字恢復顯示；運行時 +10% 本就走 `fusedRelic.id` 檢查（combat.js:514、dark-monsters.js:167），零行為變化。
+6. **find_relic 事件圖**（`event-handlers.js`）：`_openEventRelicChoiceModal` 補 eventImage 傳遞；3 個 find_relic 事件（forest_relic_roots/ruins_relic/cave_relic）仍缺圖，**生圖 prompt 已交付使用者**，圖好後在 events.js 填 `eventImage` 即生效。
+
+快取版本：以上檔案全 bump `?v=full-opt1`。驗證：node --check ×4 全過；defer 煙霧測試（開始→選角→出發→day phase）全通。
+
+審計後**明確跳過**（有驗證依據）：地圖版面重排（v0.97 刻意決策）、面板權重大改（前提被反駁）、CSS 拆檔（需工具鏈）、全死補給/敵池空/mimic null guard（狀態不可達）、戰鬥圖示鈕尺寸（已達標）。
+
+**待使用者實測（推上線前）**：手機實機 top-bar 高度與按鈕手感、defer 後完整一局（含戰鬥/事件/筆記）、黑鐵王冠融合預覽文字。
+
+---
+
+## 上一個 session（2026-06-11）：獵星之眼共鳴效果重做
 
 舊版獵星之眼效果（橘色細準星，當初只播上排 4 格）重做為新版藍色「眼睛＋星陣」8 格 sprite（使用者用自製 AI sprite 對齊工具產出並覆蓋進專案）。
 - `assets/effects/star-hunter-eye-sprite.png`：使用者已覆蓋為新圖（1972×1002，4×2＝8 格；峰值在第 5 格＝左下爆亮鎖定）。

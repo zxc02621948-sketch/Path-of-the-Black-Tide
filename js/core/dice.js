@@ -50,3 +50,23 @@ const Dice = {
     return ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'][n] || '骰';
   },
 };
+
+// 擲骰減速時程：輪盤式 減速→落定；d12 多滾三格（賭注越大滾越久）。
+// onTick 每格換面、onSettle 落定。回傳總時長(ms)供呼叫端排程 callback。
+function diceSpinRun(sides, onTick, onSettle) {
+  const delays = Number(sides) > 6
+    ? [40, 42, 45, 45, 50, 55, 62, 72, 85, 105, 135, 175, 235]
+    : [45, 50, 55, 62, 72, 85, 105, 135, 175, 235];
+  let i = 0;
+  const step = () => {
+    if (i < delays.length - 1) {
+      onTick();
+      i++;
+      setTimeout(step, delays[i]);
+    } else {
+      onSettle();
+    }
+  };
+  setTimeout(step, delays[0]);
+  return delays.reduce((a, b) => a + b, 0);
+}

@@ -236,6 +236,7 @@
     darkRelic: true,
     desc: '主動討伐黑暗化身時，若黑暗化身等級高於 5，戰鬥等級 -2，最低降至 5。被動追殺不會降低等級。',
     effect: { type: 'dark_monster_hunt_weaken', value: 2, minLevel: 5, fusedDamageRate: 0.10, fusedMinBonus: 1 },
+    fusedEffect: { type: 'dark_monster_hunt_weaken', value: 2, minLevel: 5, fusedDamageRate: 0.10, fusedMinBonus: 1 },
     nightOnly: true,
     lore: [
       '黑鐵冠不是為王準備的，而是為仍敢直視黑夜的人。',

@@ -82,6 +82,13 @@ const GameRelicResonance = {
       if (!prev.has(key)) {
         this._log(`聖物共鳴啟動：${res.name}。`, 'reward');
         newly.push(res);
+        try {
+          const seen = JSON.parse(localStorage.getItem('bbn_resonances_seen') || '[]');
+          if (!seen.includes(res.id)) {
+            seen.push(res.id);
+            localStorage.setItem('bbn_resonances_seen', JSON.stringify(seen));
+          }
+        } catch (e) { /* localStorage 不可用時略過 */ }
       }
     }
     if (opts.announceModal && newly.length > 0) {

@@ -2688,30 +2688,19 @@ const GameCombatFlow = {
     diceEl.classList.add('dice-rolling');
     attackerEl.appendChild(diceEl);
 
-    let count = 0;
-    const STEPS = 10;
-    const MS    = 75;
     AudioManager?.playSfx?.('dice');
+    const spinMs = diceSpinRun(sides, () => {
+      const face = randomFace();
+      setDiceFaceClass(diceEl, face);
+      diceEl.innerHTML = pipHtml(face);
+    }, () => {
+      setDiceFaceClass(diceEl, rollResult.value);
+      diceEl.innerHTML = pipHtml(rollResult.value);
+      diceEl.classList.remove('dice-rolling');
+      diceEl.classList.add('dice-pip-settled');
+    });
 
-    const timer = setInterval(() => {
-      count++;
-      if (count < STEPS) {
-        const face = randomFace();
-        setDiceFaceClass(diceEl, face);
-        diceEl.innerHTML = pipHtml(face);
-      } else {
-        clearInterval(timer);
-        setDiceFaceClass(diceEl, rollResult.value);
-        diceEl.innerHTML = pipHtml(rollResult.value);
-        diceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-pip-settled');
-      }
-    }, MS);
-
-    setTimeout(() => {
-      clearInterval(timer);
-      callback();
-    }, MS * STEPS + 320);
+    setTimeout(callback, spinMs + 320);
   },
 
   _showCombatGuardDicePreview(roll, callback) {
@@ -2742,29 +2731,19 @@ const GameCombatFlow = {
     diceEl.classList.add('dice-rolling');
     guardButton.before(diceEl);
 
-    let count = 0;
-    const STEPS = 10;
-    const MS = 75;
     AudioManager?.playSfx?.('dice');
-    const timer = setInterval(() => {
-      count++;
-      if (count < STEPS) {
-        const face = randomFace();
-        setDiceFaceClass(diceEl, face);
-        diceEl.innerHTML = pipHtml(face);
-      } else {
-        clearInterval(timer);
-        setDiceFaceClass(diceEl, roll);
-        diceEl.innerHTML = pipHtml(roll);
-        diceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-pip-settled');
-      }
-    }, MS);
+    const spinMs = diceSpinRun(6, () => {
+      const face = randomFace();
+      setDiceFaceClass(diceEl, face);
+      diceEl.innerHTML = pipHtml(face);
+    }, () => {
+      setDiceFaceClass(diceEl, roll);
+      diceEl.innerHTML = pipHtml(roll);
+      diceEl.classList.remove('dice-rolling');
+      diceEl.classList.add('dice-pip-settled');
+    });
 
-    setTimeout(() => {
-      clearInterval(timer);
-      callback();
-    }, MS * STEPS + 360);
+    setTimeout(callback, spinMs + 360);
   },
 
   _showModalDicePreview(rollResult, label, callback) {
@@ -2798,26 +2777,19 @@ const GameCombatFlow = {
     };
     setDiceFaceClass(diceEl, initialTrapFace);
     diceEl.classList.add('dice-rolling');
-    let count = 0;
-    const STEPS = 10;
-    const MS = 75;
     AudioManager?.playSfx?.('dice');
-    const timer = setInterval(() => {
-      count++;
-      if (count < STEPS) {
-        const face = Math.ceil(Math.random() * 6);
-        setDiceFaceClass(diceEl, face);
-        diceEl.innerHTML = pipHtml(face);
-      } else {
-        clearInterval(timer);
-        setDiceFaceClass(diceEl, rollResult.value);
-        diceEl.innerHTML = pipHtml(rollResult.value);
-        diceEl.classList.remove('dice-rolling');
-        diceEl.classList.add('dice-pip-settled');
-      }
-    }, MS);
+    const spinMs = diceSpinRun(6, () => {
+      const face = Math.ceil(Math.random() * 6);
+      setDiceFaceClass(diceEl, face);
+      diceEl.innerHTML = pipHtml(face);
+    }, () => {
+      setDiceFaceClass(diceEl, rollResult.value);
+      diceEl.innerHTML = pipHtml(rollResult.value);
+      diceEl.classList.remove('dice-rolling');
+      diceEl.classList.add('dice-pip-settled');
+    });
 
-    setTimeout(() => { clearInterval(timer); callback(); }, MS * STEPS + 320);
+    setTimeout(callback, spinMs + 320);
   },
 
   _diceThemeClassFromLabel(label = '') {

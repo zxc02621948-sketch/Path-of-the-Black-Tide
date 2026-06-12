@@ -98,6 +98,21 @@ const Render = {
     if (darknessNum) darknessNum.textContent = `${darkness} / ${meterMax}`;
     if (lightChargesDisplay) lightChargesDisplay.textContent = '';
     if (darknessFill) darknessFill.style.width = `${Math.min(100, (darkness / meterMax) * 100)}%`;
+    if (darknessNum) {
+      let nextEl = document.getElementById('darkness-next');
+      if (!nextEl) {
+        nextEl = document.createElement('span');
+        nextEl.id = 'darkness-next';
+        darknessNum.insertAdjacentElement('afterend', nextEl);
+      }
+      const bossT = CONFIG.DARKNESS_BOSS_THRESHOLD || 5;
+      const corruptT = CONFIG.DARKNESS_CORRUPT_THRESHOLD || 7;
+      nextEl.textContent = darkness < bossT
+        ? `距化身甦醒 ${bossT - darkness}`
+        : (darkness < corruptT
+          ? `距侵蝕加劇 ${corruptT - darkness}`
+          : (darkness < meterMax ? `距吞噬 ${meterMax - darkness}` : '吞噬邊界'));
+    }
     if (darknessDisplay) {
       darknessDisplay.classList.toggle('light', false);
       darknessDisplay.classList.toggle('alert', darkness >= CONFIG.DARKNESS_BOSS_THRESHOLD);
@@ -1237,6 +1252,7 @@ const Render = {
     overlay.innerHTML = '<div class="gameover-intro-red"></div><img src="assets/game-over-bg.png" alt="GAME OVER">';
     overlay.setAttribute('aria-hidden', 'false');
     overlay.classList.add('active');
+    if (state?.deathInfo?.isAvatar) AudioManager?.playSfx?.('darkMonsterGrowl', 0.4);
 
     window.setTimeout(() => overlay.classList.add('fade-image'), 1200);
     window.setTimeout(() => {
@@ -1264,8 +1280,14 @@ const Render = {
       dawn: '黎明抵達',
       devoured: '黑暗吞噬',
     };
+    const deathInfo = state.deathInfo || null;
+    let loseDesc = '小隊倒在黑潮之途上。';
+    if (deathInfo?.name) {
+      const lv = deathInfo.level != null ? ` Lv.${deathInfo.level}` : '';
+      loseDesc = `第 ${deathInfo.day} 天${deathInfo.night ? '夜裡' : ''}，${deathInfo.name}${lv} 終結了這支小隊。`;
+    }
     const descs = {
-      lose: '小隊倒在黑潮之途上。',
+      lose: loseDesc,
       evacuate: '你們帶著殘存的火光撤離了邊境。',
       dawn: '黑夜退去，黎明終於抵達。',
       devoured: '黑暗值達到極限，邊境吞沒了一切。',
@@ -1280,11 +1302,61 @@ const Render = {
     const survived = state.squad.map(c => c.name).join('、') || '無';
     const relics = state.squad.flatMap(c => [c.relic, c.fusedRelic].filter(Boolean)).map(r => r.name).join('、') || '無';
 
+    const tips = [];
+    if (result === 'devoured') tips.push('黑暗值可透過「主動討伐黑暗化身」與神壇選項降低——別讓它漲到 20。');
+    if (result === 'lose' && deathInfo?.isAvatar) tips.push('化身頭上的綠/黃/紅光是追獵倒數——主動討伐能自己挑開戰時機，比被追上有利。');
+    if (result === 'lose' && !deathInfo?.isAvatar && (state.day || 0) <= 4) tips.push('開局別硬拚：原地休息可全隊回血；戰鬥中「格檔」不消耗主戰出手。');
+    if ((result === 'lose' || result === 'devoured') && !state.squad.some(c => c.fusedRelic)) tips.push('神壇融合是流派的起點——扣一點永久生命，換一次質變。');
+    const tipsHtml = tips.slice(0, 2).map(t => `<div class="gameover-tip">☾ ${t}</div>`).join('');
+
+    let seenRes = [];
+    try { seenRes = JSON.parse(localStorage.getItem('bbn_resonances_seen') || '[]'); } catch (e) { /* ignore */ }
+    const gallery = this._resonanceGallery();
+    const seenCount = gallery.filter(r => seenRes.includes(r.id)).length;
+    const wallHtml = `
+      <div class="resonance-wall">
+        <div class="resonance-wall-title">共鳴見證　${seenCount} / ${gallery.length}</div>
+        <div class="resonance-wall-icons">
+          ${gallery.map(r => {
+            const seen = seenRes.includes(r.id);
+            return `<img class="resonance-wall-icon${seen ? ' seen' : ''}" src="${r.icon}" alt="" title="${seen ? r.name : '未見證的共鳴——融合不同的聖物試試'}">`;
+          }).join('')}
+        </div>
+      </div>`;
+
     document.getElementById('gameover-results').innerHTML = `
       <div class="gameover-result-line"><span>倖存者：${survived}</span><span>攜帶聖物：${relics}</span></div>
       <div>存活天數：${state.day} 天</div>
       ${state.libraryUnlocked && !state.libraryUnlockedAtStart ? '<div style="color:var(--accent)">聖物庫已解鎖</div>' : ''}
+      ${tipsHtml}
+      ${wallHtml}
     `;
+  },
+
+  _resonanceGallery() {
+    return [
+      { id: 'pain_resonance', name: '痛痕爆發', icon: 'assets/relics/pain-burst-resonance.png' },
+      { id: 'pain_scar_resonance', name: '痛痕折磨', icon: 'assets/relics/pain-torment-resonance.png' },
+      { id: 'greatsword_resonance', name: '沉鐵劍律', icon: 'assets/relics/iron-scabbard-resonance.png' },
+      { id: 'rapier_resonance', name: '銀蜂劍律', icon: 'assets/relics/silver-bee-rapier-resonance.png' },
+      { id: 'dodeca_fate_dice', name: '十二面命運骰', icon: 'assets/relics/dodeca-fate-dice-resonance.png' },
+      { id: 'dodeca_lucky_dice', name: '十二面幸運骰', icon: 'assets/relics/dodeca-lucky-dice-resonance.png' },
+      { id: 'star_hunter_eye', name: '獵星之眼', icon: 'assets/relics/star-hunter-eye-resonance.png' },
+      { id: 'star_breaker_eye', name: '裂星破滅', icon: 'assets/relics/star-breaker-eye-resonance.png' },
+      { id: 'dual_banner_formation', name: '雙旗戰陣', icon: 'assets/relics/dual-banner-formation-resonance.png' },
+    ];
+  },
+
+  renderCareerStrip() {
+    const el = document.getElementById('career-strip');
+    if (!el) return;
+    let career = {};
+    try { career = JSON.parse(localStorage.getItem('bbn_career') || '{}'); } catch (e) { /* ignore */ }
+    if (!career.runs) { el.hidden = true; return; }
+    const parts = [`第 ${career.runs + 1} 次遠征`, `最遠抵達第 ${Math.max(1, career.bestDay || 1)} 天`];
+    if (career.dawnCount > 0) parts.push(`黎明 ${career.dawnCount} 次`);
+    el.innerHTML = parts.join('｜') + (career.dawnCount > 0 ? '' : '<span class="career-hook">黎明，尚未有人見過。</span>');
+    el.hidden = false;
   },
 
   // Section.

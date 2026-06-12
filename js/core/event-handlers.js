@@ -255,6 +255,8 @@ const GameEventHandlers = {
     G.eventRelicChoiceContext = { cell, ev, relicChoices };
     this._openModal({
       title: ev.name,
+      eventImage: ev.eventImage || '',
+      eventImageAlt: ev.name || '',
       descHtml: `
         <div class="event-relic-choice-intro">
           <p>${this._escapeEventHtml(`${this._eventDiceText(ev)}${ev.desc || ''}`)}</p>
