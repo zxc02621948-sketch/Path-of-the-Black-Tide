@@ -963,14 +963,12 @@ const Render = {
         if (!char.relic && !char.fusedRelic) return `<span class="card-val dim">無</span>`;
         const parts = [];
         if (char.fusedRelic) {
-          parts.push(`<span class="card-relic-name fused">${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-card-icon')}</span>
-            <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','fusedRelic')">查看</button>`);
+          parts.push(`<span class="card-relic-line"><span class="card-relic-name fused" title="${char.fusedRelic.name || ''}">${EquipmentIcon.label(char.fusedRelic, 'equipment-inline-icon relic-card-icon')}</span><button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','fusedRelic')">查看</button></span>`);
         }
         if (char.relic) {
-          parts.push(`<span class="card-relic-name">${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-card-icon')}</span>
-            <button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','relic')">查看</button>`);
+          parts.push(`<span class="card-relic-line"><span class="card-relic-name" title="${char.relic.name || ''}">${EquipmentIcon.label(char.relic, 'equipment-inline-icon relic-card-icon')}</span><button class="btn-tiny" onclick="Game.showRelicDetail('${char.id}','relic')">查看</button></span>`);
         }
-        return parts.join('<br>');
+        return parts.join('');
       })();
 
       const weaponHtml = char.weapon

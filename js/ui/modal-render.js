@@ -1507,8 +1507,14 @@ const RenderModal = {
       stamp.textContent = tier === 'finisher' ? '終結' : '重擊';
       pop.appendChild(stamp);
     }
-    const x = targetRect.left - sceneRect.left + targetRect.width / 2;
-    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104) + (opts.offsetY || 0);
+    // 同目標短時間內的多筆數字（本體＋濺射/連擊）錯開排列，避免疊成一個假數字（如 11+1 疊成 111）。
+    const concurrent = targetEl._dmgPopActive || 0;
+    targetEl._dmgPopActive = concurrent + 1;
+    setTimeout(() => { targetEl._dmgPopActive = Math.max(0, (targetEl._dmgPopActive || 1) - 1); }, 1100);
+    const lateralShift = concurrent ? (concurrent % 2 === 1 ? 1 : -1) * Math.ceil(concurrent / 2) * 38 : 0;
+    const verticalShift = concurrent * 14;
+    const x = targetRect.left - sceneRect.left + targetRect.width / 2 + lateralShift;
+    const y = targetRect.top - sceneRect.top + (opts.side === 'ally' ? 30 : 104) + (opts.offsetY || 0) - verticalShift;
     pop.style.left = `${Math.round(x)}px`;
     pop.style.top = `${Math.round(y)}px`;
     sceneEl.appendChild(pop);
@@ -1814,6 +1820,8 @@ const RenderModal = {
         ?.find?.(item => item?.id === event.targetId);
       if (char?._deathSfxPlayed) return;
       if (char) char._deathSfxPlayed = true;
+      // 倒下視覺與慘叫同幀套用，避免「先慘叫、演出跑完才倒下」的時間差。
+      findAllyUnit(event.targetId)?.classList.add('down');
       AudioManager?.playSfx?.(event.deathSfx, event.deathSfxVolume ?? 0.58);
     };
     const damageEvents = Array.isArray(playerDamageEvents) ? playerDamageEvents : [];
@@ -2071,6 +2079,23 @@ const RenderModal = {
               if (event.to <= 0) playAllyDeathSfxOnce(event);
             }
           }, hitOffset);
+        });
+        // 濺射等命中其他隊友的事件：補上受擊反應與傷害數字（原本被主目標過濾掉，造成日誌有傷害、演出沒數字）。
+        const splashEvents = incomingEvents.filter(item => item?.targetId && item.targetId !== counterTarget);
+        splashEvents.forEach((event, index) => {
+          setTimeout(() => {
+            const splashEl = findAllyUnit(event.targetId);
+            if (splashEl) {
+              const fxTier = this._playCombatDamageReaction(splashEl, event.damage);
+              if (Number.isFinite(event.allyBlockAfter)) this._setDisplayedAllyBlock(event.targetId, event.allyBlockAfter);
+              if (event.fullBlock) playFullBlockSfx();
+              setTimeout(() => this._showCombatDamageNumber(splashEl, event.damage, { side: 'ally', scene: combatScene, tier: fxTier }), 110);
+            }
+            if (Number.isFinite(event.to)) {
+              this._setDisplayedAllyHp(event.targetId, event.to);
+              if (event.to <= 0) playAllyDeathSfxOnce(event);
+            }
+          }, 140 + index * 130);
         });
       }
       if (remainingBlocks) {

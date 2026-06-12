@@ -386,8 +386,17 @@ const GameStateHelpers = {
     char.deathLocation = { x: G.playerX, y: G.playerY };
     const deathSfx = char.deathSfx || (typeof CLASS_DEATH_SFX !== 'undefined' ? CLASS_DEATH_SFX[char.cls] : '');
     if (deathSfx && !char._deathSfxPlayed) {
-      char._deathSfxPlayed = true;
-      AudioManager?.playSfx?.(deathSfx, char.deathSfxVolume ?? 0.58);
+      if (G.combat) {
+        // 戰鬥中交給演出層在命中拍點播放（同步倒下視覺）；2.5 秒後若仍未播，補播保險。
+        setTimeout(() => {
+          if (char._deathSfxPlayed || !char.dead) return;
+          char._deathSfxPlayed = true;
+          AudioManager?.playSfx?.(deathSfx, char.deathSfxVolume ?? 0.58);
+        }, 2500);
+      } else {
+        char._deathSfxPlayed = true;
+        AudioManager?.playSfx?.(deathSfx, char.deathSfxVolume ?? 0.58);
+      }
     }
     this._log(`${char.name} 倒下了。`, 'danger');
 

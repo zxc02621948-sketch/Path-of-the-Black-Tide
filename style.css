@@ -1227,9 +1227,18 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
 .status-critical { color: #9a2020; }
 .status-shield   { color: #4a7aaa; }
 
-/* 聖物文字 */
+/* 聖物文字：一個聖物固定一行，名字彈性收縮、查看鈕不被擠落行 */
+.card-relic-line {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.card-relic-line + .card-relic-line { margin-top: 2px; }
 .card-relic-name {
   display: inline-block;
+  flex: 1;
+  min-width: 0;
   max-width: calc(100% - 48px);
   color: #4a9a9a;
   overflow: hidden;
@@ -1237,6 +1246,8 @@ body.combat-preimpact-world-finisher #event-modal:not(.hidden) .modal-content.co
   white-space: nowrap;
   vertical-align: bottom;
 }
+.card-relic-line .card-relic-name { max-width: none; }
+.card-relic-line .btn-tiny { flex: 0 0 auto; }
 .card-relic-name.fused  { color: #9a5aaa; }
 
 /* 裝備列 */
@@ -11908,6 +11919,12 @@ body::before {
   z-index: 2;
 }
 
+/* 引導徽章維持絕對定位，不被相鄰高亮的子元素規則拉回文流 */
+.map-cell.adjacent-highlight > .guide-quest-badge {
+  position: absolute;
+  z-index: 5;
+}
+
 .map-cell.type-empty.adjacent-highlight:not(.fog) {
   background:
     radial-gradient(circle at 50% 42%, rgba(201, 145, 47, .08), transparent 56%),
@@ -14421,4 +14438,12 @@ body::before {
     font-size: .9em;
     line-height: 1.43;
   }
+}
+
+/* ── QA polish：日誌面板外框不捲動，僅訊息列表捲動（標題釘頂、指引任務卡釘底） ── */
+#log-panel { overflow-y: hidden; }
+#log-messages {
+  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
 }

@@ -1575,7 +1575,9 @@ const GameCombatFlow = {
                 : null)),
           choices: this._combatActionChoices(),
         });
-        if (!hasActableNext && this._combatShouldAutoSkipPlayerTurn()) {
+        if (!hasActableNext) {
+          // 不在此同步呼叫 _combatShouldAutoSkipPlayerTurn 把關：此刻動畫鎖(actionInProgress)常為 true 會誤判，
+          // 導致跳過機制從未排程（單人被震攝＝卡死）。改由排程觸發時自行驗證＋重試。
           this._scheduleAutoSkipPlayerTurn(this._combatResultAnimDuration(combatAnims, combatResult.enemyDiceRoll ? { animate: true } : null) + 240);
         }
     },
@@ -1977,11 +1979,21 @@ const GameCombatFlow = {
     if (!G.combat) return;
     const token = `${G.combat.round || 1}-${Date.now()}-${Math.random()}`;
     G.combat.autoSkipToken = token;
-    window.setTimeout(() => {
+    const attempt = retriesLeft => {
       if (!G.combat || G.combat.autoSkipToken !== token) return;
-      if (!this._combatShouldAutoSkipPlayerTurn()) return;
+      const stuck = this._aliveSquad().length > 0
+        && this._combatActableSquad().length === 0
+        && !this._combatItemTargeting()
+        && !this._combatGuardTargeting();
+      if (!stuck) return;
+      if (G.combat.actionInProgress) {
+        // 動畫鎖未解就放棄＝卡死；改為重試直到鎖解開（防呆上限 10 次）。
+        if (retriesLeft > 0) window.setTimeout(() => attempt(retriesLeft - 1), 600);
+        return;
+      }
       this._skipCombatTurnForNoActingCharacters();
-    }, Math.max(0, delayMs || 0));
+    };
+    window.setTimeout(() => attempt(10), Math.max(0, delayMs || 0));
   },
 
   _skipCombatTurnForNoActingCharacters() {
